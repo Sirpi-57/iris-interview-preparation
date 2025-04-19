@@ -1,0 +1,2565 @@
+// IRIS - Interview Readiness & Improvement System
+// Main JavaScript file (with basic continuous voice attempt)
+
+// Global State
+const state = {
+    sessionId: null,
+    interviewId: null,
+    mediaRecorder: null,
+    audioChunks: [],
+    isRecording: false,
+    recordingStartTime: null,
+    recordingTimer: null, // For visual timer display
+    videoStream: null, // Holds the combined video/audio stream from getUserMedia
+    interviewType: 'general',
+    conversationHistory: [], // Stores { role: 'user'/'assistant', content: '...' }
+
+    // -- State for Continuous Voice Attempt --
+    isInterviewActive: false, // Is an interview session running?
+    isAIResponding: false,    // Is the AI currently speaking (TTS)?
+    silenceTimer: null,       // Timer ID for detecting end-of-speech silence
+    silenceDelay: 2500,       // ms of silence AFTER speech before stopping (ADJUST AS NEEDED - increased slightly)
+    // --- Web Audio API VAD State ---
+    audioContext: null,       // AudioContext instance
+    analyserNode: null,       // AnalyserNode for volume detection
+    audioSourceNode: null,    // Source node from the microphone stream
+    audioDataArray: null,     // Uint8Array to store frequency data
+    vadAnimationFrameId: null,// ID for the requestAnimationFrame loop
+    speechDetectedInChunk: false, // Flag: Has speech been detected since recording started/last silence?
+};
+
+// --- Constants for VAD ---
+// Adjust this threshold based on testing with your microphone sensitivity
+// Lower values are more sensitive to noise, higher values might miss quiet speech.
+// Typical range on 0-255 scale might be 40-70.
+const SPEECH_THRESHOLD = 55; // Example value (0-255)
+const FFT_SIZE = 256;        // Smaller FFT size for faster analysis, less frequency detail needed
+
+// API Base URL - Make sure this points to your BACKEND (port 5000)
+const API_BASE_URL = 'https://cuddly-trout-wrqrxpw6vqwc7gq-5000.app.github.dev'; // No trailing slash
+
+// DOM Elements Cache (Optional but good practice)
+const DOMElements = {
+    sidebar: document.getElementById('sidebar'),
+    content: document.getElementById('content'),
+    // Add other frequently accessed elements if needed
+};
+
+document.addEventListener('DOMContentLoaded', function() {
+    // Initialize UI interactions
+    initNavigation();
+    initButtons();
+    initForms();
+
+    // Load available browser voices (for fallback TTS)
+    loadVoices();
+    if (speechSynthesis.onvoiceschanged !== undefined) {
+        speechSynthesis.onvoiceschanged = loadVoices;
+    }
+
+    // Check for any saved session
+    checkForExistingSession();
+
+    // Check browser support
+    checkBrowserSupport();
+});
+
+// --- Initialization Functions ---
+
+function loadVoices() {
+    const voices = window.speechSynthesis.getVoices();
+    console.log('Available browser voices:', voices.map(v => `${v.name} (${v.lang})`));
+    // You could potentially try to find an Indian voice here for the fallback
+    // state.fallbackVoice = voices.find(voice => voice.lang === 'en-IN');
+}
+
+function checkBrowserSupport() {
+     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        alert('Your browser does not support the necessary media features for the interactive interview. Please use a modern browser like Chrome, Firefox, or Edge.');
+    }
+    // MediaRecorder support is crucial for sending audio
+    if (typeof MediaRecorder === 'undefined') {
+         alert('Your browser does not support the MediaRecorder API needed for voice input.');
+    }
+}
+
+
+function initNavigation() {
+    const navItems = document.querySelectorAll('.nav-item');
+    navItems.forEach(item => {
+        item.addEventListener('click', function() {
+            const targetSection = this.getAttribute('data-target');
+            // Prevent navigation if locked (unless it's the upload/landing section)
+            const isLocked = this.querySelector('.status-indicator.locked');
+            if (this.classList.contains('active') || (isLocked && targetSection !== 'upload' && targetSection !== 'landing')) {
+                return;
+            }
+
+            // Switch active nav item
+            document.querySelector('.nav-item.active')?.classList.remove('active');
+            this.classList.add('active');
+
+            // Switch active content section
+            document.querySelector('.content-section.active')?.classList.remove('active');
+            document.getElementById(targetSection)?.classList.add('active');
+
+            // Special actions when navigating
+            if (targetSection === 'history') {
+                loadProgressHistory();
+            }
+        });
+    });
+}
+
+function initButtons() {
+    // --- General Navigation ---
+    document.getElementById('getStartedBtn')?.addEventListener('click', () => navigateTo('upload'));
+    document.getElementById('viewPrepPlanBtn')?.addEventListener('click', () => navigateTo('prep-plan'));
+    document.getElementById('startInterviewBtn')?.addEventListener('click', () => {
+        navigateTo('mock-interview');
+        showPermissionsModal(); // Request permissions before starting
+    });
+     document.getElementById('startNewInterviewBtn')?.addEventListener('click', () => {
+        navigateTo('mock-interview');
+        showPermissionsModal();
+    });
+    document.getElementById('viewProgressBtn')?.addEventListener('click', () => navigateTo('history')); // History loading is handled in navigateTo/initNavigation
+    document.getElementById('startAnotherInterviewBtn')?.addEventListener('click', () => {
+        navigateTo('mock-interview');
+        showPermissionsModal();
+    });
+
+
+    // --- Mock Interview Controls ---
+     document.getElementById('endInterviewBtn')?.addEventListener('click', endInterview); // End interview
+
+    const interviewTypeButtons = document.querySelectorAll('#interviewTypeSelector button');
+    interviewTypeButtons.forEach(button => {
+        button.addEventListener('click', function() {
+            interviewTypeButtons.forEach(btn => btn.classList.remove('active'));
+            this.classList.add('active');
+            state.interviewType = this.getAttribute('data-type');
+        });
+    });
+
+    document.getElementById('toggleCameraBtn')?.addEventListener('click', toggleCamera);
+    document.getElementById('toggleMicBtn')?.addEventListener('click', toggleMicrophone);
+
+    // Text input (still useful as a backup or alternative)
+    document.getElementById('sendReplyBtn')?.addEventListener('click', sendTextReply);
+    document.getElementById('userReplyInput')?.addEventListener('keyup', (event) => {
+        if (event.key === 'Enter') sendTextReply();
+    });
+
+     // Permissions Modal
+    document.getElementById('grantPermissionsBtn')?.addEventListener('click', setupMediaDevices);
+
+    // --- Recording Buttons (Now potentially hidden/repurposed for continuous mode) ---
+    const voiceReplyBtn = document.getElementById('voiceReplyBtn');
+    const stopRecordingBtn = document.getElementById('stopRecordingBtn');
+    if(voiceReplyBtn) voiceReplyBtn.style.display = 'none'; // Hide manual start
+    if(stopRecordingBtn) stopRecordingBtn.style.display = 'none'; // Hide manual stop
+
+    // Example: repurpose voiceReplyBtn icon for listening state
+    if(voiceReplyBtn) {
+        voiceReplyBtn.disabled = true; // Make it non-interactive
+        // We'll toggle classes on its icon later maybe
+    }
+}
+
+function initForms() {
+    const resumeUploadForm = document.getElementById('resumeUploadForm');
+    if (resumeUploadForm) {
+        resumeUploadForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            uploadResumeAndAnalyze();
+        });
+    }
+}
+
+// --- UI Navigation & State ---
+
+function navigateTo(sectionId) {
+    document.querySelectorAll('.nav-item').forEach(item => {
+        item.classList.remove('active');
+        if (item.getAttribute('data-target') === sectionId) {
+            item.classList.add('active');
+        }
+    });
+
+    document.querySelectorAll('.content-section').forEach(section => {
+        section.classList.remove('active');
+    });
+    const targetElement = document.getElementById(sectionId);
+    if (targetElement) {
+        targetElement.classList.add('active');
+        // Special actions after navigation
+        if (sectionId === 'history') {
+             loadProgressHistory(); // Load history data when navigating to history tab
+        }
+         if (sectionId === 'mock-interview' && !state.videoStream) {
+            // If navigating to interview and stream isn't setup, prompt for permissions
+            // showPermissionsModal(); // This is now triggered by buttons explicitly
+        }
+    } else {
+        console.error(`Navigation target not found: ${sectionId}`);
+    }
+}
+
+function unlockSection(sectionId) {
+    const navItem = document.getElementById(`nav-${sectionId}`);
+    if (navItem) {
+        const lockIcon = navItem.querySelector('.status-indicator');
+        if (lockIcon && lockIcon.classList.contains('locked')) {
+            lockIcon.classList.remove('locked');
+            lockIcon.classList.add('unlocked');
+            lockIcon.innerHTML = '<i class="fas fa-check"></i>';
+        }
+    }
+}
+
+function lockSection(sectionId) {
+     const navItem = document.getElementById(`nav-${sectionId}`);
+    if (navItem) {
+        const lockIcon = navItem.querySelector('.status-indicator');
+        if (lockIcon && lockIcon.classList.contains('unlocked')) {
+            lockIcon.classList.remove('unlocked');
+            lockIcon.classList.add('locked');
+            lockIcon.innerHTML = '<i class="fas fa-lock"></i>';
+        }
+    }
+}
+
+function checkForExistingSession() {
+    const savedSessionId = localStorage.getItem('irisSessionId');
+    if (savedSessionId) {
+        console.log(`Found existing session ID: ${savedSessionId}`);
+        state.sessionId = savedSessionId;
+        checkAnalysisStatus(savedSessionId); // Check if analysis was completed previously
+    } else {
+        // Lock sections that depend on analysis if no session found
+        lockSection('analysis');
+        lockSection('prep-plan');
+        lockSection('mock-interview');
+        lockSection('performance');
+        lockSection('history');
+    }
+}
+
+// --- API Communication ---
+
+function uploadResumeAndAnalyze() {
+    const form = document.getElementById('resumeUploadForm');
+    if (!form) return;
+    const formData = new FormData(form);
+    const progressContainer = document.getElementById('uploadProgress');
+    const progressBar = progressContainer?.querySelector('.progress-bar');
+    const progressMessage = document.getElementById('progressMessage');
+
+    if (!progressContainer || !progressBar || !progressMessage) {
+        console.error("Progress UI elements not found.");
+        return;
+    }
+
+    // Basic validation
+    if (!formData.get('resumeFile') || !formData.get('jobDescription')) {
+        alert("Please select a resume file and provide a job description.");
+        return;
+    }
+
+    progressContainer.style.display = 'block';
+    progressBar.style.width = '10%';
+    progressBar.classList.remove('bg-success', 'bg-danger');
+    progressMessage.textContent = 'Uploading files...';
+
+    fetch(`${API_BASE_URL}/analyze-resume`, {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => {
+        if (!response.ok) {
+            // Attempt to read error message from backend
+            return response.json().then(errData => {
+                throw new Error(errData.error || `Network response was not ok (${response.status})`);
+            }).catch(() => {
+                // If backend didn't send JSON error
+                 throw new Error(`Network response was not ok (${response.status})`);
+            });
+        }
+        return response.json();
+    })
+    .then(data => {
+        console.log('Upload response:', data);
+        if (!data.sessionId) {
+             throw new Error("Backend did not return a session ID.");
+        }
+        state.sessionId = data.sessionId;
+        localStorage.setItem('irisSessionId', data.sessionId); // Save session ID
+
+        progressMessage.textContent = 'Analyzing resume...';
+        pollAnalysisStatus(data.sessionId); // Start polling
+    })
+    .catch(error => {
+        console.error('Error uploading resume:', error);
+        progressMessage.textContent = `Error: ${error.message}`;
+        if(progressBar) progressBar.classList.add('bg-danger');
+    });
+}
+
+function pollAnalysisStatus(sessionId) {
+    const progressContainer = document.getElementById('uploadProgress');
+    const progressBar = progressContainer?.querySelector('.progress-bar');
+    const progressMessage = document.getElementById('progressMessage');
+
+     if (!progressContainer || !progressBar || !progressMessage) return; // Exit if elements aren't there
+
+    const checkStatus = () => {
+        // If session changed or cleared, stop polling
+        if (state.sessionId !== sessionId) {
+            console.log("Session changed, stopping polling for", sessionId);
+            return;
+        }
+
+        fetch(`${API_BASE_URL}/get-analysis-status/${sessionId}`)
+        .then(response => {
+            if (response.status === 404) {
+                 localStorage.removeItem('irisSessionId'); // Session expired/not found
+                 throw new Error('Session not found or expired. Please upload again.');
+            }
+            if (!response.ok) {
+                throw new Error(`Network response was not ok (${response.status})`);
+            }
+            return response.json();
+        })
+        .then(statusData => {
+            console.log('Status update:', statusData);
+
+            progressBar.style.width = `${statusData.progress || 0}%`;
+
+            if (statusData.status === 'completed') {
+                progressMessage.textContent = 'Analysis complete!';
+                progressBar.classList.add('bg-success');
+
+                unlockSection('analysis');
+                unlockSection('prep-plan');
+                unlockSection('mock-interview'); // Unlock interview now
+
+                loadAnalysisResults(sessionId);
+                loadPreparationPlan(sessionId);
+
+                setTimeout(() => {
+                    navigateTo('analysis');
+                    progressContainer.style.display = 'none';
+                }, 1500);
+
+            } else if (statusData.status === 'failed') {
+                progressMessage.textContent = `Error: ${statusData.errors?.[0] || 'Analysis failed'}`;
+                progressBar.classList.add('bg-danger');
+            } else { // Still processing
+                progressMessage.textContent = `Analyzing resume (${statusData.progress || 0}%)...`;
+                // Schedule next poll only if still processing
+                 setTimeout(checkStatus, 3000); // Poll slightly less frequently
+            }
+        })
+        .catch(error => {
+            console.error('Error checking status:', error);
+            progressMessage.textContent = `Error: ${error.message}`;
+            progressBar.classList.add('bg-danger');
+            if (error.message.includes('Session not found')) {
+                 // Reset relevant UI?
+            }
+        });
+    };
+    checkStatus(); // Start the first check
+}
+
+// Check status of an existing session on page load
+function checkAnalysisStatus(sessionId) {
+    fetch(`${API_BASE_URL}/get-analysis-status/${sessionId}`)
+    .then(response => {
+        if (response.status === 404) {
+            localStorage.removeItem('irisSessionId');
+            state.sessionId = null;
+            lockSection('analysis'); // Lock sections again
+            lockSection('prep-plan');
+            lockSection('mock-interview');
+            lockSection('performance');
+            lockSection('history');
+            return null; // Stop processing
+        }
+        if (!response.ok) throw new Error('Network response was not ok');
+        return response.json();
+    })
+    .then(statusData => {
+        if (!statusData) return; // Exit if session was not found
+
+        if (statusData.status === 'completed') {
+            console.log("Existing session analysis complete. Loading data.");
+            unlockSection('analysis');
+            unlockSection('prep-plan');
+            unlockSection('mock-interview');
+            // Check if there's interview history to unlock performance/history
+            fetch(`${API_BASE_URL}/get-progress-history/${sessionId}`)
+                .then(res => res.ok ? res.json() : null)
+                .then(historyData => {
+                    if (historyData && historyData.interviews?.length > 0) {
+                         unlockSection('performance'); // Unlock based on existing history
+                         unlockSection('history');
+                    }
+                });
+
+            loadAnalysisResults(sessionId);
+            loadPreparationPlan(sessionId);
+        } else if (statusData.status === 'processing') {
+             console.log("Existing session still processing. Restarting polling.");
+             // If user reloads page while processing
+             document.getElementById('uploadProgress').style.display = 'block'; // Show progress bar again
+             pollAnalysisStatus(sessionId);
+        } else {
+            // Failed or unknown status, treat as needing new upload
+             localStorage.removeItem('irisSessionId');
+             state.sessionId = null;
+        }
+    })
+    .catch(error => {
+        console.error('Error checking existing session status:', error);
+        localStorage.removeItem('irisSessionId');
+        state.sessionId = null;
+    });
+}
+
+
+function loadAnalysisResults(sessionId) {
+    fetch(`${API_BASE_URL}/get-full-analysis/${sessionId}`)
+    .then(response => {
+        if (!response.ok) throw new Error('Network response was not ok');
+        return response.json();
+    })
+    .then(data => {
+        console.log('Analysis results loaded:', data);
+        displayAnalysisResults(data); // Separate display logic
+    })
+    .catch(error => {
+        console.error('Error loading full analysis results:', error);
+        document.getElementById('analysis').innerHTML = `<div class="alert alert-danger">Error loading analysis results: ${error.message}</div>`;
+    });
+}
+
+function loadPreparationPlan(sessionId) {
+     fetch(`${API_BASE_URL}/get-full-analysis/${sessionId}`)
+    .then(response => {
+        if (!response.ok) throw new Error('Network response was not ok');
+        return response.json();
+    })
+    .then(data => {
+        console.log('Prep plan data loaded:', data);
+        displayPreparationPlan(data); // Separate display logic
+    })
+    .catch(error => {
+        console.error('Error loading preparation plan data:', error);
+         document.getElementById('prep-plan').innerHTML = `<div class="alert alert-danger">Error loading preparation plan: ${error.message}</div>`;
+    });
+}
+
+function rewriteResumeSection(section) {
+    if (!state.sessionId) {
+        alert('No active session. Please analyze a resume first.');
+        return;
+    }
+    console.log(`Requesting rewrite for section: ${section}`);
+    // Add a loading indicator?
+    const button = document.querySelector(`.rewrite-section-btn[data-section="${section}"]`);
+    if(button) button.textContent = 'Rewriting...'; button.disabled = true;
+
+    fetch(`${API_BASE_URL}/rewrite-resume-section`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionId: state.sessionId, section: section })
+    })
+    .then(response => {
+        if (!response.ok) throw new Error('Network response was not ok');
+        return response.json();
+    })
+    .then(data => {
+        console.log('Rewrite result:', data);
+        displayRewriteResult(data, section); // Show result (e.g., in a modal)
+    })
+    .catch(error => {
+        console.error('Error rewriting resume section:', error);
+        alert(`Error rewriting section: ${error.message}`);
+    })
+    .finally(() => {
+         if(button) button.textContent = 'Rewrite this section'; button.disabled = false; // Reset button
+    });
+}
+
+// --- Display Functions ---
+
+// --- Function to modify in app.js ---
+// Replace the existing displayAnalysisResults function
+
+function displayAnalysisResults(data) {
+    if (!data || !data.matchResults) {
+        document.getElementById('analysis').innerHTML = '<div class="alert alert-warning">Analysis data is missing or incomplete.</div>';
+        return;
+    }
+    const matchResults = data.matchResults;
+
+    // Match Score
+    const scoreValue = matchResults.matchScore || 0;
+    document.getElementById('matchScore').textContent = scoreValue;
+    document.querySelector('.match-score-circle')?.style.setProperty('--percentage', `${scoreValue}%`);
+    let scoreDesc = "Analysis";
+    if (scoreValue >= 80) scoreDesc = "Excellent Match";
+    else if (scoreValue >= 60) scoreDesc = "Good Match";
+    else if (scoreValue >= 40) scoreDesc = "Fair Match";
+    else scoreDesc = "Needs Improvement";
+    document.getElementById('matchScoreDescription').textContent = scoreDesc;
+
+    // Match Analysis
+    document.getElementById('matchAnalysis').textContent = matchResults.matchAnalysis || 'No analysis summary available.';
+
+    // Key Strengths
+    const keyStrengthsList = document.getElementById('keyStrengthsList');
+    keyStrengthsList.innerHTML = ''; // Clear loading/previous
+    if (matchResults.keyStrengths?.length > 0) {
+        matchResults.keyStrengths.forEach(strength => {
+            const li = document.createElement('li');
+            li.className = 'list-group-item';
+            li.innerHTML = `<i class="fas fa-check-circle text-success me-2"></i><strong></strong>: `;
+            // Safely add text
+            li.querySelector('strong').textContent = strength.strength || 'N/A';
+            li.appendChild(document.createTextNode(strength.relevance || 'N/A'));
+            keyStrengthsList.appendChild(li);
+        });
+    } else {
+        keyStrengthsList.innerHTML = '<li class="list-group-item text-muted">No specific strengths highlighted for this job.</li>';
+    }
+
+    // Skill Gaps
+    const skillGapsList = document.getElementById('skillGapsList');
+    skillGapsList.innerHTML = ''; // Clear loading/previous
+    if (matchResults.skillGaps?.length > 0) {
+        matchResults.skillGaps.forEach(gap => {
+            const li = document.createElement('li');
+            li.className = 'list-group-item';
+            let importanceIcon = 'fa-exclamation-circle text-warning'; // Medium default
+            if (gap.importance?.toLowerCase() === 'high') importanceIcon = 'fa-times-circle text-danger';
+            if (gap.importance?.toLowerCase() === 'low') importanceIcon = 'fa-info-circle text-info';
+            li.innerHTML = `<i class="fas ${importanceIcon} me-2"></i><strong></strong> (${gap.importance || 'N/A'}): `;
+             // Safely add text
+            li.querySelector('strong').textContent = gap.missingSkill || 'N/A';
+            li.appendChild(document.createTextNode(gap.suggestion || 'N/A'));
+            skillGapsList.appendChild(li);
+        });
+    } else {
+        skillGapsList.innerHTML = '<li class="list-group-item text-muted">No critical skill gaps identified.</li>';
+    }
+
+    // --- Resume Improvements (Button Removed) ---
+    const resumeImprovementsContainer = document.getElementById('resumeImprovements');
+    resumeImprovementsContainer.innerHTML = ''; // Clear loading/previous
+    if (matchResults.resumeImprovements?.length > 0) {
+        const accordion = document.createElement('div');
+        accordion.className = 'accordion';
+        accordion.id = 'resumeImprovementsAccordion';
+
+        matchResults.resumeImprovements.forEach((improvement, index) => {
+            const item = document.createElement('div');
+            item.className = 'accordion-item';
+            const headerId = `resumeImproveHeader-${index}`;
+            const collapseId = `resumeImproveCollapse-${index}`;
+
+            const section = improvement.section || 'General';
+            const issue = improvement.issue || 'Suggestion';
+            const recommendation = improvement.recommendation || 'N/A';
+            const example = improvement.example;
+
+            // Use textContent for safety
+            item.innerHTML = `
+                <h2 class="accordion-header" id="${headerId}">
+                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#${collapseId}" aria-expanded="false" aria-controls="${collapseId}">
+                        <i class="fas fa-edit me-2"></i> Improve: <strong></strong> - <span></span>
+                    </button>
+                </h2>
+                <div id="${collapseId}" class="accordion-collapse collapse" aria-labelledby="${headerId}" data-bs-parent="#resumeImprovementsAccordion">
+                    <div class="accordion-body">
+                        <p><strong>Recommendation:</strong> <span class="recommendation-text"></span></p>
+                        ${example ? `<p><strong>Example:</strong> <em><span class="example-text"></span></em></p>` : ''}
+                        </div>
+                </div>`;
+
+            // Safely populate text content
+            item.querySelector('strong').textContent = section;
+            item.querySelector('h2 span').textContent = issue; // Assuming the span after strong is for the issue
+            item.querySelector('.recommendation-text').textContent = recommendation;
+            if (example) {
+                 item.querySelector('.example-text').textContent = example;
+            }
+
+            accordion.appendChild(item);
+        });
+        resumeImprovementsContainer.appendChild(accordion);
+        // No need to re-attach event listeners for the removed button
+    } else {
+        resumeImprovementsContainer.innerHTML = '<div class="alert alert-light">No specific resume improvement suggestions provided for this job.</div>';
+    }
+
+    // const analysisSection = document.getElementById('analysis');
+    // if(analysisSection && !document.getElementById('resumeResourcesCard')) { // Prevent adding multiple times
+    //      const resourceCard = document.createElement('div');
+    //      resourceCard.id = 'resumeResourcesCard';
+    //      resourceCard.className = 'card mb-4';
+    //      resourceCard.innerHTML = `
+    //          <div class="card-header"><h3>Resume Resources</h3></div>
+    //          <div class="card-body">
+    //              <p>Consider these resources for professional resume templates:</p>
+    //              <ul>
+    //                  <li><a href="https://resumake.io/" target="_blank" rel="noopener noreferrer">Resumake</a></li>
+    //                  <li><a href="https://www.canva.com/resumes/templates/" target="_blank" rel="noopener noreferrer">Canva Resume Templates</a></li>
+    //                  <li><a href="https://zety.com/resume-templates" target="_blank" rel="noopener noreferrer">Zety Resume Templates</a></li>
+    //              </ul>
+    //          </div>`;
+    //      // Append after resume improvements, before the final button
+    //      const nextButton = analysisSection.querySelector('#viewPrepPlanBtn');
+    //      if(nextButton) {
+    //           nextButton.parentNode.insertBefore(resourceCard, nextButton);
+    //      } else {
+    //            analysisSection.querySelector('.container').appendChild(resourceCard); // Fallback append
+    //      }
+    // }
+
+
+}
+
+
+// --- Function to modify in app.js ---
+// Replace the existing displayPreparationPlan function
+
+// --- Function to modify in app.js ---
+// Replace the existing displayPreparationPlan function
+
+function displayPreparationPlan(data) {
+    if (!data || !data.prepPlan) {
+        document.getElementById('prep-plan').innerHTML = '<div class="alert alert-warning">Preparation plan data is missing or incomplete.</div>';
+        return;
+    }
+    const prepPlan = data.prepPlan;
+
+    // --- Focus Areas --- (Keep as before)
+    const focusAreasList = document.getElementById('focusAreasList');
+    if (focusAreasList) {
+        focusAreasList.innerHTML = '';
+        if (prepPlan.focusAreas?.length > 0) {
+            prepPlan.focusAreas.forEach(area => {
+                const li = document.createElement('li');
+                li.innerHTML = `<i class="fas fa-bullseye me-2"></i>`;
+                li.appendChild(document.createTextNode(area || 'N/A')); // Handle potential null/undefined
+                focusAreasList.appendChild(li);
+            });
+        } else {
+            focusAreasList.innerHTML = '<li class="text-muted">No specific focus areas provided.</li>';
+        }
+    }
+
+    // --- Likely Questions (Updated) --- (Keep as before)
+    const likelyQuestionsContainer = document.getElementById('likelyQuestions');
+    if (likelyQuestionsContainer) {
+        likelyQuestionsContainer.innerHTML = ''; // Clear previous
+        if (prepPlan.likelyQuestions?.length > 0) {
+            const accordion = document.createElement('div');
+            accordion.className = 'accordion';
+            accordion.id = 'likelyQuestionsAccordion';
+            prepPlan.likelyQuestions.forEach((item, index) => {
+                const accordionItem = document.createElement('div');
+                accordionItem.className = 'accordion-item';
+                const headerId = `qHeader-${index}`;
+                const collapseId = `qCollapse-${index}`;
+
+                const category = item.category || "General";
+                const question = item.question || "No question text.";
+                const guidance = item.guidance || "No specific guidance provided.";
+
+                // Create button and content safely
+                const button = document.createElement('button');
+                button.className = 'accordion-button collapsed';
+                button.type = 'button';
+                button.dataset.bsToggle = 'collapse';
+                button.dataset.bsTarget = `#${collapseId}`;
+                button.setAttribute('aria-expanded', 'false');
+                button.setAttribute('aria-controls', collapseId);
+                button.innerHTML = `<span class="badge bg-secondary me-2"></span> `; // Placeholder for category
+                button.querySelector('.badge').textContent = category; // Set category safely
+                button.appendChild(document.createTextNode(question)); // Set question safely
+
+                const header = document.createElement('h2');
+                header.className = 'accordion-header';
+                header.id = headerId;
+                header.appendChild(button);
+
+                const collapseDiv = document.createElement('div');
+                collapseDiv.id = collapseId;
+                collapseDiv.className = 'accordion-collapse collapse';
+                collapseDiv.setAttribute('aria-labelledby', headerId);
+                collapseDiv.dataset.bsParent = '#likelyQuestionsAccordion';
+
+                const bodyDiv = document.createElement('div');
+                bodyDiv.className = 'accordion-body';
+                bodyDiv.innerHTML = `<strong><i class="fas fa-info-circle me-1"></i>Guidance:</strong>`;
+                const guidanceP = document.createElement('p');
+                guidanceP.textContent = guidance; // Set guidance safely
+                bodyDiv.appendChild(guidanceP);
+                collapseDiv.appendChild(bodyDiv);
+
+                accordionItem.appendChild(header);
+                accordionItem.appendChild(collapseDiv);
+                accordion.appendChild(accordionItem);
+            });
+            likelyQuestionsContainer.appendChild(accordion);
+        } else {
+            likelyQuestionsContainer.innerHTML = '<div class="alert alert-light">No likely questions generated for this plan.</div>';
+        }
+    }
+
+    // --- Concepts to Study --- (Keep as before)
+    const conceptsToStudyContainer = document.getElementById('conceptsToStudy');
+    if (conceptsToStudyContainer) {
+        conceptsToStudyContainer.innerHTML = ''; // Clear
+        if (prepPlan.conceptsToStudy) {
+            const conceptsContent = formatConcepts(prepPlan.conceptsToStudy); // Use existing helper
+            if (conceptsContent) {
+                conceptsToStudyContainer.appendChild(conceptsContent);
+            } else {
+                conceptsToStudyContainer.innerHTML = '<div class="alert alert-light">No specific concepts to study listed.</div>';
+            }
+        } else {
+            conceptsToStudyContainer.innerHTML = '<div class="alert alert-light">No specific concepts to study listed.</div>';
+        }
+    }
+
+    // --- Gap Strategies Section --- (Keep as before)
+     const gapStrategiesContainer = document.getElementById('gapStrategies');
+     if (gapStrategiesContainer) {
+        gapStrategiesContainer.innerHTML = ''; // Clear loading/previous
+        if (prepPlan.gapStrategies?.length > 0) {
+            const listGroup = document.createElement('div');
+            listGroup.className = 'list-group list-group-flush'; // Flush looks good inside card
+            prepPlan.gapStrategies.forEach(item => {
+                const listItem = document.createElement('div');
+                listItem.className = 'list-group-item';
+                // Use textContent for safety where possible
+                listItem.innerHTML = `<h6 class="mb-1"><i class="fas fa-exclamation-triangle text-warning me-2"></i> Gap: <span class="gap-text"></span></h6>`;
+                listItem.querySelector('.gap-text').textContent = item.gap || 'N/A';
+
+                const strategyP = document.createElement('p');
+                strategyP.className = 'mb-1';
+                strategyP.innerHTML = `<strong><i class="fas fa-comments me-1"></i> Suggested Strategy:</strong> `;
+                strategyP.appendChild(document.createTextNode(item.strategy || 'No specific strategy provided.'));
+                listItem.appendChild(strategyP);
+
+                const focusSmall = document.createElement('small');
+                focusSmall.className = 'text-muted';
+                focusSmall.innerHTML = `<strong><i class="fas fa-book-open me-1"></i> Focus for Prep:</strong> `;
+                focusSmall.appendChild(document.createTextNode(item.focus_during_prep || 'Review related concepts.'));
+                listItem.appendChild(focusSmall);
+
+                listGroup.appendChild(listItem);
+            });
+             gapStrategiesContainer.appendChild(listGroup);
+        } else {
+             gapStrategiesContainer.innerHTML = '<div class="alert alert-light">No specific gap strategies provided.</div>';
+        }
+    }
+
+
+    // --- REMOVE Old Timeline Display Logic ---
+    const preparationTimelineContainer = document.getElementById('preparationTimeline');
+    if (preparationTimelineContainer) {
+        // Clear the container instead of populating it
+        preparationTimelineContainer.innerHTML = ''; // Remove old content
+        // Maybe hide the parent card if it's now empty, or add placeholder text for dynamic one
+        const parentCard = preparationTimelineContainer.closest('.card');
+        if (parentCard) parentCard.style.display = 'none'; // Hide the old timeline card entirely
+    }
+
+    // --- Make Dynamic Timeline Controls Visible ---
+    const dynamicTimelineControls = document.getElementById('dynamicTimelineControls');
+    if (dynamicTimelineControls) {
+        dynamicTimelineControls.style.display = 'block'; // Show the input and button
+
+        // Ensure listener is attached only once or re-attach if needed
+        const generateBtn = document.getElementById('generateDynamicTimelineBtn');
+
+        // Clone and replace to remove old listeners before adding a new one
+        if (generateBtn) {
+            const newBtn = generateBtn.cloneNode(true);
+            generateBtn.parentNode.replaceChild(newBtn, generateBtn);
+            newBtn.addEventListener('click', handleGenerateDynamicTimeline);
+            console.log("Event listener attached to generateDynamicTimelineBtn");
+        }
+
+    } else {
+        console.error("Dynamic timeline controls container not found!");
+    }
+
+}
+
+// --- Add NEW Handler function ---
+function handleGenerateDynamicTimeline() {
+    const daysInput = document.getElementById('daysUntilInterview');
+    const dynamicTimelineArea = document.getElementById('dynamicTimelineArea');
+    const generateBtn = document.getElementById('generateDynamicTimelineBtn'); // Get button ref again
+
+    if (!daysInput || !dynamicTimelineArea || !generateBtn) {
+        console.error("Timeline input/area/button elements not found.");
+        return;
+    }
+
+    const days = daysInput.value.trim();
+    if (!days || isNaN(parseInt(days)) || parseInt(days) <= 0 || parseInt(days) > 90) {
+         alert("Please enter a valid number of days (1-90).");
+         daysInput.focus(); // Focus the input for correction
+         return;
+    }
+
+    if (!state.sessionId) {
+        alert("No active session found. Please analyze resume first.");
+        return;
+    }
+
+    console.log(`Requesting dynamic timeline for ${days} days, session ${state.sessionId}`);
+
+    // Show loading state
+    dynamicTimelineArea.innerHTML = `
+        <div class="text-center p-3">
+             <div class="spinner-border text-primary" role="status">
+                 <span class="visually-hidden">Loading...</span>
+             </div>
+             <p class="mt-2">Generating your personalized timeline (this may take a moment)...</p>
+         </div>`;
+    generateBtn.disabled = true;
+    generateBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Generating...'; // Add spinner to button
+
+    // Call the new backend endpoint
+    fetch(`${API_BASE_URL}/generate-dynamic-timeline`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            sessionId: state.sessionId,
+            days: days
+        })
+    })
+    .then(response => {
+        if (!response.ok) {
+            // Try to get error from JSON body
+             return response.json().then(errData => {
+                 // Use the specific error from backend if available
+                 throw new Error(errData.error || `Timeline generation failed (${response.status})`);
+            }).catch(() => {
+                 // Fallback if response wasn't JSON
+                 throw new Error(`Timeline generation failed (${response.status})`);
+             });
+        }
+        return response.json();
+    })
+    .then(data => {
+        console.log("Dynamic timeline data received:", data);
+        displayDynamicTimeline(data); // Display the result
+    })
+    .catch(error => {
+        console.error("Error generating dynamic timeline:", error);
+        dynamicTimelineArea.innerHTML = `<div class="alert alert-danger">Error generating timeline: ${error.message}</div>`;
+    })
+    .finally(() => {
+         // Restore button state
+         generateBtn.disabled = false;
+         generateBtn.textContent = 'Generate Dynamic Timeline'; // Restore original text
+    });
+}
+
+// --- Add NEW Display function ---
+function displayDynamicTimeline(data) {
+    const dynamicTimelineArea = document.getElementById('dynamicTimelineArea');
+    if (!dynamicTimelineArea) return;
+    dynamicTimelineArea.innerHTML = ''; // Clear loading/previous
+
+    if (data.error) {
+         dynamicTimelineArea.innerHTML = `<div class="alert alert-warning">Could not generate timeline: ${data.error}</div>`;
+         return;
+    }
+
+    if (!data || !data.timeline || data.timeline.length === 0) {
+        dynamicTimelineArea.innerHTML = '<div class="alert alert-light">No timeline schedule was generated. Please try again or adjust the number of days.</div>';
+        return;
+    }
+
+    const timelineContainer = document.createElement('div');
+    timelineContainer.className = 'dynamic-timeline mt-3'; // Add a class for styling
+
+    data.timeline.forEach(dayEntry => {
+        const dayCard = document.createElement('div');
+        // Add alternating background for readability if desired
+        dayCard.className = 'card timeline-day-card mb-3';
+
+        const cardHeader = document.createElement('div');
+        cardHeader.className = 'card-header d-flex justify-content-between align-items-center p-2'; // Reduced padding
+        // Use textContent for safety
+        cardHeader.innerHTML = `<h5 class="mb-0 day-header"></h5> <span class="badge bg-info focus-badge"></span>`;
+        cardHeader.querySelector('.day-header').textContent = `Day ${dayEntry.day}`;
+        cardHeader.querySelector('.focus-badge').textContent = dayEntry.focus || 'General Prep';
+
+
+        const cardBody = document.createElement('div');
+        cardBody.className = 'card-body p-2'; // Reduced padding
+
+        const scheduleList = document.createElement('ul');
+        scheduleList.className = 'list-group list-group-flush schedule-list';
+
+        if (dayEntry.schedule && dayEntry.schedule.length > 0) {
+            dayEntry.schedule.forEach(item => {
+                const listItem = document.createElement('li');
+                listItem.className = 'list-group-item schedule-item py-1 px-0'; // Reduced padding
+                // Use textContent for safety
+                listItem.innerHTML = `${item.time_slot ? `<span class="time-slot"></span> ` : ''}<span class="task-description"></span>`;
+                if(item.time_slot) listItem.querySelector('.time-slot').textContent = `${item.time_slot}:`;
+                listItem.querySelector('.task-description').textContent = item.task || 'N/A';
+                scheduleList.appendChild(listItem);
+            });
+        } else {
+            scheduleList.innerHTML = '<li class="list-group-item text-muted py-1 px-0">No specific tasks scheduled. Focus on the day\'s theme.</li>';
+        }
+
+        cardBody.appendChild(scheduleList);
+
+        if (dayEntry.notes) {
+            const notesP = document.createElement('p');
+            notesP.className = 'mt-2 mb-0 text-muted small fst-italic notes-text'; // Use class for styling
+            notesP.innerHTML = `<i class="far fa-sticky-note me-1"></i> `;
+            notesP.appendChild(document.createTextNode(dayEntry.notes)); // Safe text
+            cardBody.appendChild(notesP);
+        }
+
+        dayCard.appendChild(cardHeader);
+        dayCard.appendChild(cardBody);
+        timelineContainer.appendChild(dayCard);
+    });
+
+    if (data.estimated_total_hours) {
+        const estimateP = document.createElement('p');
+        estimateP.className = 'text-center text-muted mt-3 total-hours';
+        estimateP.textContent = `Estimated Total Preparation Time: ~${data.estimated_total_hours} hours`;
+        timelineContainer.appendChild(estimateP);
+    }
+
+    dynamicTimelineArea.appendChild(timelineContainer);
+}
+
+
+function displayRewriteResult(rewriteData, section) {
+    // Example: Show in a modal (requires a modal structure in index.html)
+    /*
+    const modalTitle = document.getElementById('rewriteModalLabel');
+    const modalBody = document.getElementById('rewriteModalBody');
+    if (modalTitle && modalBody) {
+        modalTitle.textContent = `AI Rewrite Suggestion for: ${section}`;
+        modalBody.innerHTML = `
+            <h5>Original:</h5>
+            <pre><code>${rewriteData.original || '[Not Available]'}</code></pre>
+            <hr>
+            <h5>Suggested Improvement:</h5>
+            <pre><code>${rewriteData.improved || '[Not Available]'}</code></pre>
+            <hr>
+            <h5>Rationale:</h5>
+            <ul>
+                ${rewriteData.explanations?.map(ex => `<li><strong>${ex.change || ''}:</strong> ${ex.rationale || ''}</li>`).join('') || '<li>No specific rationale provided.</li>'}
+            </ul>
+        `;
+        const rewriteModal = new bootstrap.Modal(document.getElementById('rewriteModal'));
+        rewriteModal.show();
+    } else { // Fallback to alert
+        alert(`Rewritten ${section}:\n\n${rewriteData.improved}\n\nRationale: ${rewriteData.explanations?.[0]?.rationale || 'N/A'}`);
+    }
+    */
+     // Simple alert for now
+    alert(`AI Suggestion for ${section}:\n\n${rewriteData.improved}\n\nRationale: ${rewriteData.explanations?.[0]?.rationale || 'N/A'}`);
+
+}
+
+// Helper to format concepts (handles object or array)
+function formatConcepts(concepts) {
+    const container = document.createElement('div');
+    if (Array.isArray(concepts) && concepts.length > 0) {
+        const ul = document.createElement('ul');
+        ul.className = 'list-group list-group-flush';
+        concepts.forEach(concept => {
+            const li = document.createElement('li');
+            li.className = 'list-group-item';
+             li.innerHTML = `<i class="fas fa-lightbulb me-2"></i>${concept}`;
+            ul.appendChild(li);
+        });
+        container.appendChild(ul);
+        return container;
+    } else if (typeof concepts === 'object' && concepts !== null && Object.keys(concepts).length > 0) {
+        for (const category in concepts) {
+            const catDiv = document.createElement('div');
+            catDiv.className = 'mb-3';
+            catDiv.innerHTML = `<h6>${category}</h6>`;
+            const subList = document.createElement('ul');
+            subList.className = 'list-group list-group-flush';
+            const items = Array.isArray(concepts[category]) ? concepts[category] : [concepts[category]];
+            items.forEach(item => {
+                 const li = document.createElement('li');
+                 li.className = 'list-group-item';
+                 li.innerHTML = `<i class="fas fa-lightbulb me-2"></i>${item}`;
+                 subList.appendChild(li);
+            });
+            catDiv.appendChild(subList);
+            container.appendChild(catDiv);
+        }
+        return container;
+    }
+    return null; // No valid concepts found
+}
+
+
+// Helper to format timeline (handles object or array)
+function formatTimeline(timelineData) {
+    const container = document.createElement('div');
+    container.className = 'timeline'; // Add base class for potential styling
+
+     if (Array.isArray(timelineData) && timelineData.length > 0) {
+         timelineData.forEach(item => {
+             const timelineItem = document.createElement('div');
+             timelineItem.className = 'timeline-item'; // Use classes from styles.css
+             const timelineContent = document.createElement('div');
+             timelineContent.className = 'timeline-content';
+
+             if (typeof item === 'string') {
+                timelineContent.innerHTML = `<i class="far fa-clock me-2"></i>${item}`;
+             } else if (typeof item === 'object' && item !== null) {
+                 // Assuming structure like { period: "...", tasks: ["..."] } or similar
+                 const title = item.period || item.title || Object.keys(item)[0];
+                 const content = item.tasks || item.details || item[title];
+                 timelineContent.innerHTML = `<div class="timeline-header"><i class="far fa-calendar-alt me-2"></i>${title}</div>`;
+                 if (Array.isArray(content)) {
+                     const ul = document.createElement('ul');
+                     content.forEach(task => ul.innerHTML += `<li>${task}</li>`);
+                     timelineContent.appendChild(ul);
+                 } else {
+                      timelineContent.innerHTML += `<p>${content}</p>`;
+                 }
+             }
+             timelineItem.appendChild(timelineContent);
+             container.appendChild(timelineItem);
+         });
+        return container;
+    } else if (typeof timelineData === 'object' && timelineData !== null && Object.keys(timelineData).length > 0) {
+        for (const period in timelineData) {
+            const timelineItem = document.createElement('div');
+            timelineItem.className = 'timeline-item';
+            const timelineContent = document.createElement('div');
+            timelineContent.className = 'timeline-content';
+            timelineContent.innerHTML = `<div class="timeline-header"><i class="far fa-calendar-alt me-2"></i>${period}</div>`;
+             const activities = timelineData[period];
+            if (Array.isArray(activities)) {
+                const ul = document.createElement('ul');
+                activities.forEach(activity => ul.innerHTML += `<li>${activity}</li>`);
+                timelineContent.appendChild(ul);
+            } else {
+                timelineContent.innerHTML += `<p>${activities}</p>`;
+            }
+             timelineItem.appendChild(timelineContent);
+            container.appendChild(timelineItem);
+        }
+        return container;
+    }
+    return null; // No valid timeline data
+}
+
+// --- Mock Interview Functions ---
+
+function showPermissionsModal() {
+    const modalElement = document.getElementById('permissionsModal');
+    if(modalElement) {
+        const modal = new bootstrap.Modal(modalElement);
+        modal.show();
+    } else {
+        console.warn("Permissions modal not found. Attempting to get media directly.");
+        // Fallback: try getting media directly, browser will prompt
+        setupMediaDevices();
+    }
+}
+
+function setupMediaDevices() {
+    // Close the permissions modal if it exists and is shown
+    const modalElement = document.getElementById('permissionsModal');
+     if(modalElement) {
+        const modalInstance = bootstrap.Modal.getInstance(modalElement);
+        modalInstance?.hide();
+    }
+
+    console.log("Requesting media permissions...");
+    navigator.mediaDevices.getUserMedia({ video: true, audio: true })
+        .then(stream => {
+            console.log("Media permissions granted.");
+            state.videoStream = stream;
+
+            const videoElement = document.getElementById('candidateVideo');
+            if (videoElement) {
+                videoElement.srcObject = stream;
+                videoElement.play().catch(e => console.error("Video play error:", e)); // Handle autoplay restrictions
+            }
+
+            setupMediaRecorder(stream);
+
+            // Only start the interview *after* media is set up
+            startMockInterview();
+        })
+        .catch(error => {
+            console.error('Error accessing media devices:', error);
+            alert(`Could not access camera/microphone: ${error.message}\n\nPlease grant permissions and ensure no other app is using the devices.`);
+            // Optionally navigate away from interview section or show error state
+            navigateTo('prep-plan'); // Go back to prep plan
+        });
+}
+
+function setupMediaRecorder(stream) {
+    if (typeof MediaRecorder === 'undefined') {
+        console.error("MediaRecorder is not supported in this browser.");
+        alert("Voice input is not supported in your browser.");
+        return; // Cannot proceed with recording
+    }
+
+    // --- Web Audio API Setup for VAD ---
+    try {
+        state.audioContext = state.audioContext || new (window.AudioContext || window.webkitAudioContext)();
+        if (state.audioSourceNode) state.audioSourceNode.disconnect();
+        if (state.analyserNode) state.analyserNode.disconnect();
+
+        state.analyserNode = state.audioContext.createAnalyser();
+        state.analyserNode.fftSize = FFT_SIZE;
+        const bufferLength = state.analyserNode.frequencyBinCount;
+        state.audioDataArray = new Uint8Array(bufferLength);
+        console.log("VAD Analyser buffer length:", bufferLength);
+
+        const audioTracks = stream.getAudioTracks();
+        if (!audioTracks.length) throw new Error("No audio track found in stream for analysis.");
+        state.audioSourceNode = state.audioContext.createMediaStreamSource(stream);
+        state.audioSourceNode.connect(state.analyserNode);
+        console.log("Web Audio API VAD setup complete.");
+    } catch (e) {
+        console.error("Failed to set up Web Audio API for VAD:", e);
+        alert(`Failed to initialize audio analysis: ${e.message}. Voice detection may be less accurate.`);
+        state.audioContext = null;
+        state.analyserNode = null;
+        state.audioSourceNode = null;
+        state.audioDataArray = null;
+    }
+    // --- End Web Audio API Setup ---
+
+
+    // --- MediaRecorder Setup (using audio-only stream) ---
+    const audioTracksForRecorder = stream.getAudioTracks();
+    if (!audioTracksForRecorder.length) {
+        console.error("No audio track found for MediaRecorder.");
+        alert("Could not find microphone track for recording.");
+        return;
+    }
+    const audioStreamForRecorder = new MediaStream([audioTracksForRecorder[0]]);
+
+    let options = { mimeType: 'audio/webm;codecs=opus' };
+    if (!MediaRecorder.isTypeSupported(options.mimeType)) {
+        console.warn(`${options.mimeType} not supported, trying audio/ogg`);
+        options = { mimeType: 'audio/ogg;codecs=opus' };
+        if (!MediaRecorder.isTypeSupported(options.mimeType)) {
+            console.warn(`${options.mimeType} not supported, trying audio/webm (default)`);
+            options = { mimeType: 'audio/webm' };
+            if (!MediaRecorder.isTypeSupported(options.mimeType)) {
+                console.warn(`${options.mimeType} not supported, using browser default`);
+                options = {};
+            }
+        }
+    }
+    console.log("Using MediaRecorder options:", options);
+
+    try {
+        state.mediaRecorder = new MediaRecorder(audioStreamForRecorder, options);
+
+        state.mediaRecorder.ondataavailable = event => {
+            if (event.data.size > 0) {
+                state.audioChunks.push(event.data);
+            } else {
+                // console.log("Received empty audio chunk."); // Can be noisy
+            }
+        };
+
+        // **** MODIFIED onstop handler ****
+        state.mediaRecorder.onstop = () => {
+            console.log("MediaRecorder stopped.");
+            // --- Check speech *before* resetting flag ---
+            const speechWasDetectedInThisSegment = state.speechDetectedInChunk;
+            const currentAudioChunks = [...state.audioChunks]; // Copy chunks before clearing
+            state.audioChunks = []; // Clear chunks immediately after stopping
+
+            // --- Reset flag AFTER checking ---
+            state.speechDetectedInChunk = false;
+
+            // --- Make decision based on the check ---
+            if (!speechWasDetectedInThisSegment || currentAudioChunks.length === 0) {
+                console.warn(`No speech detected in last segment (flag=${speechWasDetectedInThisSegment}) or no audio data captured. Discarding.`);
+
+                // Restart listening if the interview is still active and AI isn't talking
+                if (state.isInterviewActive && !state.isAIResponding) {
+                     console.log("No valid speech detected, restarting listening.");
+                     setTimeout(() => {
+                        if (state.isInterviewActive && !state.isAIResponding) {
+                             startListeningAutomatically();
+                        }
+                     }, 500); // Small delay
+                }
+                return; // Don't process the empty/silent audio
+            }
+
+            // --- Process valid audio ---
+            console.log(`Speech detected (flag=${speechWasDetectedInThisSegment}), processing ${currentAudioChunks.length} audio chunks.`);
+            const mimeType = state.mediaRecorder.mimeType || options.mimeType || 'audio/webm';
+            const audioBlob = new Blob(currentAudioChunks, { type: mimeType });
+
+            processAudioResponse(audioBlob, mimeType); // Pass mimeType
+        };
+        // **** END MODIFIED onstop handler ****
+
+
+        state.mediaRecorder.onerror = (event) => {
+            console.error('MediaRecorder error:', event.error);
+            alert(`Recording error: ${event.error.name} - ${event.error.message}`);
+            state.isRecording = false;
+            clearTimeout(state.silenceTimer);
+            cancelAnimationFrame(state.vadAnimationFrameId);
+            clearInterval(state.recordingTimer);
+            state.speechDetectedInChunk = false; // Reset on error
+            state.audioChunks = []; // Clear chunks on error
+        };
+
+        console.log("MediaRecorder setup complete.");
+
+    } catch (e) {
+        console.error("Failed to create MediaRecorder:", e);
+        alert(`Failed to initialize audio recorder: ${e.message}`);
+    }
+}
+
+
+function startMockInterview() {
+    if (!state.sessionId) {
+        alert('No active session. Please analyze a resume first.');
+        navigateTo('upload');
+        return;
+    }
+     if (!state.mediaRecorder) {
+         alert('Audio recorder not initialized. Please grant microphone permissions.');
+         // Attempt to re-initialize? Or guide user.
+         showPermissionsModal();
+         return;
+     }
+
+    console.log(`Starting ${state.interviewType} interview for session: ${state.sessionId}`);
+    state.isInterviewActive = true;
+    state.isAIResponding = false; // Ensure AI is not marked as responding initially
+    state.conversationHistory = []; // Clear previous history
+
+    const conversationContainer = document.getElementById('conversationContainer');
+    if(conversationContainer) conversationContainer.innerHTML = ''; // Clear display
+
+    // Add loading indicator?
+    addMessageToConversation("system", `Starting ${state.interviewType} interview...`);
+
+
+    fetch(`${API_BASE_URL}/start-mock-interview`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            sessionId: state.sessionId,
+            interviewType: state.interviewType
+        })
+    })
+    .then(response => {
+        if (!response.ok) throw new Error(`Network response was not ok (${response.status})`);
+        return response.json();
+    })
+    .then(data => {
+        console.log('Interview started response:', data);
+        if (!data.interviewId || !data.greeting) {
+             throw new Error("Invalid response from start-mock-interview");
+        }
+        state.interviewId = data.interviewId;
+
+        // Remove "Starting..." message
+        const systemMessages = conversationContainer.querySelectorAll('.message.system');
+        systemMessages.forEach(msg => msg.remove());
+
+        // Display and speak greeting
+        addMessageToConversation('interviewer', data.greeting);
+        generateAndPlayTTS(data.greeting); // This will trigger automatic listening on end
+    })
+    .catch(error => {
+        console.error('Error starting interview:', error);
+        alert(`Error starting interview: ${error.message}`);
+        state.isInterviewActive = false; // Reset state on error
+         addMessageToConversation("system", `Error starting interview: ${error.message}. Please try again.`);
+    });
+}
+
+function sendTextReply() {
+    const userReplyInput = document.getElementById('userReplyInput');
+    if (!userReplyInput) return;
+    const userResponse = userReplyInput.value.trim();
+
+    if (!userResponse) return;
+    if (!state.isInterviewActive || !state.interviewId) {
+         alert("Interview is not active.");
+         return;
+    }
+     if (state.isAIResponding || state.isRecording) {
+        console.warn("Cannot send text reply while AI is responding or recording is active.");
+        return; // Prevent sending while AI talks or mic is busy
+    }
+
+
+    console.log("Sending text reply:", userResponse);
+    userReplyInput.value = ''; // Clear input
+
+    addMessageToConversation('candidate', userResponse);
+    sendUserResponseToBackend(userResponse);
+}
+
+// --- Continuous Voice Logic ---
+
+function startListeningAutomatically() {
+    // Don't listen if interview ended, or if AI is currently speaking/processing
+    if (!state.isInterviewActive || state.isAIResponding) {
+        console.log("Skipping automatic listening (interview not active or AI responding).");
+        return;
+    }
+    if (state.isRecording) {
+        console.log("Already recording, skipping automatic start.");
+        return; // Already recording
+    }
+    if (!state.mediaRecorder || !state.analyserNode || !state.audioDataArray) { // Check VAD components too
+        console.error("MediaRecorder or VAD components not available to start listening.");
+        // Attempt to re-setup or prompt user?
+        // showPermissionsModal(); // Could prompt again
+        return;
+    }
+    if (state.mediaRecorder.state !== 'inactive') {
+        console.warn(`MediaRecorder not inactive (${state.mediaRecorder.state}), attempting recovery...`);
+        // Try stopping previous recording forcefully? Risky. Best to prevent this state.
+        try {
+             state.mediaRecorder.stop(); // Attempt to stop
+        } catch(e) { console.error("Error stopping stuck recorder:", e); }
+        // Clear state and potentially try again after a short delay
+        state.isRecording = false;
+        clearTimeout(state.silenceTimer);
+        cancelAnimationFrame(state.vadAnimationFrameId);
+        state.speechDetectedInChunk = false;
+        setTimeout(startListeningAutomatically, 200); // Retry shortly
+        return;
+    }
+
+    console.log("AI finished speaking, starting automatic recording...");
+    const micIcon = document.getElementById('toggleMicBtn')?.querySelector('i');
+
+    state.audioChunks = []; // Clear previous chunks
+    state.isRecording = true;
+    state.recordingStartTime = Date.now();
+    state.speechDetectedInChunk = false; // Reset speech detection flag for this new chunk
+    clearTimeout(state.silenceTimer); // Ensure any old silence timer is cleared
+
+    try {
+        state.mediaRecorder.start(); // Start recorder (records continuously until stopped)
+        console.log("MediaRecorder started for automatic listening.");
+        if(micIcon) micIcon.classList.remove('fa-microphone-slash'); // Ensure visual state is correct
+        if(micIcon) micIcon.classList.add('fa-microphone-alt', 'text-danger'); // Indicate listening
+
+        // Start the VAD loop
+        checkAudioLevel(); // Begin checking audio levels
+
+    } catch (e) {
+        console.error("Error starting MediaRecorder:", e);
+        alert(`Error starting recording: ${e.message}`);
+        state.isRecording = false;
+        if(micIcon) micIcon.classList.remove('fa-microphone-alt', 'text-danger');
+    }
+}
+
+// function startSilenceDetection() {
+//     clearTimeout(state.silenceTimer); // Clear previous timer
+
+//     console.log(`Starting silence timer (${state.silenceDelay}ms)...`);
+
+//     // !! IMPORTANT !!
+//     // This is a placeholder using only a timer. Real VAD requires analyzing
+//     // the audio stream with the Web Audio API (AnalyserNode) to detect actual
+//     // silence and reset this timer when speech is detected.
+//     // This basic timer will stop recording after state.silenceDelay ms
+//     // regardless of whether the user was actually silent.
+//     state.silenceTimer = setTimeout(() => {
+//         console.log("Silence timer expired.");
+//         if (state.isRecording) {
+//             stopRecordingAndProcess();
+//         } else {
+//              console.log("Silence timer expired, but not recording.");
+//         }
+//     }, state.silenceDelay);
+
+//     // --- Placeholder for real VAD ---
+//     // In a real implementation, you would:
+//     // 1. Use Web Audio API AnalyserNode to get volume levels periodically.
+//     // 2. If volume > threshold (speech): clearTimeout(state.silenceTimer); startSilenceDetection(); // Reset timer
+//     // 3. If volume < threshold (silence): Let the timer run.
+//     // ---------------------------------
+// }
+
+// --- VAD Core Logic ---
+// --- VAD Core Logic (with Volume Logging) ---
+function checkAudioLevel() {
+    // Stop the loop if no longer recording or VAD components missing
+    if (!state.isRecording || !state.analyserNode || !state.audioDataArray) {
+        // console.log("Stopping VAD loop (not recording or VAD missing)."); // Can be noisy
+        // Make sure animation frame is cancelled if VAD components are missing mid-recording
+        if(state.vadAnimationFrameId) {
+            cancelAnimationFrame(state.vadAnimationFrameId);
+            state.vadAnimationFrameId = null;
+        }
+        return;
+    }
+
+    // Schedule the next check
+    state.vadAnimationFrameId = requestAnimationFrame(checkAudioLevel);
+
+    // Get audio data
+    try {
+        state.analyserNode.getByteFrequencyData(state.audioDataArray); // Fill the array
+    } catch (e) {
+         console.error("Error getting frequency data from AnalyserNode:", e);
+         // Stop VAD if analyser fails
+         state.isRecording = false; // Mark as not recording to prevent recorder issues
+         cancelAnimationFrame(state.vadAnimationFrameId);
+         state.vadAnimationFrameId = null;
+         // Optionally, try to stop the recorder gracefully
+         // stopRecordingAndProcess(); // Might lead to unexpected states if called from here
+         return;
+    }
+
+
+    // Calculate average volume
+    let sum = 0;
+    for (let i = 0; i < state.audioDataArray.length; i++) {
+        sum += state.audioDataArray[i];
+    }
+    const averageVolume = sum / state.audioDataArray.length;
+
+    // **** ADDED LOGGING ****
+    // Log volume periodically (e.g., every ~30 frames) to avoid flooding console
+    if (!window.vadLogCounter) window.vadLogCounter = 0;
+    window.vadLogCounter++;
+    if (window.vadLogCounter % 30 === 0) {
+        console.log(`VAD Avg Vol: ${averageVolume.toFixed(2)} (Threshold: ${SPEECH_THRESHOLD})`);
+    }
+    // ***********************
+
+
+    // --- Silence Detection Logic ---
+    if (averageVolume > SPEECH_THRESHOLD) {
+        // Speech detected
+        if (!state.speechDetectedInChunk) {
+             console.log(`--- Speech Detected (Volume: ${averageVolume.toFixed(2)}) ---`); // Log first detection
+             state.speechDetectedInChunk = true; // Mark that speech has occurred
+        }
+        // If silence timer is running, clear it because speech is happening again
+        if (state.silenceTimer) {
+            // console.log("Speech detected, clearing silence timer."); // Can be noisy
+            clearTimeout(state.silenceTimer);
+            state.silenceTimer = null;
+        }
+    } else {
+        // Silence detected (or below threshold)
+        // Start the silence timer ONLY if speech has already been detected in this chunk
+        // AND the timer isn't already running.
+        if (state.speechDetectedInChunk && !state.silenceTimer) {
+             console.log(`Silence detected after speech (Volume: ${averageVolume.toFixed(2)}), starting ${state.silenceDelay}ms timeout...`);
+             state.silenceTimer = setTimeout(() => {
+                 console.log("Silence timer expired after speech.");
+                 // Double check we are still recording before stopping
+                 if (state.isRecording) {
+                     stopRecordingAndProcess();
+                 } else {
+                      console.log("Silence timer expired, but recording already stopped.");
+                      state.silenceTimer = null; // Clear timer ID
+                 }
+             }, state.silenceDelay);
+        }
+        // If silence timer IS running, do nothing - let it expire or be cleared by speech.
+    }
+}
+
+function stopRecordingAndProcess() {
+    if (!state.isRecording && state.mediaRecorder?.state !== 'recording') {
+         // console.log("Stop recording called, but not currently recording."); // Can be noisy
+         return; // Already stopped or wasn't started
+    }
+    console.log("Stopping recording and VAD...");
+    const micIcon = document.getElementById('toggleMicBtn')?.querySelector('i');
+
+    const wasRecording = state.isRecording; // Store if we were actively recording
+    state.isRecording = false; // Mark as not recording
+
+    // Stop the VAD loop FIRST
+    if (state.vadAnimationFrameId) {
+        cancelAnimationFrame(state.vadAnimationFrameId);
+        state.vadAnimationFrameId = null;
+        console.log("VAD Animation Frame cancelled.");
+    }
+
+    // Clear any pending silence timer
+    if (state.silenceTimer) {
+        clearTimeout(state.silenceTimer);
+        state.silenceTimer = null;
+        console.log("Pending silence timer cleared.");
+    }
+
+    // Stop visual timer
+    clearInterval(state.recordingTimer);
+
+    // --- REMOVED state.speechDetectedInChunk = false; from here ---
+
+    // Stop the MediaRecorder - this is asynchronous and triggers 'onstop'
+    if (state.mediaRecorder && state.mediaRecorder.state === "recording") {
+        console.log("Calling mediaRecorder.stop()");
+        try {
+             state.mediaRecorder.stop(); // Triggers 'onstop' which handles blob processing
+        } catch(e) {
+             console.error("Error stopping media recorder:", e);
+             state.audioChunks = []; // Clear chunks on error
+             state.speechDetectedInChunk = false; // Reset flag on error too
+        }
+    } else {
+        console.warn(`Attempted to stop recording, but recorder state was: ${state.mediaRecorder?.state}.`);
+        // If recorder wasn't 'recording' but we thought we were, reset UI and potentially clear chunks
+         state.audioChunks = [];
+         state.speechDetectedInChunk = false; // Reset flag if recorder was not in correct state
+    }
+
+    // Reset mic icon
+    if(micIcon) micIcon.classList.remove('fa-microphone-alt', 'text-danger');
+
+    // IMPORTANT: The actual processing now happens in the 'onstop' event handler
+    console.log(`stopRecordingAndProcess finished.`); // Removed speech detected log here as it's checked in onstop
+}
+
+function processAudioResponse(audioBlob, mimeType = 'audio/webm') {
+     console.log(`Processing recorded audio blob. Size: ${audioBlob.size}, Type: ${mimeType}`);
+     // document.getElementById('processingIndicator').style.display = 'none'; // Hide processing indicator
+
+    if (!state.interviewId) {
+        console.error("No active interview ID to process audio for.");
+        return;
+    }
+     if (audioBlob.size < 100) { // Very small blob might be noise/error
+        console.warn("Audio blob size is very small, skipping processing.");
+         // Restart listening?
+         if(state.isInterviewActive && !state.isAIResponding) {
+             startListeningAutomatically();
+         }
+        return;
+    }
+
+
+    const formData = new FormData();
+    // Use the determined mimeType for the filename extension if possible
+    const fileExtension = mimeType.split('/')[1]?.split(';')[0] || 'webm';
+    const filename = `recording.${fileExtension}`;
+    formData.append('audio', audioBlob, filename);
+    formData.append('interviewId', state.interviewId);
+
+    console.log(`Sending audio to /process-audio as ${filename}`);
+    state.isAIResponding = true; // Mark AI as busy while processing audio/getting response
+
+    fetch(`${API_BASE_URL}/process-audio`, {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => {
+        if (!response.ok) throw new Error(`Transcription failed (${response.status})`);
+        return response.json();
+    })
+    .then(data => {
+        console.log('Transcription result:', data);
+        if (data.transcription && data.transcription.trim()) {
+            addMessageToConversation('candidate', data.transcription);
+            sendUserResponseToBackend(data.transcription); // Send transcription for AI response
+        } else {
+             console.warn("Empty transcription received.");
+             addMessageToConversation("system", "(No speech detected or transcription failed)");
+             state.isAIResponding = false; // AI finished processing (failed transcription)
+             // Restart listening?
+             if(state.isInterviewActive) startListeningAutomatically();
+        }
+    })
+    .catch(error => {
+        console.error('Error processing audio:', error);
+        alert(`Error processing your response: ${error.message}`);
+        addMessageToConversation("system", `Error processing audio: ${error.message}`);
+        state.isAIResponding = false; // AI finished processing (error)
+         // Restart listening?
+         if(state.isInterviewActive) startListeningAutomatically();
+    });
+}
+
+function sendUserResponseToBackend(userResponse) {
+    console.log("Sending user response to backend for AI reply:", userResponse);
+    state.isAIResponding = true; // Expecting AI response now
+    animateInterviewer(false); // Ensure interviewer avatar is not 'speaking'
+
+    fetch(`${API_BASE_URL}/interview-response`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            interviewId: state.interviewId,
+            userResponse: userResponse
+        })
+    })
+    .then(response => {
+        if (!response.ok) throw new Error(`Failed to get interview response (${response.status})`);
+        return response.json();
+    })
+    .then(data => {
+        console.log('Interview response received:', data);
+        if (data.interviewerResponse) {
+            addMessageToConversation('interviewer', data.interviewerResponse);
+            generateAndPlayTTS(data.interviewerResponse); // Plays TTS, which triggers listening again on end
+        } else {
+             throw new Error("Empty response from interviewer");
+        }
+        // isAIResponding will be set to false in the TTS onended callback
+    })
+    .catch(error => {
+        console.error('Error getting interviewer response:', error);
+        addMessageToConversation('interviewer', `Sorry, an error occurred: ${error.message}. Let's try again.`);
+        state.isAIResponding = false; // Reset state on error
+        // Restart listening?
+         if(state.isInterviewActive) startListeningAutomatically();
+    });
+}
+
+// --- TTS Function ---
+
+function generateAndPlayTTS(text) {
+     if (!text) return;
+     console.log("Requesting TTS for:", text);
+     state.isAIResponding = true; // AI is about to speak
+     animateInterviewer(true); // Start animation
+
+
+    // --- Attempt 1: Fetch from Backend (Preferred) ---
+    fetch(`${API_BASE_URL}/generate-tts`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: text })
+    })
+    .then(response => {
+        if (!response.ok) {
+             // Throw error to trigger fallback
+             throw new Error(`Backend TTS failed (${response.status})`);
+        }
+        return response.json();
+    })
+    .then(data => {
+        if (!data.audioBase64) {
+             throw new Error("Backend returned no audio data.");
+        }
+        console.log("Playing TTS audio from backend");
+        const audio = new Audio(`data:audio/mp3;base64,${data.audioBase64}`);
+
+        audio.onended = () => {
+            console.log("Backend TTS finished playing.");
+            animateInterviewer(false);
+            state.isAIResponding = false;
+            // Automatically start listening after AI finishes
+            if(state.isInterviewActive) startListeningAutomatically();
+        };
+         audio.onerror = (e) => {
+            console.error("Error playing backend audio:", e);
+            animateInterviewer(false);
+            state.isAIResponding = false;
+             if(state.isInterviewActive) startListeningAutomatically(); // Still try to continue
+        };
+        audio.play().catch(e => { // Handle potential autoplay issues
+             console.error("Audio play failed:", e);
+             alert("Could not play audio automatically. Please interact with the page.");
+             animateInterviewer(false);
+             state.isAIResponding = false;
+             if(state.isInterviewActive) startListeningAutomatically();
+        });
+    })
+    .catch(error => {
+        // --- Attempt 2: Browser Fallback ---
+        console.warn(`Backend TTS error: ${error.message}. Falling back to browser TTS.`);
+        if ('speechSynthesis' in window) {
+            const utterance = new SpeechSynthesisUtterance(text);
+            utterance.rate = 1;
+            utterance.pitch = 1;
+            utterance.volume = 1;
+
+            // Try to find a suitable voice (example: prefer 'Google' or 'Daniel')
+            const voices = window.speechSynthesis.getVoices();
+             // Example: Look for a specific voice or language
+             // const preferredVoice = voices.find(voice => voice.lang === 'en-IN') || voices.find(voice => voice.name.includes('Google US English'));
+            const preferredVoice = voices.find(voice => voice.name.includes('Google US English')) || voices.find(voice => voice.default && voice.lang.startsWith('en')); // Simple preference
+            if (preferredVoice) {
+                console.log("Using browser voice:", preferredVoice.name);
+                utterance.voice = preferredVoice;
+            } else {
+                 console.log("Using default browser voice.");
+            }
+
+
+            utterance.onstart = () => {
+                 console.log("Browser TTS started.");
+                 state.isAIResponding = true;
+                 animateInterviewer(true);
+            };
+
+            utterance.onend = () => {
+                console.log("Browser TTS finished.");
+                animateInterviewer(false);
+                state.isAIResponding = false;
+                // Automatically start listening after AI finishes
+                 if(state.isInterviewActive) startListeningAutomatically();
+            };
+
+            utterance.onerror = (event) => {
+                console.error('Browser SpeechSynthesis Error:', event.error);
+                animateInterviewer(false);
+                state.isAIResponding = false;
+                 // Still try to start listening even if TTS fails
+                if(state.isInterviewActive) startListeningAutomatically();
+            };
+
+            // Cancel any previous speech before speaking
+             window.speechSynthesis.cancel();
+            window.speechSynthesis.speak(utterance);
+        } else {
+            console.error("Browser SpeechSynthesis not supported.");
+            alert("Neither backend nor browser TTS is available.");
+            animateInterviewer(false);
+            state.isAIResponding = false;
+            // Can't proceed naturally, maybe just display text?
+        }
+    });
+}
+
+
+function animateInterviewer(isSpeaking) {
+    const interviewerAvatar = document.getElementById('interviewerAvatar');
+    const interviewerSpeakingWaves = document.getElementById('interviewerSpeakingWaves');
+    if (!interviewerAvatar || !interviewerSpeakingWaves) return;
+
+    if (isSpeaking) {
+        interviewerAvatar.classList.add('speaking'); // Add class for potential CSS animation
+        interviewerSpeakingWaves.classList.add('active');
+    } else {
+        interviewerAvatar.classList.remove('speaking');
+        interviewerSpeakingWaves.classList.remove('active');
+    }
+}
+
+
+// --- Media Controls ---
+
+function toggleCamera() {
+    if (state.videoStream) {
+        const videoTrack = state.videoStream.getVideoTracks()[0];
+        if(videoTrack) {
+            videoTrack.enabled = !videoTrack.enabled;
+            const btn = document.getElementById('toggleCameraBtn');
+            const icon = btn?.querySelector('i');
+            if(icon) icon.className = videoTrack.enabled ? 'fas fa-video' : 'fas fa-video-slash';
+            if(btn) btn.classList.toggle('btn-danger', !videoTrack.enabled);
+             if(btn) btn.classList.toggle('btn-light', videoTrack.enabled);
+        }
+    }
+}
+
+function toggleMicrophone() {
+    // Note: Disabling manual mic toggle in continuous mode might be better
+    // Or, it could act as a temporary mute? Complex interaction.
+     if (state.videoStream) {
+        const audioTrack = state.videoStream.getAudioTracks()[0];
+         if (audioTrack) {
+             audioTrack.enabled = !audioTrack.enabled; // This mutes/unmutes the track for recording
+             const btn = document.getElementById('toggleMicBtn');
+             const icon = btn?.querySelector('i');
+              if (icon) icon.className = audioTrack.enabled ? 'fas fa-microphone' : 'fas fa-microphone-slash';
+              if (btn) btn.classList.toggle('btn-danger', !audioTrack.enabled);
+              if (btn) btn.classList.toggle('btn-light', audioTrack.enabled);
+             console.log(`Microphone track enabled: ${audioTrack.enabled}`);
+
+             // If mic is disabled manually, maybe stop automatic listening?
+             if (!audioTrack.enabled && state.isRecording) {
+                  console.log("Mic disabled manually, stopping recording.");
+                  stopRecordingAndProcess(); // Or just stop without processing?
+             }
+        }
+    }
+}
+
+
+// --- Interview End & Analysis ---
+
+function endInterview() {
+    if (!state.interviewId) {
+        console.warn('No active interview to end');
+        return;
+    }
+    console.log("Ending interview:", state.interviewId);
+
+    state.isInterviewActive = false; // Stop interview loop
+    state.isAIResponding = false;
+    // Stop recording if it's active
+    if (state.isRecording) {
+        stopRecordingAndProcess(); // Stop and process any final utterance
+    } else {
+         clearTimeout(state.silenceTimer); // Ensure timers are cleared
+         clearInterval(state.recordingTimer);
+    }
+
+
+    // Stop media stream tracks
+    if (state.videoStream) {
+        console.log("Stopping media stream tracks.");
+        state.videoStream.getTracks().forEach(track => track.stop());
+        state.videoStream = null;
+        // Reset video display?
+        const videoElement = document.getElementById('candidateVideo');
+        if(videoElement) videoElement.srcObject = null;
+    }
+
+     // Add visual feedback
+    addMessageToConversation("system", "Ending interview and generating analysis...");
+    const endBtn = document.getElementById('endInterviewBtn');
+    if(endBtn) endBtn.disabled = true; endBtn.textContent = 'Analyzing...';
+
+
+    fetch(`${API_BASE_URL}/end-interview`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ interviewId: state.interviewId })
+    })
+    .then(response => {
+        if (!response.ok) throw new Error(`Failed to end interview (${response.status})`);
+        return response.json();
+    })
+    .then(data => {
+        console.log('Interview ended response:', data);
+        if (data.analysisStatus === 'processing') {
+            pollInterviewAnalysis(state.interviewId); // Start polling for results
+        } else {
+             // Handle potential immediate completion or error from backend?
+             console.warn("Unexpected status after ending interview:", data.status);
+             // Maybe still try polling
+             pollInterviewAnalysis(state.interviewId);
+        }
+        // Reset interview ID *after* starting polling for its results
+        // state.interviewId = null; // Or keep it to view results? Keep it for now.
+    })
+    .catch(error => {
+        console.error('Error ending interview:', error);
+        alert(`Error ending interview: ${error.message}`);
+         if(endBtn) endBtn.disabled = false; endBtn.textContent = 'End Interview & Analyze'; // Reset button
+         addMessageToConversation("system", `Error ending interview: ${error.message}`);
+    });
+}
+
+function pollInterviewAnalysis(interviewId) {
+    console.log("Polling for interview analysis results for:", interviewId);
+    navigateTo('performance'); // Show performance section while polling
+
+    // Add loading state to performance section
+    document.getElementById('performance').innerHTML = `
+        <div class="container text-center mt-5">
+            <h2>Generating Interview Performance Analysis...</h2>
+            <p class="section-description">This may take a minute.</p>
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+        </div>`;
+
+
+    const checkAnalysis = () => {
+        // Stop polling if interview changed or isn't active anymore (though it should be ended)
+        if (state.interviewId !== interviewId) {
+            console.log("Interview ID changed, stopping analysis polling for", interviewId);
+            return;
+        }
+
+        fetch(`${API_BASE_URL}/get-interview-analysis/${interviewId}`)
+        .then(response => {
+            if (response.status === 202) { // 202 Accepted - Still processing
+                console.log("Analysis still processing...");
+                setTimeout(checkAnalysis, 5000); // Poll again after 5 seconds
+                return null; // Don't continue processing this response
+            }
+            if (response.status === 500) { // Explicit server error
+                 throw new Error("Server error while generating analysis.");
+            }
+            if (response.status === 404) {
+                throw new Error("Interview analysis not found.");
+            }
+             if (!response.ok) {
+                throw new Error(`Failed to get analysis (${response.status})`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            if (!data) return; // Exit if still processing (returned null)
+
+            console.log('Interview analysis received:', data);
+            // Restore original performance section structure before displaying
+            restorePerformanceSectionHTML(); // You'll need to define this function or paste the original HTML structure back
+            displayInterviewAnalysis(data); // Display results
+
+            // Unlock history section based on results
+            fetch(`${API_BASE_URL}/get-progress-history/${state.sessionId}`)
+                .then(res => res.ok ? res.json() : null)
+                .then(historyData => {
+                    if (historyData && historyData.interviews?.length > 0) { // Unlock if any history exists
+                         unlockSection('performance'); // Ensure performance is unlocked
+                         unlockSection('history');
+                    }
+                });
+
+             const endBtn = document.getElementById('endInterviewBtn');
+             if(endBtn) endBtn.disabled = false; endBtn.textContent = 'End Interview & Analyze'; // Reset button state
+
+        })
+        .catch(error => {
+            console.error('Error getting interview analysis:', error);
+             document.getElementById('performance').innerHTML = `<div class="alert alert-danger">Error retrieving interview analysis: ${error.message}</div>`;
+            // Reset end button state
+             const endBtn = document.getElementById('endInterviewBtn');
+             if(endBtn) endBtn.disabled = false; endBtn.textContent = 'End Interview & Analyze';
+        });
+    };
+
+    checkAnalysis(); // Start polling
+}
+
+// Function to restore the HTML structure of the performance section
+// (Needed because we overwrite it with a loading indicator during polling)
+function restorePerformanceSectionHTML() {
+    const performanceSection = document.getElementById('performance');
+    if (!performanceSection) return;
+    // Paste the full, original HTML structure from index.html here
+    // Including the NEW suggested answers section placeholder
+    performanceSection.innerHTML = `
+        <div class="container">
+            <h2>Interview Performance Analysis</h2>
+            <p class="section-description">Here's how you performed in your mock interview</p>
+
+            <div class="row">
+                <div class="col-md-4">
+                    <div class="card mb-4">
+                        <div class="card-body text-center">
+                            <h3>Overall Score</h3>
+                            <div class="performance-score-circle">
+                                <span id="overallPerformanceScore">--</span><span>%</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-8">
+                    <div class="card mb-4">
+                        <div class="card-body">
+                            <h3>Overall Assessment</h3>
+                            <p id="overallAssessment">Loading assessment...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row score-cards">
+                <div class="col-md-4">
+                    <div class="card mb-4 score-card">
+                        <div class="card-body">
+                            <h3>Technical</h3>
+                            <div class="score-indicator">
+                                <div class="score-value" id="technicalScore">--</div>
+                                <div class="score-bar"><div class="score-progress" id="technicalScoreBar" style="width: 0%;"></div></div>
+                            </div>
+                            <div class="score-details mt-3">
+                                <div class="score-strengths"><h5>Strengths</h5><ul id="technicalStrengths"><li>Loading...</li></ul></div>
+                                <div class="score-weaknesses"><h5>Areas to Improve</h5><ul id="technicalWeaknesses"><li>Loading...</li></ul></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card mb-4 score-card">
+                        <div class="card-body">
+                            <h3>Communication</h3>
+                            <div class="score-indicator">
+                                <div class="score-value" id="communicationScore">--</div>
+                                <div class="score-bar"><div class="score-progress" id="communicationScoreBar" style="width: 0%;"></div></div>
+                            </div>
+                            <div class="score-details mt-3">
+                                <div class="score-strengths"><h5>Strengths</h5><ul id="communicationStrengths"><li>Loading...</li></ul></div>
+                                <div class="score-weaknesses"><h5>Areas to Improve</h5><ul id="communicationWeaknesses"><li>Loading...</li></ul></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card mb-4 score-card">
+                        <div class="card-body">
+                            <h3>Behavioral</h3>
+                            <div class="score-indicator">
+                                <div class="score-value" id="behavioralScore">--</div>
+                                <div class="score-bar"><div class="score-progress" id="behavioralScoreBar" style="width: 0%;"></div></div>
+                            </div>
+                            <div class="score-details mt-3">
+                                <div class="score-strengths"><h5>Strengths</h5><ul id="behavioralStrengths"><li>Loading...</li></ul></div>
+                                <div class="score-weaknesses"><h5>Areas to Improve</h5><ul id="behavioralWeaknesses"><li>Loading...</li></ul></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card mb-4">
+                <div class="card-header"><h3>Key Improvement Areas</h3></div>
+                <div class="card-body"><div id="keyImprovementAreas"><p class="text-center">Loading improvement areas...</p></div></div>
+            </div>
+
+            <div class="card mb-4">
+                <div class="card-header"><h3>Interview Transcript</h3></div>
+                <div class="card-body"><div id="interviewTranscript" class="interview-transcript"><p class="text-center">Loading transcript...</p></div></div>
+            </div>
+
+            <div class="card mb-4">
+                 <div class="card-header"><h3><i class="fas fa-lightbulb me-2"></i> Suggested Answers & Rationale</h3></div>
+                 <div class="card-body">
+                     <p class="text-muted small">Here are some strong ways you could have answered the interviewer's questions, tailored to your profile.</p>
+                     <div id="suggestedAnswersAccordion" class="accordion">
+                         <div class="text-center p-3">
+                             <div class="spinner-border spinner-border-sm text-primary" role="status">
+                                 <span class="visually-hidden">Loading...</span>
+                             </div>
+                             <span class="ms-2">Loading suggested answers...</span>
+                         </div>
+                     </div>
+                 </div>
+             </div>
+             <div class="text-center mt-4">
+                <button class="btn btn-primary" id="startNewInterviewBtn">Start New Interview</button>
+                <button class="btn btn-secondary" id="viewProgressBtn">View Progress History</button>
+            </div>
+        </div>`; // End of innerHTML
+
+    // Re-attach listeners for the buttons inside this section
+     document.getElementById('startNewInterviewBtn')?.addEventListener('click', () => { navigateTo('mock-interview'); showPermissionsModal(); });
+     document.getElementById('viewProgressBtn')?.addEventListener('click', () => navigateTo('history'));
+}
+
+
+function displayInterviewAnalysis(analysisData) {
+    // Ensure analysisData and analysisData.analysis exist
+    if (!analysisData || !analysisData.analysis) {
+        console.error("Invalid analysis data received for display.");
+        // Attempt to restore the section structure before showing error
+        restorePerformanceSectionHTML();
+        document.getElementById('performance').innerHTML = '<div class="alert alert-danger">Could not display interview analysis. Data missing.</div>';
+        return;
+    }
+    const analysis = analysisData.analysis;
+    const interviewIdForSuggestions = analysisData.interviewId || state.interviewId; // Get ID for suggestions call
+
+    // --- Restore HTML Structure First (Crucial if loading overwrote it) ---
+    // Ensure the basic structure exists before populating it
+    // restorePerformanceSectionHTML(); // Called by pollInterviewAnalysis before this now
+
+    // --- Populate Data ---
+
+    // Overall Score & Assessment
+    const overallScore = analysis.overallScore || 0;
+    const overallScoreElement = document.getElementById('overallPerformanceScore');
+    const overallCircleElement = document.querySelector('.performance-score-circle'); // Use querySelector for potential future changes
+    const overallAssessmentElement = document.getElementById('overallAssessment');
+
+    if (overallScoreElement) overallScoreElement.textContent = overallScore;
+    if (overallCircleElement) overallCircleElement.style.setProperty('--percentage', `${overallScore}%`);
+    if (overallAssessmentElement) overallAssessmentElement.textContent = analysis.overallAssessment || 'No overall assessment available.';
+
+    // Helper to display score card section
+    const displayScoreSection = (sectionId, assessmentData) => {
+        const scoreEl = document.getElementById(`${sectionId}Score`);
+        const scoreBarEl = document.getElementById(`${sectionId}ScoreBar`);
+        const strengthsEl = document.getElementById(`${sectionId}Strengths`);
+        const weaknessesEl = document.getElementById(`${sectionId}Weaknesses`);
+        const data = assessmentData || {}; // Handle case where assessment section is missing
+
+        if (scoreEl) scoreEl.textContent = data.score !== undefined ? data.score : '--';
+        if (scoreBarEl) scoreBarEl.style.width = `${data.score || 0}%`;
+
+        const populateList = (listEl, items, type) => {
+            if (!listEl) return;
+            listEl.innerHTML = ''; // Clear
+            if (items?.length > 0) {
+                items.forEach(item => {
+                    const li = document.createElement('li');
+                    // Use textContent for safety against potential XSS in feedback strings
+                    li.innerHTML = `<i class="fas ${type === 'strength' ? 'fa-plus-circle text-success' : 'fa-minus-circle text-danger'} me-2"></i>`;
+                    li.appendChild(document.createTextNode(item || 'N/A')); // Append text safely
+                    listEl.appendChild(li);
+                });
+            } else {
+                listEl.innerHTML = `<li class="text-muted">None identified.</li>`;
+            }
+        };
+
+        populateList(strengthsEl, data.strengths, 'strength');
+        populateList(weaknessesEl, data.weaknesses, 'weakness');
+    };
+
+    displayScoreSection('technical', analysis.technicalAssessment);
+    displayScoreSection('communication', analysis.communicationAssessment);
+    displayScoreSection('behavioral', analysis.behavioralAssessment);
+
+
+    // Key Improvement Areas
+    const keyImprovementAreasContainer = document.getElementById('keyImprovementAreas');
+    if (keyImprovementAreasContainer) {
+        keyImprovementAreasContainer.innerHTML = ''; // Clear
+        if (analysis.keyImprovementAreas?.length > 0) {
+            const listGroup = document.createElement('div');
+            listGroup.className = 'list-group';
+            analysis.keyImprovementAreas.forEach(area => {
+                const item = document.createElement('div'); // Use div, not link 'a'
+                item.className = 'list-group-item list-group-item-action flex-column align-items-start'; // Keep classes for styling
+
+                 // Safely create and append text content
+                 const headerDiv = document.createElement('div');
+                 headerDiv.className = 'd-flex w-100 justify-content-between';
+                 const title = document.createElement('h5');
+                 title.className = 'mb-1';
+                 title.innerHTML = `<i class="fas fa-wrench me-2"></i>`; // Icon is safe
+                 title.appendChild(document.createTextNode(area.area || 'Improvement Area'));
+                 headerDiv.appendChild(title);
+                 item.appendChild(headerDiv);
+
+                 const recommendation = document.createElement('p');
+                 recommendation.className = 'mb-1';
+                 recommendation.textContent = area.recommendation || 'No specific recommendation.';
+                 item.appendChild(recommendation);
+
+                 if (area.practiceExercise) {
+                     const practice = document.createElement('small');
+                     practice.className = 'text-muted';
+                     practice.innerHTML = `<strong>Practice:</strong> `; // Bold tag is safe
+                     practice.appendChild(document.createTextNode(area.practiceExercise));
+                     item.appendChild(practice);
+                 }
+                 listGroup.appendChild(item);
+            });
+            keyImprovementAreasContainer.appendChild(listGroup);
+        } else {
+            keyImprovementAreasContainer.innerHTML = '<div class="alert alert-light">No specific areas for improvement highlighted.</div>';
+        }
+    }
+
+
+    // Interview Transcript
+    const interviewTranscriptContainer = document.getElementById('interviewTranscript');
+    if (interviewTranscriptContainer) {
+        interviewTranscriptContainer.innerHTML = ''; // Clear
+        if (analysisData.transcript?.length > 0) {
+            analysisData.transcript.forEach(message => {
+                const messageElement = document.createElement('div');
+                messageElement.className = `transcript-message ${message.speaker?.toLowerCase() || 'unknown'}`;
+
+                const speakerDiv = document.createElement('div');
+                speakerDiv.className = 'transcript-speaker';
+                speakerDiv.textContent = message.speaker || 'Unknown'; // Safe text
+
+                const textDiv = document.createElement('div');
+                textDiv.className = 'transcript-text';
+                textDiv.textContent = message.text || '(empty message)'; // Safe text
+
+                messageElement.appendChild(speakerDiv);
+                messageElement.appendChild(textDiv);
+                interviewTranscriptContainer.appendChild(messageElement);
+            });
+            interviewTranscriptContainer.scrollTop = interviewTranscriptContainer.scrollHeight; // Scroll to bottom
+        } else {
+            interviewTranscriptContainer.innerHTML = '<p class="text-muted">Transcript not available.</p>';
+        }
+    }
+
+    // **** CALL TO LOAD SUGGESTED ANSWERS (Added) ****
+    if (interviewIdForSuggestions) {
+       console.log(`Analysis displayed, now loading suggested answers for interview: ${interviewIdForSuggestions}`);
+       loadSuggestedAnswers(interviewIdForSuggestions);
+    } else {
+         console.error("Cannot load suggested answers, interview ID not found in analysis data or state.");
+         // Display error in the suggested answers section
+         const container = document.getElementById('suggestedAnswersAccordion');
+          if(container) {
+            container.innerHTML = '<div class="alert alert-danger">Could not load suggested answers: Interview ID missing.</div>';
+          }
+    }
+    // **** END OF ADDED CODE ****
+}
+
+// --- NEW Function to load suggested answers ---
+function loadSuggestedAnswers(interviewId) {
+    console.log("Requesting suggested answers for interview:", interviewId);
+    const container = document.getElementById('suggestedAnswersAccordion');
+    if (!container) return;
+
+    // Show loading state specifically for this section
+    container.innerHTML = `
+        <div class="text-center p-3">
+            <div class="spinner-border spinner-border-sm text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <span class="ms-2">Loading suggested answers...</span>
+        </div>`;
+
+    fetch(`${API_BASE_URL}/get-suggested-answers/${interviewId}`)
+    .then(response => {
+        if (!response.ok) {
+            // Try to get error message from backend JSON
+             return response.json().then(errData => {
+                 throw new Error(errData.error || `Network response was not ok (${response.status})`);
+            }).catch(() => {
+                 // If backend didn't send JSON error
+                 throw new Error(`Network response was not ok (${response.status})`);
+             });
+        }
+        return response.json();
+    })
+    .then(data => {
+        console.log('Suggested answers data received:', data);
+        displaySuggestedAnswers(data); // Call display function
+    })
+    .catch(error => {
+        console.error('Error loading suggested answers:', error);
+        if (container) {
+             container.innerHTML = `<div class="alert alert-warning">Could not load suggested answers: ${error.message}</div>`;
+        }
+    });
+}
+
+// --- NEW Function to display suggested answers ---
+function displaySuggestedAnswers(data) {
+    const container = document.getElementById('suggestedAnswersAccordion');
+    if (!container) return;
+    container.innerHTML = ''; // Clear loading state
+
+    if (data.error) {
+         container.innerHTML = `<div class="alert alert-warning">Could not generate suggested answers: ${data.error}</div>`;
+         return;
+    }
+
+    if (!data || !data.suggestedAnswers || data.suggestedAnswers.length === 0) {
+        container.innerHTML = '<div class="alert alert-light">No suggested answers were generated for this interview.</div>';
+        return;
+    }
+
+    data.suggestedAnswers.forEach((item, index) => {
+        const question = item.question || "[Question not extracted]";
+        const suggestions = item.suggestions || [];
+
+        const accordionItemId = `suggestedAnswerItem-${index}`;
+        const headerId = `suggestedAnswerHeader-${index}`;
+        const collapseId = `suggestedAnswerCollapse-${index}`;
+
+        const accordionItem = document.createElement('div');
+        accordionItem.className = 'accordion-item';
+
+        let suggestionsHTML = '';
+        if (suggestions.length > 0) {
+            suggestionsHTML = suggestions.map((suggestion, sugIndex) => `
+                <div class="suggestion-block mb-3 pb-2 ${sugIndex < suggestions.length - 1 ? 'border-bottom' : ''}">
+                    <h6>Suggestion ${sugIndex + 1}:</h6>
+                    <p><strong>Answer:</strong> ${suggestion.answer || "N/A"}</p>
+                    <p class="text-muted small"><strong><i class="fas fa-info-circle me-1"></i>Rationale:</strong> ${suggestion.rationale || "N/A"}</p>
+                </div>
+            `).join('');
+        } else {
+            suggestionsHTML = '<p class="text-muted">No specific suggestions provided for this question.</p>';
+        }
+
+        accordionItem.innerHTML = `
+            <h2 class="accordion-header" id="${headerId}">
+                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#${collapseId}" aria-expanded="false" aria-controls="${collapseId}">
+                   <i class="fas fa-question-circle text-primary me-2"></i> ${question}
+                </button>
+            </h2>
+            <div id="${collapseId}" class="accordion-collapse collapse" aria-labelledby="${headerId}" data-bs-parent="#suggestedAnswersAccordion">
+                <div class="accordion-body">
+                    ${suggestionsHTML}
+                </div>
+            </div>
+        `;
+        container.appendChild(accordionItem);
+    });
+}
+
+
+// --- History Section ---
+
+function loadProgressHistory() {
+    if (!state.sessionId) {
+        console.log('No active session for progress history');
+        // Optionally display a message in the history section
+        document.getElementById('history').innerHTML = '<div class="container"><p class="alert alert-info">Complete an interview analysis first to see progress history.</p></div>';
+        return;
+    }
+
+     console.log("Loading progress history for session:", state.sessionId);
+     // Display loading state for history
+     document.getElementById('history').innerHTML = `
+         <div class="container text-center mt-5">
+            <h2>Loading Progress History...</h2>
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+         </div>`;
+
+    fetch(`${API_BASE_URL}/get-progress-history/${state.sessionId}`)
+    .then(response => {
+        if (response.status === 404) return { interviews: [], trends: null, message: "No history found yet." }; // Handle no history gracefully
+        if (!response.ok) throw new Error(`Failed to get progress history (${response.status})`);
+        return response.json();
+    })
+    .then(data => {
+        console.log('Progress history data:', data);
+        // Restore original history section structure
+        restoreHistorySectionHTML(); // You'll need to define this
+        displayProgressHistory(data); // Display the data
+    })
+    .catch(error => {
+        console.error('Error loading progress history:', error);
+        document.getElementById('history').innerHTML = `<div class="container"><div class="alert alert-danger">Error loading progress history: ${error.message}</div></div>`;
+    });
+}
+
+// Function to restore the HTML structure of the history section
+function restoreHistorySectionHTML() {
+     const historySection = document.getElementById('history');
+     if (!historySection) return;
+     // Paste the original HTML structure from index.html here
+     historySection.innerHTML = `
+        <div class="container">
+            <h2>Progress History</h2>
+            <p class="section-description">Track your improvement across multiple mock interviews</p>
+            <div class="card mb-4">
+                <div class="card-header"><h3>Performance Trends</h3></div>
+                <div class="card-body">
+                    <div class="chart-container" style="height: 300px;"> <canvas id="progressChart"></canvas>
+                    </div>
+                </div>
+            </div>
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="card mb-4">
+                        <div class="card-header"><h3>Improvement Summary</h3></div>
+                        <div class="card-body"><div id="improvementSummary"><p class="text-center">Loading summary...</p></div></div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="card mb-4">
+                        <div class="card-header"><h3>Past Interviews</h3></div>
+                        <div class="card-body"><div id="pastInterviewsList" class="past-interviews-list"><p class="text-center">Loading past interviews...</p></div></div>
+                    </div>
+                </div>
+            </div>
+            <div class="text-center mt-4">
+                <button class="btn btn-primary" id="startAnotherInterviewBtn">Start Another Interview</button>
+            </div>
+        </div>`;
+        // Re-attach listener
+        document.getElementById('startAnotherInterviewBtn')?.addEventListener('click', () => { navigateTo('mock-interview'); showPermissionsModal(); });
+}
+
+
+function displayProgressHistory(historyData) {
+     const improvementSummary = document.getElementById('improvementSummary');
+     const pastInterviewsList = document.getElementById('pastInterviewsList');
+     const chartCanvas = document.getElementById('progressChart'); // Get canvas element
+
+     if (!improvementSummary || !pastInterviewsList || !chartCanvas) {
+          console.error("History UI elements missing.");
+          return;
+     }
+
+    // Improvement Summary
+     improvementSummary.innerHTML = ''; // Clear loading
+     const trends = historyData.trends;
+     const totalInterviews = historyData.interviews?.length || 0;
+
+     if (totalInterviews > 1 && trends) {
+         const createTrendValueHTML = (value) => {
+             const numValue = Number(value) || 0;
+             const sign = numValue > 0 ? '+' : '';
+             const colorClass = numValue > 0 ? 'text-success' : numValue < 0 ? 'text-danger' : 'text-muted';
+             return `<span class="fw-bold ${colorClass}">${sign}${numValue} pts</span>`;
+         };
+         improvementSummary.innerHTML = `
+             <div class="alert alert-info">
+                 <h5>Progress Overview</h5>
+                 <p>Completed ${totalInterviews} interviews. Showing trends from first to latest.</p>
+                 <p>Overall Change: ${createTrendValueHTML(trends.overallImprovement)}</p>
+             </div>
+             <div class="d-flex justify-content-around text-center">
+                 <div>Technical<br>${createTrendValueHTML(trends.technicalImprovement)}</div>
+                 <div>Communication<br>${createTrendValueHTML(trends.communicationImprovement)}</div>
+                 <div>Behavioral<br>${createTrendValueHTML(trends.behavioralImprovement)}</div>
+             </div>`;
+     } else if (totalInterviews === 1) {
+         improvementSummary.innerHTML = '<div class="alert alert-light">Complete more interviews to see improvement trends.</div>';
+     } else {
+          improvementSummary.innerHTML = '<div class="alert alert-light">No interview history found.</div>';
+     }
+
+    // Past Interviews List
+     pastInterviewsList.innerHTML = ''; // Clear loading
+     if (totalInterviews > 0) {
+         // Sort interviews newest first for display
+         const sortedInterviews = [...historyData.interviews].sort((a, b) => new Date(b.date) - new Date(a.date));
+         sortedInterviews.forEach((interview, index) => {
+             const item = document.createElement('div');
+             item.className = 'past-interview-item list-group-item'; // Use list-group-item for better spacing maybe
+             const date = new Date(interview.date);
+             const formattedDate = date.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+             const formattedTime = date.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit'});
+
+             item.innerHTML = `
+                 <div class="d-flex w-100 justify-content-between">
+                     <h6 class="mb-1">Interview #${totalInterviews - index} (${formattedDate})</h6>
+                     <span class="badge bg-primary rounded-pill p-2">Overall: ${interview.overallScore || 'N/A'}</span>
+                 </div>
+                 <small class="text-muted">${formattedTime} - Type: ${interview.interviewType || 'General'}</small> <div class="d-flex justify-content-around mt-1 small">
+                      <span>Tech: ${interview.technicalScore || 'N/A'}</span>
+                      <span>Comm: ${interview.communicationScore || 'N/A'}</span>
+                      <span>Behav: ${interview.behavioralScore || 'N/A'}</span>
+                 </div>
+                 `;
+             pastInterviewsList.appendChild(item);
+         });
+     } else {
+         pastInterviewsList.innerHTML = '<p class="text-muted">No past interviews recorded.</p>';
+     }
+
+    // Progress Chart
+    displayProgressChart(historyData, chartCanvas); // Pass canvas element
+}
+
+
+// --- Charting ---
+let progressChartInstance = null; // Keep track of the chart instance
+
+function displayProgressChart(historyData, canvasElement) {
+    if (!canvasElement) {
+         console.error("Chart canvas element not found");
+         return;
+    }
+    const ctx = canvasElement.getContext('2d');
+
+     // Destroy previous chart instance if it exists
+    if (progressChartInstance) {
+        progressChartInstance.destroy();
+        progressChartInstance = null;
+    }
+
+
+    if (!historyData.interviews || historyData.interviews.length < 1) {
+        // Optionally display a message on the canvas if no data
+        ctx.clearRect(0, 0, canvasElement.width, canvasElement.height); // Clear canvas
+        ctx.textAlign = 'center';
+        ctx.fillText('Complete interviews to see progress chart.', canvasElement.width / 2, 50);
+        return;
+    }
+
+    // Sort interviews by date (oldest first for chart)
+    const sortedInterviews = [...historyData.interviews].sort((a, b) => new Date(a.date) - new Date(b.date));
+
+    const labels = sortedInterviews.map((_, index) => `Interview ${index + 1}`); // Simple labels
+    const overallData = sortedInterviews.map(interview => interview.overallScore);
+    const technicalData = sortedInterviews.map(interview => interview.technicalScore);
+    const communicationData = sortedInterviews.map(interview => interview.communicationScore);
+    const behavioralData = sortedInterviews.map(interview => interview.behavioralScore);
+
+    progressChartInstance = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [
+                { label: 'Overall', data: overallData, borderColor: 'rgba(74, 111, 220, 1)', backgroundColor: 'rgba(74, 111, 220, 0.1)', tension: 0.1, borderWidth: 2, fill: true },
+                { label: 'Technical', data: technicalData, borderColor: 'rgba(75, 192, 192, 1)', backgroundColor: 'rgba(75, 192, 192, 0.1)', tension: 0.1, hidden: true }, // Hide less important ones initially?
+                { label: 'Communication', data: communicationData, borderColor: 'rgba(255, 159, 64, 1)', backgroundColor: 'rgba(255, 159, 64, 0.1)', tension: 0.1, hidden: true },
+                { label: 'Behavioral', data: behavioralData, borderColor: 'rgba(153, 102, 255, 1)', backgroundColor: 'rgba(153, 102, 255, 0.1)', tension: 0.1, hidden: true }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false, // Allow chart to fill container height
+            scales: {
+                y: { beginAtZero: true, max: 100, title: { display: true, text: 'Score' } },
+                x: { title: { display: true, text: 'Interview Session' } }
+            },
+            plugins: {
+                legend: { position: 'top' },
+                tooltip: { mode: 'index', intersect: false }
+            }
+        }
+    });
+}
+
+
+// --- Conversation Display ---
+
+function addMessageToConversation(role, content) {
+    const conversationContainer = document.getElementById('conversationContainer');
+    if (!conversationContainer) return;
+
+    const messageElement = document.createElement('div');
+    messageElement.classList.add('message', role); // Role: interviewer, candidate, system
+
+    const senderElement = document.createElement('div');
+    senderElement.className = 'sender';
+    let senderName = 'System';
+    if (role === 'interviewer') senderName = 'IRIS Interviewer';
+    if (role === 'candidate') senderName = 'You';
+    senderElement.textContent = senderName;
+
+    const contentElement = document.createElement('div');
+    // Sanitize content before adding? Basic prevention:
+    contentElement.textContent = content; // Use textContent to prevent XSS
+
+    messageElement.appendChild(senderElement);
+    messageElement.appendChild(contentElement);
+    conversationContainer.appendChild(messageElement);
+
+    // Scroll to bottom
+    conversationContainer.scrollTop = conversationContainer.scrollHeight;
+
+    // Add to logical history (only user/assistant roles for backend)
+    if (role === 'interviewer' || role === 'candidate') {
+        state.conversationHistory.push({
+            role: role === 'interviewer' ? 'assistant' : 'user',
+            content: content
+        });
+    }
+}

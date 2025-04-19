@@ -1,0 +1,11 @@
+flask
+flask_cors
+requests
+PyPDF2
+python-dotenv
+anthropic
+azure-cognitiveservices-speech
+boto3
+gunicorn 
+firebase-admin
+werkzeug
