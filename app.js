@@ -36,7 +36,7 @@ const SPEECH_THRESHOLD = 55; // Example value (0-255)
 const FFT_SIZE = 256;        // Smaller FFT size for faster analysis, less frequency detail needed
 
 // API Base URL - Make sure this points to your BACKEND (port 5000)
-const API_BASE_URL = 'https://cuddly-trout-wrqrxpw6vqwc7gq-5000.app.github.dev'; // No trailing slash
+const API_BASE_URL = 'https://iris-ai-backend.onrender.com'; // No trailing slash
 
 // DOM Elements Cache (Optional but good practice)
 const DOMElements = {
