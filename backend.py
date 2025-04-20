@@ -202,50 +202,18 @@ def add_conversation_message(interview_id, role, content):
         return False
 # === Existing Helper Functions (Keep implementations as they were) ===
 
-def extract_text_from_pdf(file_path_or_blob_name):
-    """
-    Extracts text from a PDF file, either from a local path
-    or by downloading from Firebase Storage based on the input string.
-    """
-    pdf_source_description = ""
+def extract_text_from_pdf(file_path):
+    """Extracts text from a PDF file given a local file path."""
+    # This is the simpler version handling only local paths
+    pdf_source_description = f"local file: {file_path}"
+    print(f"Attempting to extract text from {pdf_source_description}")
     try:
-        # Check if the input looks like a Firebase Storage path/blob name
-        # We assume Storage paths will start with a folder like 'resumes/'
-        if isinstance(file_path_or_blob_name, str) and '/' in file_path_or_blob_name and not os.path.isabs(file_path_or_blob_name):
-            # --- Handle Firebase Storage ---
-            blob_name = file_path_or_blob_name
-            pdf_source_description = f"Firebase Storage blob: {blob_name}"
-            print(f"Attempting to download and extract text from {pdf_source_description}")
+        if not os.path.exists(file_path):
+            raise FileNotFoundError(f"Local file not found: {file_path}")
 
-            if not bucket:
-                raise ConnectionError("Firebase Storage bucket not initialized.")
+        reader = PdfReader(file_path)
+        text = "".join([page.extract_text() + "\n" for page in reader.pages if page.extract_text()])
 
-            blob = bucket.blob(blob_name)
-            if not blob.exists():
-                 raise FileNotFoundError(f"Blob not found in Firebase Storage: {blob_name}")
-
-            # Download content into memory as bytes
-            pdf_bytes = blob.download_as_bytes()
-            print(f"Downloaded {len(pdf_bytes)} bytes from {blob_name}")
-
-            # Use BytesIO to treat the bytes like a file for PdfReader
-            pdf_file_stream = BytesIO(pdf_bytes)
-            reader = PdfReader(pdf_file_stream)
-            text = "".join([page.extract_text() + "\n" for page in reader.pages if page.extract_text()])
-
-        else:
-            # --- Handle Local File Path ---
-            local_file_path = file_path_or_blob_name
-            pdf_source_description = f"local file: {local_file_path}"
-            print(f"Attempting to extract text from {pdf_source_description}")
-
-            if not os.path.exists(local_file_path):
-                raise FileNotFoundError(f"Local file not found: {local_file_path}")
-
-            reader = PdfReader(local_file_path)
-            text = "".join([page.extract_text() + "\n" for page in reader.pages if page.extract_text()])
-
-        # --- Common Processing ---
         print(f"Extracted {len(text)} characters from {pdf_source_description}.")
         if not text.strip():
              print(f"Warning: No text extracted from {pdf_source_description}")
@@ -253,9 +221,6 @@ def extract_text_from_pdf(file_path_or_blob_name):
 
     except FileNotFoundError as e:
          print(f"ERROR: PDF source not found - {e}")
-         raise # Re-raise specific error
-    except ConnectionError as e:
-         print(f"ERROR: Storage connection error - {e}")
          raise
     except Exception as e:
         print(f"ERROR extracting text from {pdf_source_description}: {e}")
@@ -865,15 +830,16 @@ def test_route():
         'config_status': config_status
     })
 
-# === MODIFIED /analyze-resume Route for Firebase Storage ===
 @app.route('/analyze-resume', methods=['POST'])
 def analyze_resume():
     """
-    Receives resume and JD, uploads resume to Firebase Storage,
+    Analyzes resume against JD, saves resume locally temporarily,
     creates session in Firestore, and starts background analysis.
+    (Reverted from Firebase Storage upload)
     """
     session_id = None
-    # Removed temp_session_dir tracking
+    temp_session_dir = None # Keep track of directory to delete
+    temp_resume_path = None # Keep track of file path
     try:
         start_time = time.time() # Track processing time
 
@@ -887,34 +853,24 @@ def analyze_resume():
         if not (resume_file.content_type == 'application/pdf' or resume_filename.lower().endswith('.pdf')):
              return jsonify({'error': 'Only PDF resumes supported'}), 400
         if not db: return jsonify({'error': 'Database unavailable'}), 503
-        if not bucket: return jsonify({'error': 'Storage unavailable'}), 503 # Check bucket too
+        # No need to check bucket here anymore
         # --- End Validation ---
 
         session_id = str(uuid.uuid4())
         print(f"[{session_id}] Received /analyze-resume request for file: {resume_filename}")
 
-        # === Firebase Storage Upload ===
-        # Define path in Storage. Include session ID for uniqueness.
-        # TODO: When user auth is added, replace session_id with user_id in the path.
-        destination_blob_name = f"resumes/{session_id}/{resume_filename}"
-
+        # === Reverted: Temporary Local File Handling ===
         try:
-            print(f"[{session_id}] Attempting to upload to Firebase Storage: {destination_blob_name}")
-            blob = bucket.blob(destination_blob_name)
-
-            # Upload the file stream directly from the request
-            # Reset stream position just in case it was read partially before
-            resume_file.stream.seek(0)
-            blob.upload_from_file(
-                resume_file.stream,
-                content_type=resume_file.content_type
-            )
-            print(f"[{session_id}] Successfully uploaded resume to {destination_blob_name}")
-        except Exception as e:
-            print(f"[{session_id}] ERROR: Firebase Storage upload failed: {e}")
-            traceback.print_exc()
-            return jsonify({'error': f'Failed to upload resume file: {str(e)}'}), 500
-        # === End Firebase Storage Upload ===
+            temp_session_dir = os.path.join(BASE_TEMP_DIR, session_id)
+            os.makedirs(temp_session_dir, exist_ok=True)
+            temp_resume_path = os.path.join(temp_session_dir, resume_filename)
+            resume_file.save(temp_resume_path)
+            print(f"[{session_id}] Resume temporarily saved locally to: {temp_resume_path}")
+        except Exception as file_err:
+             print(f"[{session_id}] ERROR: Failed to save temporary resume file: {file_err}")
+             traceback.print_exc()
+             return jsonify({'error': f'Server file system error: {str(file_err)}'}), 500
+        # === End Reverted File Handling ===
 
         # --- Initialize session doc in Firestore ---
         session_ref = db.collection('sessions').document(session_id)
@@ -922,8 +878,8 @@ def analyze_resume():
             'status': 'processing',
             'progress': 5,
             # 'userId': '...', # TODO: Add user ID later
-            'resume_storage_path': destination_blob_name, # Store Storage path
-            'original_filename': resume_filename, # Store original name too
+            'resume_filename_temp': resume_filename, # Store local filename again
+            # 'resume_storage_path': None, # Remove or set to None
             'job_description': job_description,
             'start_time': datetime.now().isoformat(),
             'results': {},
@@ -931,20 +887,21 @@ def analyze_resume():
             'last_updated': firestore.SERVER_TIMESTAMP
         }
         session_ref.set(initial_session_data)
-        print(f"[{session_id}] Initial session created in Firestore with Storage path.")
+        print(f"[{session_id}] Initial session created in Firestore (using local file).")
         # --- End Firestore Init ---
 
-        # Define background task (now takes Storage path)
-        def process_resume_background(current_session_id, storage_blob_name, jd):
+        # Define background task (takes local path again)
+        def process_resume_background(current_session_id, resume_local_path, jd): # Takes local path
             session_status = 'failed'
             error_list = []
             try:
-                print(f"[{current_session_id}] Background task started for Storage blob: {storage_blob_name}")
-                # Pass blob name directly to the modified extract_text_from_pdf
-                update_session_data(current_session_id, {'progress': 10, 'status_detail': 'Extracting text from Storage'})
-                resume_text = extract_text_from_pdf(storage_blob_name) # Pass blob name
-                if not resume_text: raise ValueError("Failed to extract text from PDF in Storage.")
+                print(f"[{current_session_id}] Background task started for local file: {resume_local_path}")
+                # Pass local path directly to the reverted extract_text_from_pdf
+                update_session_data(current_session_id, {'progress': 10, 'status_detail': 'Extracting text'})
+                resume_text = extract_text_from_pdf(resume_local_path) # Pass local path
+                if not resume_text: raise ValueError("Failed to extract text from PDF.")
 
+                # --- Rest of the processing remains the same ---
                 update_session_data(current_session_id, {'progress': 30, 'status_detail': 'Parsing resume'})
                 parsed_resume = parse_resume_with_claude(resume_text)
                 if not parsed_resume or not parsed_resume.get("name"): raise ValueError("Failed to parse resume.")
@@ -969,6 +926,7 @@ def analyze_resume():
                     'status_detail': 'Analysis complete', 'end_time': datetime.now().isoformat()
                 })
                 session_status = 'completed'
+                # --- End of processing ---
 
             except Exception as e:
                 error_msg = f"Error in background task for {current_session_id}: {e}"
@@ -979,11 +937,20 @@ def analyze_resume():
                     'status': 'failed', 'errors': firestore.ArrayUnion([str(e)]),
                     'status_detail': f'Error: {str(e)[:100]}...', 'end_time': datetime.now().isoformat()
                 })
-            # No finally block needed for local file cleanup anymore
-            print(f"[{current_session_id}] Background processing finished with status: {session_status}")
+            finally:
+                # === Reverted: Add local directory cleanup back ===
+                dir_to_remove = os.path.dirname(resume_local_path)
+                try:
+                    if os.path.exists(dir_to_remove):
+                         print(f"[{current_session_id}] Cleaning up temporary directory: {dir_to_remove}")
+                         shutil.rmtree(dir_to_remove)
+                except Exception as cleanup_error:
+                     print(f"[{current_session_id}] WARNING: Failed to cleanup temp dir {dir_to_remove}: {cleanup_error}")
+                # === End Reverted Cleanup ===
+                print(f"[{current_session_id}] Background processing finished with status: {session_status}")
 
-        # Start background thread with STORAGE PATH
-        processing_thread = threading.Thread(target=process_resume_background, args=(session_id, destination_blob_name, job_description))
+        # Start background thread with LOCAL PATH
+        processing_thread = threading.Thread(target=process_resume_background, args=(session_id, temp_resume_path, job_description))
         processing_thread.daemon = True
         processing_thread.start()
 
@@ -995,9 +962,13 @@ def analyze_resume():
         traceback.print_exc()
         # If session_id was created, try to mark as failed in Firestore
         if session_id and db: update_session_data(session_id, {'status': 'failed', 'errors': firestore.ArrayUnion([f'Route level error: {str(e)}'])})
-        # No temporary directory to clean up here
+        # Clean up temp dir if created before error (added check)
+        if temp_resume_path and os.path.exists(os.path.dirname(temp_resume_path)):
+             try:
+                  shutil.rmtree(os.path.dirname(temp_resume_path))
+             except Exception as cleanup_err:
+                  print(f"Error cleaning up temp dir during route exception: {cleanup_err}")
         return jsonify({'error': f'Server error: {str(e)}'}), 500
-# === END MODIFIED /analyze-resume Route ===
 
 
 @app.route('/get-analysis-status/<session_id>', methods=['GET'])
