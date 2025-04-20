@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>IRIS</title>
+    <title>IRIS - Interview Readiness & Improvement System</title>
     <!-- External Libraries -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -11,50 +11,45 @@
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-    <div class="app-container">
-        <!-- Sidebar Navigation -->
-        <nav id="sidebar">
-            <div class="sidebar-header">
-                <h3>IRIS</h3>
-                <p>Interview Readiness & Improvement System</p>
-            </div>
-            <ul class="nav-items">
-                <li class="nav-item active" data-target="landing">
-                    <i class="fas fa-home"></i> Home
-                </li>
-                <li class="nav-item" data-target="upload">
-                    <i class="fas fa-upload"></i> Upload
-                </li>
-                <li class="nav-item" data-target="analysis" id="nav-analysis">
-                    <i class="fas fa-chart-pie"></i> Analysis
-                    <span class="status-indicator locked"><i class="fas fa-lock"></i></span>
-                </li>
-                <li class="nav-item" data-target="prep-plan" id="nav-prep-plan">
-                    <i class="fas fa-clipboard-list"></i> Prep Plan
-                    <span class="status-indicator locked"><i class="fas fa-lock"></i></span>
-                </li>
-                <li class="nav-item" data-target="mock-interview" id="nav-interview">
-                    <i class="fas fa-video"></i> Mock Interview
-                    <span class="status-indicator locked"><i class="fas fa-lock"></i></span>
-                </li>
-                <li class="nav-item" data-target="performance" id="nav-performance">
-                    <i class="fas fa-chart-line"></i> Performance
-                    <span class="status-indicator locked"><i class="fas fa-lock"></i></span>
-                </li>
-                <li class="nav-item" data-target="history" id="nav-history">
-                    <i class="fas fa-history"></i> History
-                    <span class="status-indicator locked"><i class="fas fa-lock"></i></span>
-                </li>
-            </ul>
-            <div class="sidebar-footer">
-                <p>&copy; 2025 IRIS</p>
+    <!-- Error Messages Container -->
+    <div id="error-messages" class="position-fixed top-0 end-0 p-3" style="z-index: 11000;"></div>
+
+    <!-- Public View (Shown when not logged in) -->
+    <div id="public-view">
+        <!-- Public Navbar -->
+        <nav class="navbar navbar-expand-lg navbar-dark" id="public-navbar">
+            <div class="container">
+                <a class="navbar-brand" href="#">
+                    <i class="fas fa-comments iris-logo-sm me-2"></i>
+                    IRIS
+                </a>
+                <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                    <span class="navbar-toggler-icon"></span>
+                </button>
+                <div class="collapse navbar-collapse" id="navbarNav">
+                    <ul class="navbar-nav me-auto">
+                        <li class="nav-item">
+                            <a class="nav-link tab-button active" data-tab="welcome-tab" href="#">Home</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link tab-button" data-tab="features-tab" href="#">Features</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link tab-button" data-tab="pricing-tab" href="#">Pricing</a>
+                        </li>
+                    </ul>
+                    <div class="d-flex">
+                        <button class="btn btn-outline-light me-2" data-auth="signin">Sign In</button>
+                        <button class="btn btn-primary" data-auth="signup">Get Started</button>
+                    </div>
+                </div>
             </div>
         </nav>
 
-        <!-- Main Content Area -->
-        <main id="content">
-            <!-- Landing Page -->
-            <section id="landing" class="content-section active">
+        <!-- Public Content Tabs -->
+        <div class="public-tabs-container">
+            <!-- Welcome Tab -->
+            <div id="welcome-tab" class="public-tab active">
                 <div class="hero-section">
                     <div class="container text-center">
                         <div class="logo-container">
@@ -63,6 +58,7 @@
                         <h1>Welcome to IRIS</h1>
                         <h2>Interview Readiness & Improvement System</h2>
                         <p class="lead">Your AI-powered interview coach that helps you prepare, practice, and perform better in job interviews.</p>
+                        <button class="btn btn-primary btn-lg get-started-btn" data-auth="signup">Get Started for Free</button>
                         <div class="features-grid">
                             <div class="feature-card">
                                 <i class="fas fa-file-alt"></i>
@@ -85,489 +81,1103 @@
                                 <p>Get detailed feedback and track your improvement over time</p>
                             </div>
                         </div>
-                        <button class="btn btn-primary btn-lg get-started-btn" id="getStartedBtn">Get Started</button>
                     </div>
                 </div>
-            </section>
+            </div>
 
-            <!-- Upload Resume & Job Description -->
-            <section id="upload" class="content-section">
-                <div class="container">
-                    <h2>Upload Your Resume & Job Description</h2>
-                    <p class="section-description">Let's analyze your resume against a specific job to create a personalized interview preparation plan.</p>
+            <!-- Features Tab -->
+            <div id="features-tab" class="public-tab">
+                <div class="container py-5">
+                    <h1 class="text-center mb-5">Powerful Features to Ace Your Interviews</h1>
                     
-                    <div class="card">
-                        <div class="card-body">
-                            <form id="resumeUploadForm" enctype="multipart/form-data">
-                                <div class="mb-3">
-                                    <label for="resumeFile" class="form-label">Upload Your Resume (PDF)</label>
-                                    <input type="file" class="form-control" id="resumeFile" name="resumeFile" accept=".pdf" required>
-                                </div>
-                                <div class="mb-3">
-                                    <label for="jobDescription" class="form-label">Job Description</label>
-                                    <textarea class="form-control" id="jobDescription" name="jobDescription" rows="6" placeholder="Paste the complete job description here..." required></textarea>
-                                </div>
-                                <button type="submit" class="btn btn-primary" id="analyzeBtn">Analyze Resume</button>
-                            </form>
-                        </div>
-                    </div>
-
-                    <div id="uploadProgress" class="progress-container mt-4" style="display: none;">
-                        <h4>Analyzing Your Resume...</h4>
-                        <div class="progress">
-                            <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 0%"></div>
-                        </div>
-                        <p id="progressMessage">Uploading files...</p>
-                    </div>
-                </div>
-            </section>
-
-            <!-- Resume Analysis Results -->
-            <section id="analysis" class="content-section">
-                <div class="container">
-                    <h2>Resume Analysis Results</h2>
-                    <p class="section-description">Here's how your resume matches with the job requirements</p>
-                    
-                    <div class="row">
-                        <div class="col-md-4">
-                            <div class="card mb-4">
-                                <div class="card-body text-center">
-                                    <h3>Match Score</h3>
-                                    <div class="match-score-circle">
-                                        <span id="matchScore">--</span><span>%</span>
-                                    </div>
-                                    <p id="matchScoreDescription">Loading analysis...</p>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-md-8">
-                            <div class="card mb-4">
-                                <div class="card-body">
-                                    <h3>Match Analysis</h3>
-                                    <p id="matchAnalysis">Loading analysis...</p>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="row">
+                    <div class="row align-items-center mb-5">
                         <div class="col-md-6">
-                            <div class="card mb-4">
-                                <div class="card-header">
-                                    <h3>Key Strengths</h3>
-                                </div>
-                                <div class="card-body">
-                                    <ul id="keyStrengthsList" class="list-group list-group-flush">
-                                        <li class="list-group-item text-center">Loading strengths...</li>
-                                    </ul>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-md-6">
-                            <div class="card mb-4">
-                                <div class="card-header">
-                                    <h3>Skill Gaps</h3>
-                                </div>
-                                <div class="card-body">
-                                    <ul id="skillGapsList" class="list-group list-group-flush">
-                                        <li class="list-group-item text-center">Loading gaps...</li>
-                                    </ul>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="card mb-4">
-                        <div class="card-header">
-                            <h3>Resume Improvement Suggestions</h3>
-                        </div>
-                        <div class="card-body">
-                            <div id="resumeImprovements">
-                                <p class="text-center">Loading suggestions...</p>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="card mb-4">
-                        <div class="card-header"><h3>Resume Resources</h3></div>
-                        <div class="card-body">
-                            <p>Consider these external resources for professional resume templates and examples:</p>
+                            <h2>Resume Analysis</h2>
+                            <p>Our AI-powered system analyzes your resume against specific job descriptions to:</p>
                             <ul>
-                                <li><a href="https://flowcv.com/" target="_blank" rel="noopener noreferrer">FlowCV Resume Builder</a></li>
-                                <li><a href="https://resumake.io/" target="_blank" rel="noopener noreferrer">Resumake.io (Free Templates)</a></li>
-                                <li><a href="https://www.canva.com/resumes/templates/" target="_blank" rel="noopener noreferrer">Canva Resume Templates</a></li>
-                                <li><a href="https://zety.com/resume-templates" target="_blank" rel="noopener noreferrer">Zety Resume Templates</a></li>
-                                <li><a href="https://enhancv.com/resume-examples/" target="_blank" rel="noopener noreferrer">Enhancv Examples</a></li>
+                                <li>Identify skill matches and gaps</li>
+                                <li>Calculate a comprehensive match score</li>
+                                <li>Suggest targeted improvements to your resume</li>
+                                <li>Highlight your strengths relevant to the position</li>
                             </ul>
                         </div>
-                    </div>
-
-                    <div class="text-center mt-4">
-                        <button class="btn btn-primary" id="viewPrepPlanBtn">View Preparation Plan</button>
-                    </div>
-                </div>
-            </section>
-
-            <!-- Interview Preparation Plan -->
-            <section id="prep-plan" class="content-section">
-                <div class="container">
-                    <h2>Your Interview Preparation Plan</h2>
-                    <p class="section-description">Based on your resume analysis, here's a personalized plan to help you prepare</p>
-
-                    <div class="card mb-4">
-                        <div class="card-header"><h3>Focus Areas</h3></div>
-                        <div class="card-body"><ul id="focusAreasList" class="focus-areas-list"><li>Loading...</li></ul></div>
-                    </div>
-
-                    <div class="card mb-4">
-                        <div class="card-header"><h3>Likely Interview Questions</h3></div>
-                        <div class="card-body"><div id="likelyQuestions" class="accordion"><p class="text-center">Loading...</p></div></div>
-                    </div>
-
-                    <div class="row">
                         <div class="col-md-6">
-                            <div class="card mb-4">
-                                <div class="card-header"><h3>Concepts to Study</h3></div>
-                                <div class="card-body"><div id="conceptsToStudy"><p class="text-center">Loading...</p></div></div>
-                            </div>
-                        </div>
-                        <div class="col-md-6">
-                            <div class="card mb-4">
-                                <div class="card-header"><h3><i class="fas fa-exclamation-triangle text-warning me-2"></i> Addressing Potential Gaps</h3></div>
-                                <div class="card-body">
-                                    <p class="text-muted small">Advice on how to positively frame areas where your profile might differ from the JD.</p>
-                                    <div id="gapStrategies"><p class="text-center">Loading...</p></div>
-                                </div>
-                            </div>
+                            <img src="https://via.placeholder.com/600x400?text=Resume+Analysis" alt="Resume Analysis" class="img-fluid rounded shadow">
                         </div>
                     </div>
-
-                    <div class="card mb-4">
-                        <div class="card-header">
-                            <h3><i class="fas fa-calendar-alt me-2"></i> Dynamic Preparation Timeline</h3>
-                        </div>
-                        <div class="card-body">
-                            <div id="dynamicTimelineControls" style="display: none;" class="mb-3 p-3 border rounded bg-light">
-                                <label for="daysUntilInterview" class="form-label fw-bold">Generate a schedule:</label>
-                                <div class="input-group">
-                                    <span class="input-group-text">Days until interview:</span>
-                                    <input type="number" class="form-control" id="daysUntilInterview" placeholder="e.g., 7" min="1" max="90" aria-label="Number of days until interview">
-                                    <button class="btn btn-success" type="button" id="generateDynamicTimelineBtn">
-                                        <i class="fas fa-cogs me-1"></i> Generate Timeline
-                                    </button>
-                                </div>
-                                <div class="form-text">Enter the number of full days you have left to prepare (1-90 recommended).</div>
-                            </div>
-                            <div id="dynamicTimelineArea" class="mt-3">
-                                <p class="text-center text-muted">Enter the number of days above and click generate to create your personalized timeline.</p>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="text-center mt-4">
-                        <button class="btn btn-primary btn-lg" id="startInterviewBtn">Start Mock Interview Now</button>
-                    </div>
-                </div>
-            </section>
-
-            <!-- Mock Interview Interface -->
-            <section id="mock-interview" class="content-section">
-                <div class="container-fluid">
-                    <h2>Mock Interview</h2>
-                    <p class="section-description">Practice with our AI interviewer in a realistic interview setting</p>
                     
-                    <div class="interview-type-selector mb-4" id="interviewTypeSelector">
-                        <button class="btn btn-outline-primary active" data-type="general">General</button>
-                        <button class="btn btn-outline-primary" data-type="technical">Technical</button>
-                        <button class="btn btn-outline-primary" data-type="behavioral">Behavioral</button>
+                    <div class="row align-items-center mb-5">
+                        <div class="col-md-6 order-md-2">
+                            <h2>Personalized Preparation Plans</h2>
+                            <p>Get a customized interview preparation plan including:</p>
+                            <ul>
+                                <li>Focused study topics based on job requirements</li>
+                                <li>Most likely interview questions with guidance</li>
+                                <li>Strategies to address potential skill gaps</li>
+                                <li>Dynamic timeline that adjusts to your interview date</li>
+                            </ul>
+                        </div>
+                        <div class="col-md-6 order-md-1">
+                            <img src="https://via.placeholder.com/600x400?text=Preparation+Plans" alt="Preparation Plans" class="img-fluid rounded shadow">
+                        </div>
                     </div>
+                    
+                    <div class="row align-items-center mb-5">
+                        <div class="col-md-6">
+                            <h2>Interactive Mock Interviews</h2>
+                            <p>Practice with our AI interviewer, which provides:</p>
+                            <ul>
+                                <li>Realistic interview experiences with voice interaction</li>
+                                <li>Different interview types (General, Technical, Behavioral)</li>
+                                <li>Questions tailored to your resume and target job</li>
+                                <li>Natural conversations with follow-up questions</li>
+                            </ul>
+                        </div>
+                        <div class="col-md-6">
+                            <img src="https://via.placeholder.com/600x400?text=Mock+Interviews" alt="Mock Interviews" class="img-fluid rounded shadow">
+                        </div>
+                    </div>
+                    
+                    <div class="row align-items-center">
+                        <div class="col-md-6 order-md-2">
+                            <h2>Performance Analysis & Improvement</h2>
+                            <p>After each mock interview, receive:</p>
+                            <ul>
+                                <li>Detailed scoring across technical, communication, and behavioral dimensions</li>
+                                <li>Alternative answer suggestions for each question</li>
+                                <li>Specific improvement recommendations</li>
+                                <li>Progress tracking across multiple practice sessions</li>
+                            </ul>
+                        </div>
+                        <div class="col-md-6 order-md-1">
+                            <img src="https://via.placeholder.com/600x400?text=Performance+Analysis" alt="Performance Analysis" class="img-fluid rounded shadow">
+                        </div>
+                    </div>
+                    
+                    <div class="text-center mt-5">
+                        <button class="btn btn-primary btn-lg" data-auth="signup">Start Your Interview Preparation</button>
+                    </div>
+                </div>
+            </div>
 
-                    <div class="interview-container">
+            <!-- Pricing Tab -->
+            <div id="pricing-tab" class="public-tab">
+                <div class="container py-5">
+                    <h1 class="text-center mb-5">Choose Your Plan</h1>
+                    <div class="row justify-content-center">
+                        <!-- Free Plan -->
+                        <div class="col-lg-4 col-md-6 mb-4">
+                            <div class="card pricing-card">
+                                <div class="card-header">
+                                    <h3 class="my-0 font-weight-normal">Free</h3>
+                                </div>
+                                <div class="card-body">
+                                    <h2 class="card-title pricing-card-title">₹0 <small class="text-muted">/ mo</small></h2>
+                                    <ul class="list-unstyled mt-3 mb-4">
+                                        <li><i class="fas fa-check text-success me-2"></i> Resume analysis</li>
+                                        <li><i class="fas fa-check text-success me-2"></i> Basic preparation plan</li>
+                                        <li><i class="fas fa-check text-success me-2"></i> 1 mock interview per week</li>
+                                        <li><i class="fas fa-check text-success me-2"></i> Basic performance feedback</li>
+                                        <li><i class="fas fa-times text-danger me-2"></i> Advanced analytics</li>
+                                        <li><i class="fas fa-times text-danger me-2"></i> Unlimited interviews</li>
+                                    </ul>
+                                    <button type="button" class="btn btn-lg btn-block btn-outline-primary w-100" data-auth="signup">Sign Up Free</button>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Premium Plan -->
+                        <div class="col-lg-4 col-md-6 mb-4">
+                            <div class="card pricing-card highlight-card">
+                                <div class="card-header">
+                                    <h3 class="my-0 font-weight-normal">Premium</h3>
+                                </div>
+                                <div class="card-body">
+                                    <h2 class="card-title pricing-card-title">₹399 <small class="text-muted">/ mo</small></h2>
+                                    <ul class="list-unstyled mt-3 mb-4">
+                                        <li><i class="fas fa-check text-success me-2"></i> Advanced resume analysis</li>
+                                        <li><i class="fas fa-check text-success me-2"></i> Comprehensive prep plan</li>
+                                        <li><i class="fas fa-check text-success me-2"></i> Unlimited mock interviews</li>
+                                        <li><i class="fas fa-check text-success me-2"></i> Detailed performance analytics</li>
+                                        <li><i class="fas fa-check text-success me-2"></i> Suggested answers library</li>
+                                        <li><i class="fas fa-check text-success me-2"></i> Progress tracking</li>
+                                    </ul>
+                                    <button type="button" class="btn btn-lg btn-block btn-primary w-100" data-auth="signup">Get Premium</button>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Enterprise Plan -->
+                        <div class="col-lg-4 col-md-6 mb-4">
+                            <div class="card pricing-card">
+                                <div class="card-header">
+                                    <h3 class="my-0 font-weight-normal">Enterprise</h3>
+                                </div>
+                                <div class="card-body">
+                                    <h2 class="card-title pricing-card-title">Custom</h2>
+                                    <ul class="list-unstyled mt-3 mb-4">
+                                        <li><i class="fas fa-check text-success me-2"></i> Everything in Premium</li>
+                                        <li><i class="fas fa-check text-success me-2"></i> Multi-user management</li>
+                                        <li><i class="fas fa-check text-success me-2"></i> Custom integration</li>
+                                        <li><i class="fas fa-check text-success me-2"></i> Dedicated support</li>
+                                        <li><i class="fas fa-check text-success me-2"></i> Advanced reporting</li>
+                                        <li><i class="fas fa-check text-success me-2"></i> Branded experience</li>
+                                    </ul>
+                                    <button type="button" class="btn btn-lg btn-block btn-outline-primary w-100" onclick="window.location.href='mailto:info@irisapp.co'">Contact Us</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <footer class="public-footer">
+            <div class="container">
+                <div class="row">
+                    <div class="col-md-4 mb-4">
+                        <h5><i class="fas fa-comments iris-logo-sm me-2"></i> IRIS</h5>
+                        <p>Your AI-powered interview coach that helps you prepare, practice, and perform better in job interviews.</p>
+                    </div>
+                    <div class="col-md-2 mb-4">
+                        <h5>Product</h5>
+                        <ul class="list-unstyled">
+                            <li><a href="#" class="tab-button" data-tab="features-tab">Features</a></li>
+                            <li><a href="#" class="tab-button" data-tab="pricing-tab">Pricing</a></li>
+                        </ul>
+                    </div>
+                    <div class="col-md-2 mb-4">
+                        <h5>Company</h5>
+                        <ul class="list-unstyled">
+                            <li><a href="#">About Us</a></li>
+                            <li><a href="#">Contact</a></li>
+                        </ul>
+                    </div>
+                    <div class="col-md-2 mb-4">
+                        <h5>Legal</h5>
+                        <ul class="list-unstyled">
+                            <li><a href="#">Privacy Policy</a></li>
+                            <li><a href="#">Terms of Service</a></li>
+                        </ul>
+                    </div>
+                    <div class="col-md-2 mb-4">
+                        <h5>Connect</h5>
+                        <div class="social-icons">
+                            <a href="#"><i class="fab fa-twitter"></i></a>
+                            <a href="#"><i class="fab fa-linkedin"></i></a>
+                            <a href="#"><i class="fab fa-github"></i></a>
+                        </div>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-12 text-center mt-4">
+                        <p class="mb-0">&copy; 2025 IRIS Interview Prep. All rights reserved.</p>
+                    </div>
+                </div>
+            </div>
+        </footer>
+    </div>
+
+    <!-- App View (Shown when logged in) -->
+    <div id="app-view" style="display: none;">
+        <div class="app-container">
+            <!-- Sidebar Navigation -->
+            <nav id="sidebar">
+                <div class="sidebar-header">
+                    <h3>IRIS</h3>
+                    <p>Interview Readiness & Improvement System</p>
+                </div>
+                <ul class="nav-items">
+                    <li class="nav-item active" data-target="landing">
+                        <i class="fas fa-home"></i> Home
+                    </li>
+                    <li class="nav-item" data-target="upload">
+                        <i class="fas fa-upload"></i> Upload
+                    </li>
+                    <li class="nav-item" data-target="analysis" id="nav-analysis">
+                        <i class="fas fa-chart-pie"></i> Analysis
+                        <span class="status-indicator locked"><i class="fas fa-lock"></i></span>
+                    </li>
+                    <li class="nav-item" data-target="prep-plan" id="nav-prep-plan">
+                        <i class="fas fa-clipboard-list"></i> Prep Plan
+                        <span class="status-indicator locked"><i class="fas fa-lock"></i></span>
+                    </li>
+                    <li class="nav-item" data-target="mock-interview" id="nav-interview">
+                        <i class="fas fa-video"></i> Mock Interview
+                        <span class="status-indicator locked"><i class="fas fa-lock"></i></span>
+                    </li>
+                    <li class="nav-item" data-target="performance" id="nav-performance">
+                        <i class="fas fa-chart-line"></i> Performance
+                        <span class="status-indicator locked"><i class="fas fa-lock"></i></span>
+                    </li>
+                    <li class="nav-item" data-target="history" id="nav-history">
+                        <i class="fas fa-history"></i> History
+                        <span class="status-indicator locked"><i class="fas fa-lock"></i></span>
+                    </li>
+                    <!-- New: User Profile Section -->
+                    <li class="nav-item" data-target="user-profile" id="nav-user-profile">
+                        <i class="fas fa-user-circle"></i> My Profile
+                    </li>
+                </ul>
+                
+                <!-- User Info in Sidebar -->
+                <div class="sidebar-user-info">
+                    <div class="user-avatar-container">
+                        <img src="https://i.stack.imgur.com/34AD2.jpg" alt="User" class="user-avatar rounded-circle">
+                        <span class="user-plan-badge">Free</span>
+                    </div>
+                    <div class="user-details">
+                        <span class="user-display-name">User Name</span>
+                        <span class="user-email small">user@example.com</span>
+                    </div>
+                    <button class="btn btn-sm btn-outline-light signout-button mt-2">
+                        <i class="fas fa-sign-out-alt"></i> Sign Out
+                    </button>
+                </div>
+
+                <div class="sidebar-footer">
+                    <p>&copy; 2025 IRIS</p>
+                </div>
+            </nav>
+
+            <!-- Main Content Area -->
+            <main id="content">
+                <!-- Landing Page -->
+                <section id="landing" class="content-section active">
+                    <div class="hero-section">
+                        <div class="container text-center">
+                            <div class="logo-container">
+                                <i class="fas fa-comments iris-logo"></i>
+                            </div>
+                            <h1>Welcome to IRIS</h1>
+                            <h2>Interview Readiness & Improvement System</h2>
+                            <p class="lead">Your AI-powered interview coach that helps you prepare, practice, and perform better in job interviews.</p>
+                            <div class="features-grid">
+                                <div class="feature-card">
+                                    <i class="fas fa-file-alt"></i>
+                                    <h3>Resume Analysis</h3>
+                                    <p>Get insights on how your resume matches specific job requirements</p>
+                                </div>
+                                <div class="feature-card">
+                                    <i class="fas fa-tasks"></i>
+                                    <h3>Personalized Prep</h3>
+                                    <p>Receive a customized study plan based on your skills and the job</p>
+                                </div>
+                                <div class="feature-card">
+                                    <i class="fas fa-video"></i>
+                                    <h3>Mock Interviews</h3>
+                                    <p>Practice with our AI interviewer in a realistic setting</p>
+                                </div>
+                                <div class="feature-card">
+                                    <i class="fas fa-chart-bar"></i>
+                                    <h3>Performance Analysis</h3>
+                                    <p>Get detailed feedback and track your improvement over time</p>
+                                </div>
+                            </div>
+                            <button class="btn btn-primary btn-lg get-started-btn" id="getStartedBtn">Get Started</button>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Upload Resume & Job Description -->
+                <section id="upload" class="content-section">
+                    <div class="container">
+                        <h2>Upload Your Resume & Job Description</h2>
+                        <p class="section-description">Let's analyze your resume against a specific job to create a personalized interview preparation plan.</p>
+                        
+                        <div class="card">
+                            <div class="card-body">
+                                <form id="resumeUploadForm" enctype="multipart/form-data">
+                                    <div class="mb-3">
+                                        <label for="resumeFile" class="form-label">Upload Your Resume (PDF)</label>
+                                        <input type="file" class="form-control" id="resumeFile" name="resumeFile" accept=".pdf" required>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label for="jobDescription" class="form-label">Job Description</label>
+                                        <textarea class="form-control" id="jobDescription" name="jobDescription" rows="6" placeholder="Paste the complete job description here..." required></textarea>
+                                    </div>
+                                    <button type="submit" class="btn btn-primary" id="analyzeBtn">Analyze Resume</button>
+                                </form>
+                            </div>
+                        </div>
+
+                        <div id="uploadProgress" class="progress-container mt-4" style="display: none;">
+                            <h4>Analyzing Your Resume...</h4>
+                            <div class="progress">
+                                <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 0%"></div>
+                            </div>
+                            <p id="progressMessage">Uploading files...</p>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- User Profile Section (New) -->
+                <section id="user-profile" class="content-section">
+                    <div class="container">
+                        <h2>My Profile</h2>
+                        <p class="section-description">Manage your account information and subscription</p>
+                        
                         <div class="row">
-                            <!-- Candidate Video Feed -->
-                            <div class="col-md-6">
-                                <div class="card video-card">
-                                    <div class="card-body p-0">
-                                        <div class="video-container">
-                                            <video id="candidateVideo" autoplay muted></video>
-                                            <!-- Face detection canvas will be inserted here by JS -->
-                                            <div class="video-controls">
-                                                <button id="toggleCameraBtn" class="btn btn-sm btn-light">
-                                                    <i class="fas fa-video"></i>
-                                                </button>
-                                                <button id="toggleMicBtn" class="btn btn-sm btn-light">
-                                                    <i class="fas fa-microphone"></i>
-                                                </button>
+                            <!-- Profile Details -->
+                            <div class="col-md-8">
+                                <div class="card mb-4">
+                                    <div class="card-header d-flex justify-content-between align-items-center">
+                                        <h3 class="mb-0">Account Information</h3>
+                                        <button class="btn btn-sm btn-primary" id="editProfileBtn">
+                                            <i class="fas fa-edit"></i> Edit
+                                        </button>
+                                    </div>
+                                    <div class="card-body">
+                                        <!-- View Mode -->
+                                        <div id="profileViewMode">
+                                            <div class="row mb-3">
+                                                <div class="col-md-3 fw-bold">Name:</div>
+                                                <div class="col-md-9 user-display-name">Loading...</div>
+                                            </div>
+                                            <div class="row mb-3">
+                                                <div class="col-md-3 fw-bold">Email:</div>
+                                                <div class="col-md-9 user-email">Loading...</div>
+                                            </div>
+                                            <div class="row mb-3">
+                                                <div class="col-md-3 fw-bold">Account Created:</div>
+                                                <div class="col-md-9" id="accountCreatedDate">Loading...</div>
                                             </div>
                                         </div>
-                                    </div>
-                                    <div class="card-footer">
-                                        <div class="candidate-speaking-indicator">
-                                            <div class="audio-waves">
-                                                <span></span><span></span><span></span><span></span>
+                                        
+                                        <!-- Edit Mode (initially hidden) -->
+                                        <form id="profileEditForm" style="display: none;">
+                                            <div class="mb-3">
+                                                <label for="profileName" class="form-label">Name</label>
+                                                <input type="text" class="form-control" id="profileName" required>
                                             </div>
-                                            <span>You</span>
+                                            <div class="mb-3">
+                                                <label for="profileEmail" class="form-label">Email (readonly)</label>
+                                                <input type="email" class="form-control" id="profileEmail" readonly>
+                                            </div>
+                                            <div class="d-flex justify-content-end">
+                                                <button type="button" class="btn btn-secondary me-2" id="cancelEditBtn">Cancel</button>
+                                                <button type="submit" class="btn btn-primary">Save Changes</button>
+                                            </div>
+                                        </form>
+                                    </div>
+                                </div>
+                                
+                                <div class="card mb-4">
+                                    <div class="card-header">
+                                        <h3 class="mb-0">Security</h3>
+                                    </div>
+                                    <div class="card-body">
+                                        <div class="d-grid gap-3">
+                                            <button class="btn btn-outline-primary" id="changePasswordBtn">
+                                                <i class="fas fa-lock me-2"></i> Change Password
+                                            </button>
+                                            <button class="btn btn-outline-secondary" id="twoFactorBtn">
+                                                <i class="fas fa-shield-alt me-2"></i> Enable Two-Factor Authentication
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="card mb-4">
+                                    <div class="card-header">
+                                        <h3 class="mb-0">Data & Privacy</h3>
+                                    </div>
+                                    <div class="card-body">
+                                        <div class="d-grid gap-3">
+                                            <button class="btn btn-outline-primary" id="downloadDataBtn">
+                                                <i class="fas fa-download me-2"></i> Download My Data
+                                            </button>
+                                            <button class="btn btn-outline-danger" id="deleteAccountBtn">
+                                                <i class="fas fa-trash-alt me-2"></i> Delete My Account
+                                            </button>
                                         </div>
                                     </div>
                                 </div>
                             </div>
-
-                            <!-- AI Interviewer Avatar -->
-                            <div class="col-md-6">
-                                <div class="card avatar-card">
+                            
+                            <!-- Subscription Details -->
+                            <div class="col-md-4">
+                                <div class="card mb-4">
+                                    <div class="card-header bg-primary text-white">
+                                        <h3 class="mb-0">Subscription</h3>
+                                    </div>
                                     <div class="card-body">
-                                        <div class="avatar-container">
-                                            <div class="avatar-circle" id="interviewerAvatar">
-                                                <i class="fas fa-user-tie"></i>
+                                        <div class="subscription-details">
+                                            <div class="current-plan mb-3">
+                                                <h4>Current Plan</h4>
+                                                <div class="d-flex align-items-center">
+                                                    <span class="badge rounded-pill bg-primary me-2 p-2 user-plan">Free</span>
+                                                    <span class="text-muted" id="planExpiryDate"></span>
+                                                </div>
                                             </div>
-                                            <div class="avatar-pulse-rings">
-                                                <div class="pulse-ring"></div>
-                                                <div class="pulse-ring"></div>
-                                                <div class="pulse-ring"></div>
+                                            
+                                            <div class="usage-section mb-3">
+                                                <h5>Usage This Month</h5>
+                                                <div class="mb-3">
+                                                    <div class="d-flex justify-content-between mb-1">
+                                                        <span>Resume Analyses</span>
+                                                        <span id="resumeAnalysesCount">0/2</span>
+                                                    </div>
+                                                    <div class="progress" style="height: 8px;">
+                                                        <div class="progress-bar" role="progressbar" style="width: 0%"></div>
+                                                    </div>
+                                                </div>
+                                                <div class="mb-3">
+                                                    <div class="d-flex justify-content-between mb-1">
+                                                        <span>Mock Interviews</span>
+                                                        <span id="mockInterviewsCount">0/4</span>
+                                                    </div>
+                                                    <div class="progress" style="height: 8px;">
+                                                        <div class="progress-bar" role="progressbar" style="width: 0%"></div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            
+                                            <div class="plan-upgrade">
+                                                <h5>Upgrade to Premium</h5>
+                                                <ul class="list-unstyled mb-3">
+                                                    <li><i class="fas fa-check text-success me-2"></i> Unlimited resume analyses</li>
+                                                    <li><i class="fas fa-check text-success me-2"></i> Unlimited mock interviews</li>
+                                                    <li><i class="fas fa-check text-success me-2"></i> Advanced analytics</li>
+                                                    <li><i class="fas fa-check text-success me-2"></i> Suggested answers for all questions</li>
+                                                </ul>
+                                                <button class="btn btn-success w-100" id="upgradePlanBtn">
+                                                    <i class="fas fa-crown me-2"></i> Upgrade Now
+                                                </button>
                                             </div>
                                         </div>
                                     </div>
-                                    <div class="card-footer">
-                                        <div class="interviewer-speaking-indicator">
-                                            <div class="audio-waves active" id="interviewerSpeakingWaves">
-                                                <span></span><span></span><span></span><span></span>
-                                            </div>
-                                            <span>IRIS</span>
+                                </div>
+                                
+                                <div class="card mb-4">
+                                    <div class="card-header">
+                                        <h3 class="mb-0">Need Help?</h3>
+                                    </div>
+                                    <div class="card-body">
+                                        <p>If you have any questions or need assistance with your account:</p>
+                                        <div class="d-grid">
+                                            <a href="mailto:support@irisapp.co" class="btn btn-outline-primary">
+                                                <i class="fas fa-envelope me-2"></i> Contact Support
+                                            </a>
                                         </div>
                                     </div>
                                 </div>
                             </div>
                         </div>
+                    </div>
+                </section>
 
-                        <!-- Interview Conversation -->
-                        <div class="card mt-4 conversation-card">
+                <section id="analysis" class="content-section">
+                    <div class="container">
+                        <h2>Resume Analysis Results</h2>
+                        <p class="section-description">Here's how your resume matches with the job requirements</p>
+                        
+                        <div class="row">
+                            <div class="col-md-4">
+                                <div class="card mb-4">
+                                    <div class="card-body text-center">
+                                        <h3>Match Score</h3>
+                                        <div class="match-score-circle">
+                                            <span id="matchScore">--</span><span>%</span>
+                                        </div>
+                                        <p id="matchScoreDescription">Loading analysis...</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-8">
+                                <div class="card mb-4">
+                                    <div class="card-body">
+                                        <h3>Match Analysis</h3>
+                                        <p id="matchAnalysis">Loading analysis...</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+    
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="card mb-4">
+                                    <div class="card-header">
+                                        <h3>Key Strengths</h3>
+                                    </div>
+                                    <div class="card-body">
+                                        <ul id="keyStrengthsList" class="list-group list-group-flush">
+                                            <li class="list-group-item text-center">Loading strengths...</li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="card mb-4">
+                                    <div class="card-header">
+                                        <h3>Skill Gaps</h3>
+                                    </div>
+                                    <div class="card-body">
+                                        <ul id="skillGapsList" class="list-group list-group-flush">
+                                            <li class="list-group-item text-center">Loading gaps...</li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+    
+                        <div class="card mb-4">
                             <div class="card-header">
-                                <h3>Interview Conversation</h3>
+                                <h3>Resume Improvement Suggestions</h3>
                             </div>
                             <div class="card-body">
-                                <div id="conversationContainer" class="conversation-container">
-                                    <!-- Messages will be added here -->
+                                <div id="resumeImprovements">
+                                    <p class="text-center">Loading suggestions...</p>
                                 </div>
-                                <div class="reply-container mt-3">
+                            </div>
+                        </div>
+    
+                        <div class="card mb-4">
+                            <div class="card-header"><h3>Resume Resources</h3></div>
+                            <div class="card-body">
+                                <p>Consider these external resources for professional resume templates and examples:</p>
+                                <ul>
+                                    <li><a href="https://flowcv.com/" target="_blank" rel="noopener noreferrer">FlowCV Resume Builder</a></li>
+                                    <li><a href="https://resumake.io/" target="_blank" rel="noopener noreferrer">Resumake.io (Free Templates)</a></li>
+                                    <li><a href="https://www.canva.com/resumes/templates/" target="_blank" rel="noopener noreferrer">Canva Resume Templates</a></li>
+                                    <li><a href="https://zety.com/resume-templates" target="_blank" rel="noopener noreferrer">Zety Resume Templates</a></li>
+                                    <li><a href="https://enhancv.com/resume-examples/" target="_blank" rel="noopener noreferrer">Enhancv Examples</a></li>
+                                </ul>
+                            </div>
+                        </div>
+    
+                        <div class="text-center mt-4">
+                            <button class="btn btn-primary" id="viewPrepPlanBtn">View Preparation Plan</button>
+                        </div>
+                    </div>
+                </section>
+    
+                <!-- Interview Preparation Plan -->
+                <section id="prep-plan" class="content-section">
+                    <div class="container">
+                        <h2>Your Interview Preparation Plan</h2>
+                        <p class="section-description">Based on your resume analysis, here's a personalized plan to help you prepare</p>
+    
+                        <div class="card mb-4">
+                            <div class="card-header"><h3>Focus Areas</h3></div>
+                            <div class="card-body"><ul id="focusAreasList" class="focus-areas-list"><li>Loading...</li></ul></div>
+                        </div>
+    
+                        <div class="card mb-4">
+                            <div class="card-header"><h3>Likely Interview Questions</h3></div>
+                            <div class="card-body"><div id="likelyQuestions" class="accordion"><p class="text-center">Loading...</p></div></div>
+                        </div>
+    
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="card mb-4">
+                                    <div class="card-header"><h3>Concepts to Study</h3></div>
+                                    <div class="card-body"><div id="conceptsToStudy"><p class="text-center">Loading...</p></div></div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="card mb-4">
+                                    <div class="card-header"><h3><i class="fas fa-exclamation-triangle text-warning me-2"></i> Addressing Potential Gaps</h3></div>
+                                    <div class="card-body">
+                                        <p class="text-muted small">Advice on how to positively frame areas where your profile might differ from the JD.</p>
+                                        <div id="gapStrategies"><p class="text-center">Loading...</p></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+    
+                        <div class="card mb-4">
+                            <div class="card-header">
+                                <h3><i class="fas fa-calendar-alt me-2"></i> Dynamic Preparation Timeline</h3>
+                            </div>
+                            <div class="card-body">
+                                <div id="dynamicTimelineControls" style="display: none;" class="mb-3 p-3 border rounded bg-light">
+                                    <label for="daysUntilInterview" class="form-label fw-bold">Generate a schedule:</label>
                                     <div class="input-group">
-                                        <input type="text" id="userReplyInput" class="form-control" placeholder="Type your response or use microphone...">
-                                        <button class="btn btn-primary" id="sendReplyBtn">
-                                            <i class="fas fa-paper-plane"></i>
-                                        </button>
-                                        <button class="btn btn-secondary" id="voiceReplyBtn">
-                                            <i class="fas fa-microphone"></i>
+                                        <span class="input-group-text">Days until interview:</span>
+                                        <input type="number" class="form-control" id="daysUntilInterview" placeholder="e.g., 7" min="1" max="90" aria-label="Number of days until interview">
+                                        <button class="btn btn-success" type="button" id="generateDynamicTimelineBtn">
+                                            <i class="fas fa-cogs me-1"></i> Generate Timeline
                                         </button>
                                     </div>
-                                    <div id="recordingIndicator" class="recording-indicator">
-                                        Recording... <span id="recordingTime">0:00</span>
-                                        <button id="stopRecordingBtn" class="btn btn-sm btn-danger">
-                                            <i class="fas fa-stop"></i> Stop
-                                        </button>
+                                    <div class="form-text">Enter the number of full days you have left to prepare (1-90 recommended).</div>
+                                </div>
+                                <div id="dynamicTimelineArea" class="mt-3">
+                                    <p class="text-center text-muted">Enter the number of days above and click generate to create your personalized timeline.</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="text-center mt-4">
+                            <button class="btn btn-primary btn-lg" id="startInterviewBtn">Start Mock Interview Now</button>
+                        </div>
+                    </div>
+                </section>
+    
+                <!-- Mock Interview Interface -->
+                <section id="mock-interview" class="content-section">
+                    <div class="container-fluid">
+                        <h2>Mock Interview</h2>
+                        <p class="section-description">Practice with our AI interviewer in a realistic interview setting</p>
+                        
+                        <div class="interview-type-selector mb-4" id="interviewTypeSelector">
+                            <button class="btn btn-outline-primary active" data-type="general">General</button>
+                            <button class="btn btn-outline-primary" data-type="technical">Technical</button>
+                            <button class="btn btn-outline-primary" data-type="behavioral">Behavioral</button>
+                        </div>
+    
+                        <div class="interview-container">
+                            <div class="row">
+                                <!-- Candidate Video Feed -->
+                                <div class="col-md-6">
+                                    <div class="card video-card">
+                                        <div class="card-body p-0">
+                                            <div class="video-container">
+                                                <video id="candidateVideo" autoplay muted></video>
+                                                <!-- Face detection canvas will be inserted here by JS -->
+                                                <div class="video-controls">
+                                                    <button id="toggleCameraBtn" class="btn btn-sm btn-light">
+                                                        <i class="fas fa-video"></i>
+                                                    </button>
+                                                    <button id="toggleMicBtn" class="btn btn-sm btn-light">
+                                                        <i class="fas fa-microphone"></i>
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="card-footer">
+                                            <div class="candidate-speaking-indicator">
+                                                <div class="audio-waves">
+                                                    <span></span><span></span><span></span><span></span>
+                                                </div>
+                                                <span>You</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+    
+                                <!-- AI Interviewer Avatar -->
+                                <div class="col-md-6">
+                                    <div class="card avatar-card">
+                                        <div class="card-body">
+                                            <div class="avatar-container">
+                                                <div class="avatar-circle" id="interviewerAvatar">
+                                                    <i class="fas fa-user-tie"></i>
+                                                </div>
+                                                <div class="avatar-pulse-rings">
+                                                    <div class="pulse-ring"></div>
+                                                    <div class="pulse-ring"></div>
+                                                    <div class="pulse-ring"></div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="card-footer">
+                                            <div class="interviewer-speaking-indicator">
+                                                <div class="audio-waves active" id="interviewerSpeakingWaves">
+                                                    <span></span><span></span><span></span><span></span>
+                                                </div>
+                                                <span>IRIS</span>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
-                            <div class="card-footer">
-                                <button id="endInterviewBtn" class="btn btn-danger">End Interview & Analyze</button>
+    
+                            <!-- Interview Conversation -->
+                            <div class="card mt-4 conversation-card">
+                                <div class="card-header">
+                                    <h3>Interview Conversation</h3>
+                                </div>
+                                <div class="card-body">
+                                    <div id="conversationContainer" class="conversation-container">
+                                        <!-- Messages will be added here -->
+                                    </div>
+                                    <div class="reply-container mt-3">
+                                        <div class="input-group">
+                                            <input type="text" id="userReplyInput" class="form-control" placeholder="Type your response or use microphone...">
+                                            <button class="btn btn-primary" id="sendReplyBtn">
+                                                <i class="fas fa-paper-plane"></i>
+                                            </button>
+                                            <button class="btn btn-secondary" id="voiceReplyBtn">
+                                                <i class="fas fa-microphone"></i>
+                                            </button>
+                                        </div>
+                                        <div id="recordingIndicator" class="recording-indicator">
+                                            Recording... <span id="recordingTime">0:00</span>
+                                            <button id="stopRecordingBtn" class="btn btn-sm btn-danger">
+                                                <i class="fas fa-stop"></i> Stop
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="card-footer">
+                                    <button id="endInterviewBtn" class="btn btn-danger">End Interview & Analyze</button>
+                                </div>
                             </div>
+                        </div>
+                    </div>
+                </section>
+    
+                <!-- Performance Analysis -->
+                <section id="performance" class="content-section">
+                    <div class="container">
+                        <h2>Interview Performance Analysis</h2>
+                        <p class="section-description">Here's how you performed in your mock interview</p>
+        
+                        <div class="row">
+                            <div class="col-md-4">
+                                <div class="card mb-4">
+                                    <div class="card-body text-center">
+                                        <h3>Overall Score</h3>
+                                        <div class="performance-score-circle">
+                                            <span id="overallPerformanceScore">--</span><span>%</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-8">
+                                <div class="card mb-4">
+                                    <div class="card-body">
+                                        <h3>Overall Assessment</h3>
+                                        <p id="overallAssessment">Loading assessment...</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+        
+                        <div class="row score-cards">
+                            <div class="col-md-4">
+                                <div class="card mb-4 score-card">
+                                    <div class="card-body">
+                                        <h3>Technical</h3>
+                                        <div class="score-indicator">
+                                            <div class="score-value" id="technicalScore">--</div>
+                                            <div class="score-bar">
+                                                <div class="score-progress" id="technicalScoreBar" style="width: 0%;"></div>
+                                            </div>
+                                        </div>
+                                        <div class="score-details mt-3">
+                                            <div class="score-strengths">
+                                                <h5>Strengths</h5>
+                                                <ul id="technicalStrengths"><li>Loading...</li></ul>
+                                            </div>
+                                            <div class="score-weaknesses">
+                                                <h5>Areas to Improve</h5>
+                                                <ul id="technicalWeaknesses"><li>Loading...</li></ul>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="card mb-4 score-card">
+                                    <div class="card-body">
+                                        <h3>Communication</h3>
+                                        <div class="score-indicator">
+                                            <div class="score-value" id="communicationScore">--</div>
+                                            <div class="score-bar">
+                                                <div class="score-progress" id="communicationScoreBar" style="width: 0%;"></div>
+                                            </div>
+                                        </div>
+                                        <div class="score-details mt-3">
+                                            <div class="score-strengths">
+                                                <h5>Strengths</h5>
+                                                <ul id="communicationStrengths"><li>Loading...</li></ul>
+                                            </div>
+                                            <div class="score-weaknesses">
+                                                <h5>Areas to Improve</h5>
+                                                <ul id="communicationWeaknesses"><li>Loading...</li></ul>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="card mb-4 score-card">
+                                    <div class="card-body">
+                                        <h3>Behavioral</h3>
+                                        <div class="score-indicator">
+                                            <div class="score-value" id="behavioralScore">--</div>
+                                            <div class="score-bar">
+                                                <div class="score-progress" id="behavioralScoreBar" style="width: 0%;"></div>
+                                            </div>
+                                        </div>
+                                        <div class="score-details mt-3">
+                                            <div class="score-strengths">
+                                                <h5>Strengths</h5>
+                                                <ul id="behavioralStrengths"><li>Loading...</li></ul>
+                                            </div>
+                                            <div class="score-weaknesses">
+                                                <h5>Areas to Improve</h5>
+                                                <ul id="behavioralWeaknesses"><li>Loading...</li></ul>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+        
+                        <div class="card mb-4">
+                            <div class="card-header">
+                                <h3>Key Improvement Areas</h3>
+                            </div>
+                            <div class="card-body">
+                                <div id="keyImprovementAreas">
+                                    <p class="text-center">Loading improvement areas...</p>
+                                </div>
+                            </div>
+                        </div>
+        
+                        <div class="card mb-4">
+                            <div class="card-header">
+                                <h3>Interview Transcript</h3>
+                            </div>
+                            <div class="card-body">
+                                <div id="interviewTranscript" class="interview-transcript">
+                                    <p class="text-center">Loading transcript...</p>
+                                </div>
+                            </div>
+                        </div>
+        
+                        <div class="card mb-4">
+                            <div class="card-header">
+                                <h3><i class="fas fa-lightbulb me-2"></i> Suggested Answers & Rationale</h3>
+                            </div>
+                            <div class="card-body">
+                                <p class="text-muted small">Here are some strong ways you could have answered the interviewer's questions, tailored to your profile.</p>
+                                <div id="suggestedAnswersAccordion" class="accordion">
+                                    <div class="text-center p-3">
+                                        <div class="spinner-border spinner-border-sm text-primary" role="status">
+                                            <span class="visually-hidden">Loading...</span>
+                                        </div>
+                                        <span class="ms-2">Loading suggested answers...</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="text-center mt-4">
+                            <button class="btn btn-primary" id="startNewInterviewBtn">Start New Interview</button>
+                            <button class="btn btn-secondary" id="viewProgressBtn">View Progress History</button>
+                        </div>
+                    </div> 
+                </section>
+    
+    
+                <!-- Progress History -->
+                <section id="history" class="content-section">
+                    <div class="container">
+                        <h2>Progress History</h2>
+                        <p class="section-description">Track your improvement across multiple mock interviews</p>
+                        
+                        <div class="card mb-4">
+                            <div class="card-header">
+                                <h3>Performance Trends</h3>
+                            </div>
+                            <div class="card-body">
+                                <div class="chart-container">
+                                    <canvas id="progressChart"></canvas>
+                                </div>
+                            </div>
+                        </div>
+    
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="card mb-4">
+                                    <div class="card-header">
+                                        <h3>Improvement Summary</h3>
+                                    </div>
+                                    <div class="card-body">
+                                        <div id="improvementSummary">
+                                            <p class="text-center">Loading improvement summary...</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="card mb-4">
+                                    <div class="card-header">
+                                        <h3>Past Interviews</h3>
+                                    </div>
+                                    <div class="card-body">
+                                        <div id="pastInterviewsList" class="past-interviews-list">
+                                            <p class="text-center">Loading past interviews...</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+    
+                        <div class="text-center mt-4">
+                            <button class="btn btn-primary" id="startAnotherInterviewBtn">Start Another Interview</button>
+                        </div>
+                    </div>
+                </section>
+            </main>
+        </div>
+    </div>
+
+    <!-- Authentication Modal -->
+    <div class="modal fade" id="auth-modal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="auth-modal-title">Sign In</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <!-- Sign In Form -->
+                    <form id="signin-form">
+                        <div class="mb-3">
+                            <label for="signin-email" class="form-label">Email address</label>
+                            <input type="email" class="form-control" id="signin-email" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="signin-password" class="form-label">Password</label>
+                            <input type="password" class="form-control" id="signin-password" required>
+                        </div>
+                        <div class="d-grid">
+                            <button type="submit" class="btn btn-primary">Sign In</button>
+                        </div>
+                        <div class="text-center mt-3">
+                            <p>Don't have an account? <a href="#" onclick="showAuthModal('signup'); return false;">Sign Up</a></p>
+                            <p><a href="#" id="forgot-password-link">Forgot your password?</a></p>
+                        </div>
+                    </form>
+
+                    <!-- Sign Up Form -->
+                    <form id="signup-form" style="display: none;">
+                        <div class="mb-3">
+                            <label for="signup-name" class="form-label">Your Name</label>
+                            <input type="text" class="form-control" id="signup-name" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="signup-email" class="form-label">Email address</label>
+                            <input type="email" class="form-control" id="signup-email" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="signup-password" class="form-label">Password</label>
+                            <input type="password" class="form-control" id="signup-password" required>
+                            <div class="form-text">Password must be at least 6 characters long</div>
+                        </div>
+                        <div class="mb-3 form-check">
+                            <input type="checkbox" class="form-check-input" id="terms-checkbox" required>
+                            <label class="form-check-label" for="terms-checkbox">I agree to the <a href="#">Terms of Service</a> and <a href="#">Privacy Policy</a></label>
+                        </div>
+                        <div class="d-grid">
+                            <button type="submit" class="btn btn-primary">Create Account</button>
+                        </div>
+                        <div class="text-center mt-3">
+                            <p>Already have an account? <a href="#" onclick="showAuthModal('signin'); return false;">Sign In</a></p>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <div class="w-100">
+                        <div class="separator">
+                            <span>OR</span>
+                        </div>
+                        <div class="d-grid gap-2 mt-3">
+                            <button type="button" class="btn btn-outline-secondary" id="google-signin-button">
+                                <i class="fab fa-google me-2"></i> Continue with Google
+                            </button>
                         </div>
                     </div>
                 </div>
-            </section>
+            </div>
+        </div>
+    </div>
 
-            <!-- Performance Analysis -->
-            <section id="performance" class="content-section">
-                <div class="container">
-                    <h2>Interview Performance Analysis</h2>
-                    <p class="section-description">Here's how you performed in your mock interview</p>
-    
-                    <div class="row">
-                        <div class="col-md-4">
-                            <div class="card mb-4">
-                                <div class="card-body text-center">
-                                    <h3>Overall Score</h3>
-                                    <div class="performance-score-circle">
-                                        <span id="overallPerformanceScore">--</span><span>%</span>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-md-8">
-                            <div class="card mb-4">
-                                <div class="card-body">
-                                    <h3>Overall Assessment</h3>
-                                    <p id="overallAssessment">Loading assessment...</p>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-    
-                    <div class="row score-cards">
-                        <div class="col-md-4">
-                            <div class="card mb-4 score-card">
-                                <div class="card-body">
-                                    <h3>Technical</h3>
-                                    <div class="score-indicator">
-                                        <div class="score-value" id="technicalScore">--</div>
-                                        <div class="score-bar">
-                                            <div class="score-progress" id="technicalScoreBar" style="width: 0%;"></div>
-                                        </div>
-                                    </div>
-                                    <div class="score-details mt-3">
-                                        <div class="score-strengths">
-                                            <h5>Strengths</h5>
-                                            <ul id="technicalStrengths"><li>Loading...</li></ul>
-                                        </div>
-                                        <div class="score-weaknesses">
-                                            <h5>Areas to Improve</h5>
-                                            <ul id="technicalWeaknesses"><li>Loading...</li></ul>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-md-4">
-                            <div class="card mb-4 score-card">
-                                <div class="card-body">
-                                    <h3>Communication</h3>
-                                    <div class="score-indicator">
-                                        <div class="score-value" id="communicationScore">--</div>
-                                        <div class="score-bar">
-                                            <div class="score-progress" id="communicationScoreBar" style="width: 0%;"></div>
-                                        </div>
-                                    </div>
-                                    <div class="score-details mt-3">
-                                        <div class="score-strengths">
-                                            <h5>Strengths</h5>
-                                            <ul id="communicationStrengths"><li>Loading...</li></ul>
-                                        </div>
-                                        <div class="score-weaknesses">
-                                            <h5>Areas to Improve</h5>
-                                            <ul id="communicationWeaknesses"><li>Loading...</li></ul>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-md-4">
-                            <div class="card mb-4 score-card">
-                                <div class="card-body">
-                                    <h3>Behavioral</h3>
-                                    <div class="score-indicator">
-                                        <div class="score-value" id="behavioralScore">--</div>
-                                        <div class="score-bar">
-                                            <div class="score-progress" id="behavioralScoreBar" style="width: 0%;"></div>
-                                        </div>
-                                    </div>
-                                    <div class="score-details mt-3">
-                                        <div class="score-strengths">
-                                            <h5>Strengths</h5>
-                                            <ul id="behavioralStrengths"><li>Loading...</li></ul>
-                                        </div>
-                                        <div class="score-weaknesses">
-                                            <h5>Areas to Improve</h5>
-                                            <ul id="behavioralWeaknesses"><li>Loading...</li></ul>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-    
-                    <div class="card mb-4">
-                        <div class="card-header">
-                            <h3>Key Improvement Areas</h3>
-                        </div>
-                        <div class="card-body">
-                            <div id="keyImprovementAreas">
-                                <p class="text-center">Loading improvement areas...</p>
-                            </div>
-                        </div>
-                    </div>
-    
-                    <div class="card mb-4">
-                        <div class="card-header">
-                            <h3>Interview Transcript</h3>
-                        </div>
-                        <div class="card-body">
-                            <div id="interviewTranscript" class="interview-transcript">
-                                <p class="text-center">Loading transcript...</p>
-                            </div>
-                        </div>
-                    </div>
-    
-                    <div class="card mb-4">
-                        <div class="card-header">
-                            <h3><i class="fas fa-lightbulb me-2"></i> Suggested Answers & Rationale</h3>
-                        </div>
-                        <div class="card-body">
-                            <p class="text-muted small">Here are some strong ways you could have answered the interviewer's questions, tailored to your profile.</p>
-                            <div id="suggestedAnswersAccordion" class="accordion">
-                                <div class="text-center p-3">
-                                    <div class="spinner-border spinner-border-sm text-primary" role="status">
-                                        <span class="visually-hidden">Loading...</span>
-                                    </div>
-                                    <span class="ms-2">Loading suggested answers...</span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="text-center mt-4">
-                        <button class="btn btn-primary" id="startNewInterviewBtn">Start New Interview</button>
-                        <button class="btn btn-secondary" id="viewProgressBtn">View Progress History</button>
-                    </div>
-                </div> 
-            </section>
-
-
-            <!-- Progress History -->
-            <section id="history" class="content-section">
-                <div class="container">
-                    <h2>Progress History</h2>
-                    <p class="section-description">Track your improvement across multiple mock interviews</p>
-                    
-                    <div class="card mb-4">
-                        <div class="card-header">
-                            <h3>Performance Trends</h3>
-                        </div>
-                        <div class="card-body">
-                            <div class="chart-container">
-                                <canvas id="progressChart"></canvas>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="row">
-                        <div class="col-md-6">
-                            <div class="card mb-4">
-                                <div class="card-header">
-                                    <h3>Improvement Summary</h3>
-                                </div>
-                                <div class="card-body">
-                                    <div id="improvementSummary">
-                                        <p class="text-center">Loading improvement summary...</p>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-md-6">
-                            <div class="card mb-4">
-                                <div class="card-header">
-                                    <h3>Past Interviews</h3>
-                                </div>
-                                <div class="card-body">
-                                    <div id="pastInterviewsList" class="past-interviews-list">
-                                        <p class="text-center">Loading past interviews...</p>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="text-center mt-4">
-                        <button class="btn btn-primary" id="startAnotherInterviewBtn">Start Another Interview</button>
-                    </div>
+    <!-- Password Reset Modal -->
+    <div class="modal fade" id="reset-password-modal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Reset Password</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
-            </section>
-        </main>
+                <div class="modal-body">
+                    <form id="reset-password-form">
+                        <div class="mb-3">
+                            <label for="reset-email" class="form-label">Email address</label>
+                            <input type="email" class="form-control" id="reset-email" required>
+                            <div class="form-text">We'll send you a password reset link.</div>
+                        </div>
+                        <div class="d-grid">
+                            <button type="submit" class="btn btn-primary">Send Reset Link</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Change Password Modal -->
+    <div class="modal fade" id="change-password-modal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Change Password</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="change-password-form">
+                        <div class="mb-3">
+                            <label for="current-password" class="form-label">Current Password</label>
+                            <input type="password" class="form-control" id="current-password" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="new-password" class="form-label">New Password</label>
+                            <input type="password" class="form-control" id="new-password" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="confirm-new-password" class="form-label">Confirm New Password</label>
+                            <input type="password" class="form-control" id="confirm-new-password" required>
+                        </div>
+                        <div class="d-grid">
+                            <button type="submit" class="btn btn-primary">Update Password</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Delete Account Confirmation Modal -->
+    <div class="modal fade" id="delete-account-modal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title text-danger">Delete Account</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="alert alert-danger">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        <strong>Warning:</strong> This action cannot be undone.
+                    </div>
+                    <p>Deleting your account will permanently remove:</p>
+                    <ul>
+                        <li>All your resume analyses</li>
+                        <li>Interview recordings and transcripts</li>
+                        <li>Preparation plans and performance history</li>
+                        <li>Account information and settings</li>
+                    </ul>
+                    <form id="delete-account-form">
+                        <div class="mb-3">
+                            <label for="delete-confirmation" class="form-label">Type "DELETE" to confirm</label>
+                            <input type="text" class="form-control" id="delete-confirmation" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="delete-password" class="form-label">Enter your password</label>
+                            <input type="password" class="form-control" id="delete-password" required>
+                        </div>
+                        <div class="d-grid">
+                            <button type="submit" class="btn btn-danger" disabled id="confirm-delete-btn">Delete My Account</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
     </div>
 
     <!-- Modal for camera/microphone permissions -->
@@ -604,6 +1214,13 @@
     </div>
 
     <!-- Scripts -->
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-analytics-compat.js"></script>
+    
+    <!-- External Libraries -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     
@@ -611,6 +1228,7 @@
     <script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
     
     <!-- Application Scripts -->
+    <script src="firebase-auth.js"></script>
     <script src="app.js"></script>
 </body>
 </html>

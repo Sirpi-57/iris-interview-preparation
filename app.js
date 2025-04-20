@@ -1,5 +1,5 @@
 // IRIS - Interview Readiness & Improvement System
-// Main JavaScript file (with basic continuous voice attempt)
+// Main JavaScript file (with Firebase authentication integration)
 
 // Global State
 const state = {
@@ -9,47 +9,50 @@ const state = {
     audioChunks: [],
     isRecording: false,
     recordingStartTime: null,
-    recordingTimer: null, // For visual timer display
-    videoStream: null, // Holds the combined video/audio stream from getUserMedia
+    recordingTimer: null,
+    videoStream: null,
     interviewType: 'general',
-    conversationHistory: [], // Stores { role: 'user'/'assistant', content: '...' }
+    conversationHistory: [],
 
-    // -- State for Continuous Voice Attempt --
-    isInterviewActive: false, // Is an interview session running?
-    isAIResponding: false,    // Is the AI currently speaking (TTS)?
-    silenceTimer: null,       // Timer ID for detecting end-of-speech silence
-    silenceDelay: 2500,       // ms of silence AFTER speech before stopping (ADJUST AS NEEDED - increased slightly)
-    // --- Web Audio API VAD State ---
-    audioContext: null,       // AudioContext instance
-    analyserNode: null,       // AnalyserNode for volume detection
-    audioSourceNode: null,    // Source node from the microphone stream
-    audioDataArray: null,     // Uint8Array to store frequency data
-    vadAnimationFrameId: null,// ID for the requestAnimationFrame loop
-    speechDetectedInChunk: false, // Flag: Has speech been detected since recording started/last silence?
+    // Voice detection state
+    isInterviewActive: false,
+    isAIResponding: false,
+    silenceTimer: null,
+    silenceDelay: 2500,
+    audioContext: null,
+    analyserNode: null,
+    audioSourceNode: null,
+    audioDataArray: null,
+    vadAnimationFrameId: null,
+    speechDetectedInChunk: false,
 };
 
-// --- Constants for VAD ---
-// Adjust this threshold based on testing with your microphone sensitivity
-// Lower values are more sensitive to noise, higher values might miss quiet speech.
-// Typical range on 0-255 scale might be 40-70.
-const SPEECH_THRESHOLD = 55; // Example value (0-255)
-const FFT_SIZE = 256;        // Smaller FFT size for faster analysis, less frequency detail needed
+// VAD Constants
+const SPEECH_THRESHOLD = 55;
+const FFT_SIZE = 256;
 
-// API Base URL - Make sure this points to your BACKEND (port 5000)
-const API_BASE_URL = 'https://iris-ai-backend.onrender.com'; // No trailing slash
+// API Base URL
+const API_BASE_URL = 'https://iris-ai-backend.onrender.com';
 
-// DOM Elements Cache (Optional but good practice)
+// DOM Elements Cache
 const DOMElements = {
     sidebar: document.getElementById('sidebar'),
     content: document.getElementById('content'),
-    // Add other frequently accessed elements if needed
 };
 
 document.addEventListener('DOMContentLoaded', function() {
+    // Check if Firebase auth is initialized
+    if (typeof irisAuth !== 'undefined') {
+        console.log('Firebase Auth module detected');
+    } else {
+        console.warn('Firebase Auth module not found, some features may be limited');
+    }
+
     // Initialize UI interactions
     initNavigation();
     initButtons();
     initForms();
+    initProfilePage();
 
     // Load available browser voices (for fallback TTS)
     loadVoices();
@@ -57,14 +60,349 @@ document.addEventListener('DOMContentLoaded', function() {
         speechSynthesis.onvoiceschanged = loadVoices;
     }
 
-    // Check for any saved session
-    checkForExistingSession();
-
     // Check browser support
     checkBrowserSupport();
 });
 
-// --- Initialization Functions ---
+// --- Authentication-related Functions ---
+
+function initializeIRISApp() {
+    // This function will be called when the user is authenticated and the app view is shown
+    console.log('Initializing IRIS app for authenticated user');
+    
+    // Check for any saved session
+    checkForExistingSession();
+}
+
+function initProfilePage() {
+    // Profile edit functionality
+    document.getElementById('editProfileBtn')?.addEventListener('click', function() {
+        document.getElementById('profileViewMode').style.display = 'none';
+        document.getElementById('profileEditForm').style.display = 'block';
+        
+        // Populate form with current user data
+        const user = irisAuth?.getCurrentUser();
+        const profile = irisAuth?.getUserProfile();
+        
+        if (user) {
+            document.getElementById('profileName').value = user.displayName || profile?.displayName || '';
+            document.getElementById('profileEmail').value = user.email || '';
+        }
+    });
+    
+    document.getElementById('cancelEditBtn')?.addEventListener('click', function() {
+        document.getElementById('profileViewMode').style.display = 'block';
+        document.getElementById('profileEditForm').style.display = 'none';
+    });
+    
+    document.getElementById('profileEditForm')?.addEventListener('submit', function(e) {
+        e.preventDefault();
+        const newName = document.getElementById('profileName').value.trim();
+        
+        // Update user profile in Firebase
+        const user = firebase.auth().currentUser;
+        if (user) {
+            // Show loading state
+            const submitBtn = this.querySelector('button[type="submit"]');
+            const originalText = submitBtn.innerHTML;
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Saving...';
+            
+            user.updateProfile({
+                displayName: newName
+            }).then(() => {
+                // Update Firestore profile if needed
+                if (firebase.firestore) {
+                    return firebase.firestore().collection('users').doc(user.uid).update({
+                        displayName: newName,
+                        updatedAt: new Date().toISOString()
+                    });
+                }
+            }).then(() => {
+                document.getElementById('profileViewMode').style.display = 'block';
+                document.getElementById('profileEditForm').style.display = 'none';
+                
+                // Update UI elements
+                document.querySelectorAll('.user-display-name').forEach(el => {
+                    el.textContent = newName;
+                });
+                
+                showMessage('Profile updated successfully!', 'success');
+            }).catch(error => {
+                console.error('Error updating profile:', error);
+                showMessage(`Error updating profile: ${error.message}`, 'danger');
+            }).finally(() => {
+                // Restore button state
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = originalText;
+            });
+        }
+    });
+    
+    // Security buttons
+    document.getElementById('changePasswordBtn')?.addEventListener('click', function() {
+        const modal = new bootstrap.Modal(document.getElementById('change-password-modal'));
+        modal.show();
+    });
+    
+    document.getElementById('change-password-form')?.addEventListener('submit', function(e) {
+        e.preventDefault();
+        const currentPassword = document.getElementById('current-password').value;
+        const newPassword = document.getElementById('new-password').value;
+        const confirmPassword = document.getElementById('confirm-new-password').value;
+        
+        if (newPassword !== confirmPassword) {
+            showMessage('New passwords do not match', 'danger');
+            return;
+        }
+        
+        const user = firebase.auth().currentUser;
+        if (user) {
+            // Show loading state
+            const submitBtn = this.querySelector('button[type="submit"]');
+            const originalText = submitBtn.innerHTML;
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Updating...';
+            
+            // Get credentials for reauthentication
+            const credential = firebase.auth.EmailAuthProvider.credential(
+                user.email, 
+                currentPassword
+            );
+            
+            // Reauthenticate first
+            user.reauthenticateWithCredential(credential).then(() => {
+                // Now update password
+                return user.updatePassword(newPassword);
+            }).then(() => {
+                bootstrap.Modal.getInstance(document.getElementById('change-password-modal')).hide();
+                showMessage('Password updated successfully!', 'success');
+                
+                // Clear form
+                document.getElementById('current-password').value = '';
+                document.getElementById('new-password').value = '';
+                document.getElementById('confirm-new-password').value = '';
+            }).catch(error => {
+                console.error('Error updating password:', error);
+                if (error.code === 'auth/wrong-password') {
+                    showMessage('Current password is incorrect', 'danger');
+                } else {
+                    showMessage(`Error updating password: ${error.message}`, 'danger');
+                }
+            }).finally(() => {
+                // Restore button state
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = originalText;
+            });
+        }
+    });
+    
+    // Account deletion
+    document.getElementById('deleteAccountBtn')?.addEventListener('click', function() {
+        const modal = new bootstrap.Modal(document.getElementById('delete-account-modal'));
+        modal.show();
+    });
+    
+    document.getElementById('delete-confirmation')?.addEventListener('input', function() {
+        const deleteBtn = document.getElementById('confirm-delete-btn');
+        deleteBtn.disabled = this.value !== 'DELETE';
+    });
+    
+    document.getElementById('delete-account-form')?.addEventListener('submit', function(e) {
+        e.preventDefault();
+        const password = document.getElementById('delete-password').value;
+        const confirmation = document.getElementById('delete-confirmation').value;
+        
+        if (confirmation !== 'DELETE') {
+            showMessage('Please type DELETE to confirm account deletion', 'danger');
+            return;
+        }
+        
+        const user = firebase.auth().currentUser;
+        if (user) {
+            // Show loading state
+            const submitBtn = this.querySelector('button[type="submit"]');
+            const originalText = submitBtn.innerHTML;
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Deleting...';
+            
+            // Reauthenticate first
+            const credential = firebase.auth.EmailAuthProvider.credential(
+                user.email, 
+                password
+            );
+            
+            user.reauthenticateWithCredential(credential).then(() => {
+                // Delete user data from Firestore
+                if (firebase.firestore) {
+                    const batch = firebase.firestore().batch();
+                    
+                    // Delete user profile
+                    batch.delete(firebase.firestore().collection('users').doc(user.uid));
+                    
+                    // Find and delete user sessions
+                    return firebase.firestore().collection('sessions')
+                        .where('userId', '==', user.uid)
+                        .get()
+                        .then(snapshot => {
+                            snapshot.forEach(doc => {
+                                batch.delete(doc.ref);
+                            });
+                            
+                            // Find and delete user interviews
+                            return firebase.firestore().collection('interviews')
+                                .where('userId', '==', user.uid)
+                                .get();
+                        })
+                        .then(snapshot => {
+                            snapshot.forEach(doc => {
+                                batch.delete(doc.ref);
+                            });
+                            
+                            // Commit the batch
+                            return batch.commit();
+                        });
+                }
+            }).then(() => {
+                // Finally delete the user account
+                return user.delete();
+            }).then(() => {
+                bootstrap.Modal.getInstance(document.getElementById('delete-account-modal')).hide();
+                showMessage('Your account has been deleted successfully', 'success');
+                
+                // Sign out and redirect to public view
+                // This should be handled by the auth state change listener in firebase-auth.js
+            }).catch(error => {
+                console.error('Error deleting account:', error);
+                if (error.code === 'auth/wrong-password') {
+                    showMessage('Password is incorrect', 'danger');
+                } else {
+                    showMessage(`Error deleting account: ${error.message}`, 'danger');
+                }
+            }).finally(() => {
+                // Restore button state
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = originalText;
+            });
+        }
+    });
+    
+    // Plan upgrade button
+    document.getElementById('upgradePlanBtn')?.addEventListener('click', function() {
+        showPaymentModal();
+    });
+    
+    // Data download button
+    document.getElementById('downloadDataBtn')?.addEventListener('click', function() {
+        downloadUserData();
+    });
+}
+
+function showPaymentModal() {
+    // Placeholder for Razorpay integration
+    alert('Payment processing will be implemented with Razorpay integration.');
+    // In the actual implementation, this would:
+    // 1. Create a Razorpay order on the backend
+    // 2. Show the Razorpay payment modal
+    // 3. Handle the payment success/failure
+    // 4. Update the user's subscription status
+}
+
+function downloadUserData() {
+    // Placeholder for user data download
+    const user = firebase.auth().currentUser;
+    if (!user || !firebase.firestore) {
+        showMessage('Unable to download data at this time', 'danger');
+        return;
+    }
+    
+    // Show loading message
+    showMessage('Preparing your data for download...', 'info');
+    
+    // Collect user data from Firestore
+    const userData = {
+        profile: null,
+        sessions: [],
+        interviews: []
+    };
+    
+    // Get user profile
+    firebase.firestore().collection('users').doc(user.uid).get()
+        .then(doc => {
+            if (doc.exists) {
+                userData.profile = doc.data();
+            }
+            
+            // Get user sessions
+            return firebase.firestore().collection('sessions')
+                .where('userId', '==', user.uid)
+                .get();
+        })
+        .then(snapshot => {
+            snapshot.forEach(doc => {
+                userData.sessions.push({
+                    id: doc.id,
+                    ...doc.data()
+                });
+            });
+            
+            // Get user interviews
+            return firebase.firestore().collection('interviews')
+                .where('userId', '==', user.uid)
+                .get();
+        })
+        .then(snapshot => {
+            snapshot.forEach(doc => {
+                userData.interviews.push({
+                    id: doc.id,
+                    ...doc.data()
+                });
+            });
+            
+            // Create and download JSON file
+            const dataStr = JSON.stringify(userData, null, 2);
+            const dataBlob = new Blob([dataStr], { type: 'application/json' });
+            const url = URL.createObjectURL(dataBlob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `iris-data-${new Date().toISOString().split('T')[0]}.json`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            
+            showMessage('Your data has been downloaded', 'success');
+        })
+        .catch(error => {
+            console.error('Error downloading user data:', error);
+            showMessage(`Error downloading data: ${error.message}`, 'danger');
+        });
+}
+
+function showMessage(message, type = 'info') {
+    const errorContainer = document.getElementById('error-messages');
+    if (!errorContainer) {
+        console.warn('Error messages container not found');
+        alert(message); // Fallback to alert
+        return;
+    }
+    
+    const messageDiv = document.createElement('div');
+    messageDiv.className = `alert alert-${type} alert-dismissible fade show`;
+    messageDiv.innerHTML = `
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    `;
+    errorContainer.appendChild(messageDiv);
+    
+    // Auto-dismiss after 5 seconds
+    setTimeout(() => {
+        messageDiv.classList.remove('show');
+        setTimeout(() => messageDiv.remove(), 500);
+    }, 5000);
+}
+
+// --- Original IRIS Functions ---
 
 function loadVoices() {
     const voices = window.speechSynthesis.getVoices();
@@ -82,7 +420,6 @@ function checkBrowserSupport() {
          alert('Your browser does not support the MediaRecorder API needed for voice input.');
     }
 }
-
 
 function initNavigation() {
     const navItems = document.querySelectorAll('.nav-item');
@@ -154,17 +491,11 @@ function initButtons() {
      // Permissions Modal
     document.getElementById('grantPermissionsBtn')?.addEventListener('click', setupMediaDevices);
 
-    // --- Recording Buttons (Now potentially hidden/repurposed for continuous mode) ---
+    // Recording Buttons (hidden/repurposed for continuous mode)
     const voiceReplyBtn = document.getElementById('voiceReplyBtn');
     const stopRecordingBtn = document.getElementById('stopRecordingBtn');
     if(voiceReplyBtn) voiceReplyBtn.style.display = 'none'; // Hide manual start
     if(stopRecordingBtn) stopRecordingBtn.style.display = 'none'; // Hide manual stop
-
-    // Example: repurpose voiceReplyBtn icon for listening state
-    if(voiceReplyBtn) {
-        voiceReplyBtn.disabled = true; // Make it non-interactive
-        // We'll toggle classes on its icon later maybe
-    }
 }
 
 function initForms() {
@@ -249,6 +580,13 @@ function checkForExistingSession() {
 // --- API Communication ---
 
 function uploadResumeAndAnalyze() {
+    // Check if user is authenticated
+    if (!firebase.auth().currentUser) {
+        showMessage('Please sign in to use this feature', 'warning');
+        irisAuth.showSignInModal();
+        return;
+    }
+
     const form = document.getElementById('resumeUploadForm');
     if (!form) return;
     const formData = new FormData(form);
@@ -263,8 +601,14 @@ function uploadResumeAndAnalyze() {
 
     // Basic validation
     if (!formData.get('resumeFile') || !formData.get('jobDescription')) {
-        alert("Please select a resume file and provide a job description.");
+        showMessage("Please select a resume file and provide a job description.", 'warning');
         return;
+    }
+
+    // Add user ID to request if available
+    const user = firebase.auth().currentUser;
+    if (user) {
+        formData.append('userId', user.uid);
     }
 
     progressContainer.style.display = 'block';
@@ -303,6 +647,7 @@ function uploadResumeAndAnalyze() {
         console.error('Error uploading resume:', error);
         progressMessage.textContent = `Error: ${error.message}`;
         if(progressBar) progressBar.classList.add('bg-danger');
+        showMessage(`Error uploading resume: ${error.message}`, 'danger');
     });
 }
 
@@ -355,6 +700,7 @@ function pollAnalysisStatus(sessionId) {
             } else if (statusData.status === 'failed') {
                 progressMessage.textContent = `Error: ${statusData.errors?.[0] || 'Analysis failed'}`;
                 progressBar.classList.add('bg-danger');
+                showMessage(`Analysis failed: ${statusData.errors?.[0] || 'Unknown error'}`, 'danger');
             } else { // Still processing
                 progressMessage.textContent = `Analyzing resume (${statusData.progress || 0}%)...`;
                 // Schedule next poll only if still processing
@@ -365,6 +711,7 @@ function pollAnalysisStatus(sessionId) {
             console.error('Error checking status:', error);
             progressMessage.textContent = `Error: ${error.message}`;
             progressBar.classList.add('bg-danger');
+            showMessage(`Error checking analysis status: ${error.message}`, 'danger');
             if (error.message.includes('Session not found')) {
                  // Reset relevant UI?
             }

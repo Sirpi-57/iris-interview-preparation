@@ -24,6 +24,140 @@ body {
     color: #333;
 }
 
+/* ===== Public View Styles ===== */
+#public-view {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+#public-navbar {
+    background: linear-gradient(to right, var(--gradient-start), var(--gradient-end));
+    padding: 1rem 0;
+}
+
+.iris-logo-sm {
+    font-size: 1.2rem;
+    color: white;
+}
+
+.public-tabs-container {
+    flex: 1;
+}
+
+.public-tab {
+    display: none;
+}
+
+.public-tab.active {
+    display: block;
+    animation: fadeIn 0.5s;
+}
+
+.public-footer {
+    background-color: #2a2f35;
+    color: white;
+    padding: 40px 0 20px;
+}
+
+.public-footer a {
+    color: rgba(255, 255, 255, 0.7);
+    text-decoration: none;
+    transition: color 0.3s;
+}
+
+.public-footer a:hover {
+    color: white;
+}
+
+.public-footer h5 {
+    color: white;
+    margin-bottom: 15px;
+    font-weight: 600;
+}
+
+.social-icons {
+    display: flex;
+    gap: 15px;
+}
+
+.social-icons a {
+    display: inline-flex;
+    justify-content: center;
+    align-items: center;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background-color: rgba(255, 255, 255, 0.1);
+    transition: background-color 0.3s;
+}
+
+.social-icons a:hover {
+    background-color: rgba(255, 255, 255, 0.2);
+}
+
+/* Pricing Cards */
+.pricing-card {
+    height: 100%;
+    transition: transform 0.3s, box-shadow 0.3s;
+}
+
+.pricing-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
+}
+
+.pricing-card .card-header {
+    background-color: #f8f9fa;
+    border-bottom: none;
+    text-align: center;
+    padding: 1.5rem 1rem;
+}
+
+.pricing-card-title {
+    margin: 1.5rem 0;
+    font-size: 2.5rem;
+    text-align: center;
+    font-weight: 600;
+}
+
+.highlight-card {
+    border-color: var(--primary-color);
+    box-shadow: 0 5px 15px rgba(74, 111, 220, 0.2);
+}
+
+.highlight-card .card-header {
+    background: linear-gradient(to right, var(--gradient-start), var(--gradient-end));
+    color: white;
+}
+
+/* Auth Modals */
+#auth-modal .modal-header {
+    background: linear-gradient(to right, var(--gradient-start), var(--gradient-end));
+    color: white;
+}
+
+.separator {
+    display: flex;
+    align-items: center;
+    text-align: center;
+    margin: 10px 0;
+}
+
+.separator::before,
+.separator::after {
+    content: '';
+    flex: 1;
+    border-bottom: 1px solid #ddd;
+}
+
+.separator span {
+    padding: 0 10px;
+    color: #6c757d;
+    font-size: 0.9rem;
+}
+
+/* ===== App View Styles ===== */
 .app-container {
     display: flex;
     min-height: 100vh;
@@ -41,6 +175,8 @@ body {
     transition: all var(--transition-speed);
     z-index: 1000;
     box-shadow: 2px 0 10px rgba(0, 0, 0, 0.1);
+    display: flex;
+    flex-direction: column;
 }
 
 .sidebar-header {
@@ -65,6 +201,7 @@ body {
     list-style-type: none;
     padding: 0;
     margin: 20px 0;
+    flex-grow: 1;
 }
 
 .nav-item {
@@ -108,6 +245,57 @@ body {
 
 .status-indicator.unlocked {
     background-color: var(--success-color);
+}
+
+/* User Info in Sidebar */
+.sidebar-user-info {
+    padding: 15px;
+    border-top: 1px solid rgba(255, 255, 255, 0.2);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.user-avatar-container {
+    position: relative;
+    margin-bottom: 10px;
+}
+
+.user-avatar {
+    width: 64px;
+    height: 64px;
+    object-fit: cover;
+    border: 2px solid white;
+}
+
+.user-plan-badge {
+    position: absolute;
+    bottom: -5px;
+    right: -5px;
+    background: var(--warning-color);
+    color: #333;
+    font-size: 10px;
+    font-weight: bold;
+    padding: 3px 8px;
+    border-radius: 10px;
+    text-transform: uppercase;
+}
+
+.user-details {
+    text-align: center;
+    margin-bottom: 10px;
+}
+
+.user-display-name {
+    display: block;
+    font-weight: bold;
+    font-size: 14px;
+}
+
+.user-email {
+    display: block;
+    opacity: 0.8;
+    font-size: 12px;
 }
 
 .sidebar-footer {
@@ -158,6 +346,46 @@ h2:after {
     bottom: -10px;
     left: 0;
     border-radius: 3px;
+}
+
+/* User Profile Styles */
+.subscription-details h4,
+.subscription-details h5 {
+    margin-bottom: 15px;
+    font-weight: 600;
+}
+
+.subscription-details .badge {
+    font-size: 0.875rem;
+}
+
+.usage-section .progress {
+    height: 8px;
+    border-radius: 4px;
+    background-color: #eee;
+}
+
+.usage-section .progress-bar {
+    background: linear-gradient(to right, var(--gradient-start), var(--gradient-end));
+}
+
+.plan-upgrade {
+    border-top: 1px solid #eee;
+    padding-top: 20px;
+    margin-top: 20px;
+}
+
+.plan-upgrade ul li {
+    margin-bottom: 8px;
+}
+
+#profileViewMode .row {
+    padding: 10px 0;
+    border-bottom: 1px solid #f0f0f0;
+}
+
+#profileViewMode .row:last-child {
+    border-bottom: none;
 }
 
 /* Landing Page Styles */
@@ -539,6 +767,16 @@ video {
     border-top-right-radius: 0;
 }
 
+.message.system {
+    background-color: #f0f0f0;
+    color: #666;
+    margin: 0 auto;
+    font-style: italic;
+    font-size: 0.9rem;
+    text-align: center;
+    border-radius: 5px;
+}
+
 .message .sender {
     font-weight: bold;
     margin-bottom: 5px;
@@ -711,10 +949,19 @@ video {
     to { opacity: 1; }
 }
 
+/* Error Messages */
+#error-messages {
+    max-width: 400px;
+}
+
 /* Responsive Styles */
 @media (max-width: 992px) {
     #sidebar {
         width: 220px;
+    }
+    
+    .pricing-card-title {
+        font-size: 2rem;
     }
 }
 
@@ -739,6 +986,24 @@ video {
     
     .video-container, .avatar-container {
         height: 250px;
+    }
+    
+    .features-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .sidebar-user-info {
+        flex-direction: row;
+        justify-content: space-between;
+    }
+    
+    .user-avatar {
+        width: 40px;
+        height: 40px;
+    }
+    
+    .user-plan-badge {
+        font-size: 8px;
     }
 }
 
