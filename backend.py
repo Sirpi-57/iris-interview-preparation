@@ -50,10 +50,11 @@ PORT = int(os.environ.get('PORT', 5000)) # Use Render's PORT env var
 BASE_TEMP_DIR = tempfile.mkdtemp(prefix="iris_temp_") # For initial local save before Storage upload
 # --- End Constants ---
 
-# --- Firebase Admin SDK Initialization ---
+# --- Firebase Admin SDK Initialization (Enhanced Check) ---
 db = None
 bucket = None
 try:
+    print("Attempting Firebase Admin SDK initialization...")
     service_account_json_str = os.environ.get('FIREBASE_SERVICE_ACCOUNT_JSON')
     if service_account_json_str:
         service_account_info = json.loads(service_account_json_str)
@@ -62,16 +63,47 @@ try:
         if not project_id:
              raise ValueError("Project ID not found in Firebase credentials.")
 
+        print(f"Initializing Firebase App for project: {project_id}")
         firebase_admin.initialize_app(cred, {
+            # We still pass storageBucket here for default behavior reference if needed
             'storageBucket': f"{project_id}.appspot.com"
         })
-        print("Firebase Admin SDK initialized successfully.")
-        db = firestore.client()
-        print("Firestore client initialized.")
-        bucket = storage.bucket()
-        print("Storage client initialized.")
+        print("Firebase App initialized successfully.")
+
+        # --- Explicitly Check Bucket Existence ---
+        try:
+            print("Attempting to initialize Firestore client...")
+            db = firestore.client()
+            print("Firestore client initialized successfully.")
+
+            print("Attempting to initialize Storage client and check bucket...")
+            bucket_name_to_check = f"{project_id}.appspot.com"
+            # Try getting the bucket object explicitly by name
+            check_bucket = storage.bucket(name=bucket_name_to_check)
+
+            # Use the exists() method to verify
+            if check_bucket.exists():
+                 print(f"INIT CHECK: Bucket '{check_bucket.name}' confirmed to EXIST via SDK.")
+                 bucket = check_bucket # Assign the verified bucket object
+                 print("Storage client assigned successfully.")
+            else:
+                 # This case should ideally not happen if the bucket truly exists
+                 print(f"INIT CHECK: Bucket '{bucket_name_to_check}' reported as NOT FOUND via SDK exists() check!")
+                 bucket = None # Ensure bucket is None
+
+        except Exception as client_init_err:
+             print(f"INIT CHECK: Error during Firestore/Storage client init or bucket check: {client_init_err}")
+             traceback.print_exc()
+             # Allow db to be initialized even if bucket check fails? Yes, for now.
+             if not db: # If db also failed
+                 db = None
+             bucket = None # Ensure bucket is None on error
+
     else:
         print("CRITICAL ERROR: FIREBASE_SERVICE_ACCOUNT_JSON environment variable not set.")
+        db = None
+        bucket = None
+
 except json.JSONDecodeError as e:
     print(f"CRITICAL ERROR: Failed to parse Firebase credentials from JSON string: {e}")
 except ValueError as e:
