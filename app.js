@@ -66,12 +66,40 @@ document.addEventListener('DOMContentLoaded', function() {
 
 // --- Authentication-related Functions ---
 
+// Replace this function in app.js
 function initializeIRISApp() {
-    // This function will be called when the user is authenticated and the app view is shown
-    console.log('Initializing IRIS app for authenticated user');
-    
-    // Check for any saved session
-    checkForExistingSession();
+    console.log('Initializing IRIS app for authenticated user...');
+
+    // Reset global state potentially tied to previous user/session
+    state.sessionId = null;
+    state.interviewId = null;
+    // Add any other state resets needed here
+
+    const userProfile = irisAuth?.getUserProfile(); // Get profile loaded by auth module
+
+    // Check if user profile and Firestore DB object are available
+    // (Assuming 'db' is globally accessible if needed in checkAndLoadSessionStatus error handling)
+     if (!userProfile) {
+         console.warn("User profile not loaded yet, cannot check for last session.");
+         // This might happen on initial fast load. The profile should load shortly after.
+         // You could add a small delay/retry or rely on UI state being locked initially.
+         lockAllSections(); // Ensure sections start locked
+         navigateTo('upload'); // Default view
+         return;
+     }
+
+    const lastSessionId = userProfile.lastActiveSessionId;
+
+    if (lastSessionId) {
+        console.log(`Found last active session ID from user profile: ${lastSessionId}`);
+        // Check the status of this session
+        checkAndLoadSessionStatus(lastSessionId);
+    } else {
+        console.log("No last active session found for this user. Starting fresh.");
+        // Ensure sections are locked if no session ID found
+        lockAllSections(); // Use helper to lock all dependent sections
+        navigateTo('upload'); // Start on upload page
+    }
 }
 
 // Replace this entire function in app.js
@@ -616,16 +644,27 @@ function checkForExistingSession() {
 
 // --- API Communication ---
 
+// Replace this entire function in app.js
 function uploadResumeAndAnalyze() {
     // Check if user is authenticated
-    if (!firebase.auth().currentUser) {
+    const user = firebase.auth().currentUser; // Get user first
+    if (!user) { // Check if user object exists
         showMessage('Please sign in to use this feature', 'warning');
-        irisAuth.showSignInModal();
+        // Ensure irisAuth and showSignInModal are available globally or passed correctly
+        if (typeof irisAuth !== 'undefined' && typeof irisAuth.showSignInModal === 'function') {
+            irisAuth.showSignInModal();
+        } else {
+            console.error("irisAuth or showSignInModal not available.");
+            // Fallback or alternative handling needed here
+        }
         return;
     }
 
     const form = document.getElementById('resumeUploadForm');
-    if (!form) return;
+    if (!form) {
+        console.error("resumeUploadForm not found");
+        return;
+    }
     const formData = new FormData(form);
     const progressContainer = document.getElementById('uploadProgress');
     const progressBar = progressContainer?.querySelector('.progress-bar');
@@ -636,56 +675,77 @@ function uploadResumeAndAnalyze() {
         return;
     }
 
-    // Basic validation
-    if (!formData.get('resumeFile') || !formData.get('jobDescription')) {
-        showMessage("Please select a resume file and provide a job description.", 'warning');
+    // Basic validation - Check if file exists in FormData
+    const resumeFile = formData.get('resumeFile');
+    if (!resumeFile || typeof resumeFile === 'string' || resumeFile.size === 0) { // Check if it's a real file
+         showMessage("Please select a resume file.", 'warning');
+         return;
+     }
+     if (!formData.get('jobDescription')) {
+        showMessage("Please provide a job description.", 'warning');
         return;
     }
 
-    // Add user ID to request if available
-    const user = firebase.auth().currentUser;
-    if (user) {
-        formData.append('userId', user.uid);
-    }
 
+    // Add user ID to request (already have 'user' from check above)
+    formData.append('userId', user.uid);
+    console.log(`Appending userId: ${user.uid} to FormData`); // Debug log
+
+    // Reset and show progress bar
     progressContainer.style.display = 'block';
     progressBar.style.width = '10%';
     progressBar.classList.remove('bg-success', 'bg-danger');
     progressMessage.textContent = 'Uploading files...';
 
+    // Disable button during upload
+    const analyzeBtn = document.getElementById('analyzeBtn');
+    if(analyzeBtn) analyzeBtn.disabled = true; analyzeBtn.textContent = 'Analyzing...';
+
+
     fetch(`${API_BASE_URL}/analyze-resume`, {
         method: 'POST',
         body: formData
+        // Note: No 'Content-Type' header needed for FormData, browser sets it
     })
     .then(response => {
         if (!response.ok) {
-            // Attempt to read error message from backend
+            // Attempt to read error message from backend JSON response
             return response.json().then(errData => {
-                throw new Error(errData.error || `Network response was not ok (${response.status})`);
-            }).catch(() => {
-                // If backend didn't send JSON error
-                 throw new Error(`Network response was not ok (${response.status})`);
+                 // Throw an error with the message from backend if available
+                 throw new Error(errData.error || `Analysis request failed (${response.status})`);
+            }).catch((jsonParseError) => {
+                 // If backend didn't send valid JSON error, throw generic HTTP error
+                 console.error("Could not parse error JSON from backend:", jsonParseError);
+                 throw new Error(`Analysis request failed (${response.status} ${response.statusText})`);
             });
         }
-        return response.json();
+        return response.json(); // Parse successful JSON response
     })
     .then(data => {
         console.log('Upload response:', data);
         if (!data.sessionId) {
-             throw new Error("Backend did not return a session ID.");
+            throw new Error("Backend did not return a valid session ID.");
         }
+        // Set session ID in the global state (used for polling)
         state.sessionId = data.sessionId;
-        localStorage.setItem('irisSessionId', data.sessionId); // Save session ID
+
+        // ---> REMOVED localStorage.setItem('irisSessionId', data.sessionId); <---
+        console.log("Session ID stored in state, NOT localStorage.");
 
         progressMessage.textContent = 'Analyzing resume...';
-        pollAnalysisStatus(data.sessionId); // Start polling
+        pollAnalysisStatus(data.sessionId); // Start polling using the received session ID
     })
     .catch(error => {
         console.error('Error uploading resume:', error);
-        progressMessage.textContent = `Error: ${error.message}`;
-        if(progressBar) progressBar.classList.add('bg-danger');
+        if(progressMessage) progressMessage.textContent = `Error: ${error.message}`; // Display specific error
+        if(progressBar) progressBar.classList.add('bg-danger'); progressBar.style.width = '100%'; // Indicate error on progress bar
         showMessage(`Error uploading resume: ${error.message}`, 'danger');
+
+        // Re-enable button on error
+         if(analyzeBtn) analyzeBtn.disabled = false; analyzeBtn.textContent = 'Analyze Resume';
     });
+     // Note: Button re-enabling on SUCCESS happens implicitly when polling finishes and navigates away,
+     // but you might want to explicitly re-enable it if the user stays on the upload page after success.
 }
 
 function pollAnalysisStatus(sessionId) {
@@ -2946,4 +3006,112 @@ function addMessageToConversation(role, content) {
             content: content
         });
     }
+}
+
+// NEW function (or modified pollAnalysisStatus start) in app.js
+function checkAndLoadSessionStatus(sessionId) {
+    console.log(`Checking status for session: ${sessionId}`);
+    lockAllSections(); // Start with sections locked
+
+    // Show a general loading indicator maybe?
+    // Or just let the UI update based on the status check
+
+    fetch(`${API_BASE_URL}/get-analysis-status/${sessionId}`)
+        .then(response => {
+            if (response.status === 404) {
+                console.warn(`Session ${sessionId} from profile not found in backend. Clearing from profile.`);
+                const user = irisAuth?.getCurrentUser();
+                // Attempt to clear the invalid ID from the user's profile
+                if (user && typeof firebase !== 'undefined' && firebase.firestore) {
+                    const db = firebase.firestore(); // Get Firestore instance
+                    db.collection('users').doc(user.uid).update({
+                         lastActiveSessionId: firebase.firestore.FieldValue.delete() // Use FieldValue.delete()
+                    }).catch(err => console.error("Failed to clear invalid sessionId from profile:", err));
+                }
+                lockAllSections(); // Ensure locked
+                navigateTo('upload'); // Start fresh
+                return null; // Stop processing this response
+            }
+            if (!response.ok) throw new Error(`Network response was not ok (${response.status}) checking session status`);
+            return response.json();
+        })
+        .then(statusData => {
+            if (!statusData) return; // Exit if session was not found (handled above)
+
+            // *** IMPORTANT: Set the global state session ID ***
+            state.sessionId = sessionId;
+            console.log(`Set active session ID in state: ${state.sessionId}`);
+
+            if (statusData.status === 'completed') {
+                console.log(`Session ${sessionId} analysis complete. Loading data.`);
+                unlockSection('analysis');
+                unlockSection('prep-plan');
+                unlockSection('mock-interview');
+                // Check history and unlock performance/history based on actual interviews for *this* session
+                checkAndUnlockHistorySections(sessionId);
+
+                // Load the actual data now that sections are unlocked
+                loadAnalysisResults(sessionId);
+                loadPreparationPlan(sessionId);
+                // Decide where to navigate - analysis seems logical
+                navigateTo('analysis');
+            } else if (statusData.status === 'processing') {
+                console.log(`Session ${sessionId} still processing. Restarting polling.`);
+                const progressContainer = document.getElementById('uploadProgress');
+                const progressBar = document.querySelector('#uploadProgress .progress-bar');
+                const progressMessage = document.getElementById('progressMessage');
+                if (progressContainer) progressContainer.style.display = 'block';
+                if (progressBar) progressBar.style.width = `${statusData.progress || 0}%`;
+                if (progressMessage) progressMessage.textContent = `Analysis in progress (${statusData.progress || 0}%)...`;
+                pollAnalysisStatus(sessionId); // Resume polling - ensure pollAnalysisStatus uses state.sessionId
+                navigateTo('upload'); // Stay on upload page while polling resumes
+            } else { // Failed or unknown status
+                console.warn(`Session ${sessionId} has status: ${statusData.status}. Starting fresh.`);
+                lockAllSections(); // Keep locked
+                navigateTo('upload');
+            }
+        })
+        .catch(error => {
+            console.error('Error checking session status from profile:', error);
+            lockAllSections(); // Lock on error
+            navigateTo('upload'); // Go to upload on error
+        });
+}
+
+// NEW Helper function in app.js to check history and unlock sections
+function checkAndUnlockHistorySections(sessionIdToCheck) {
+   if (!sessionIdToCheck) return; // Need a session ID
+    fetch(`${API_BASE_URL}/get-progress-history/${sessionIdToCheck}`)
+         .then(res => {
+             if (!res.ok) { // Handle non-200 responses gracefully (e.g., 404 if no history yet)
+                 console.log(`No history found or error fetching for session ${sessionIdToCheck} (status: ${res.status}). Keeping sections locked.`);
+                  return null;
+             }
+             return res.json();
+         })
+         .then(historyData => {
+             if (historyData && historyData.interviews?.length > 0) {
+                  console.log(`Found ${historyData.interviews.length} past interviews for session ${sessionIdToCheck}. Unlocking performance/history.`);
+                  unlockSection('performance');
+                  unlockSection('history');
+             } else {
+                  console.log(`No interview history found for session ${sessionIdToCheck}. Keeping performance/history locked.`);
+                  lockSection('performance'); // Ensure they remain locked if no history
+                  lockSection('history');
+             }
+         })
+          .catch(err => {
+             console.error(`Error checking history for session ${sessionIdToCheck}:`, err);
+             lockSection('performance'); // Lock on error
+             lockSection('history');
+          });
+}
+
+// NEW Helper function in app.js to lock sections dependent on analysis
+function lockAllSections() {
+   lockSection('analysis');
+   lockSection('prep-plan');
+   lockSection('mock-interview');
+   lockSection('performance');
+   lockSection('history');
 }

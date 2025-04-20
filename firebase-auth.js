@@ -59,20 +59,20 @@ const firebaseConfig = {
   
   function handleAuthStateChanged(user) {
     console.log('Auth state changed:', user ? `User ${user.email} signed in` : 'User signed out');
-  
     authState.user = user;
-  
     if (user) {
-      // User is signed in
-      loadUserProfile(user);
+      loadUserProfile(user); // This now becomes crucial for loading the session ID
       showAppView();
       updateUserProfileUI(user);
     } else {
-      // User is signed out
       authState.userProfile = null;
-      localStorage.removeItem('irisSessionId'); // <-- Clears session ID on sign-out
-      // Optionally reset other app state if needed:
-      // resetAppState();
+      // localStorage.removeItem('irisSessionId'); // <<< REMOVE THIS LINE
+      const resumeInput = document.getElementById('resumeFile'); // Keep form reset
+      const jobDescriptionInput = document.getElementById('jobDescription');
+      if (resumeInput) resumeInput.value = null;
+      if (jobDescriptionInput) jobDescriptionInput.value = '';
+      const progressContainer = document.getElementById('uploadProgress'); // Keep progress reset
+       if (progressContainer) { /* ... reset progress bar ... */ }
       showPublicView();
       clearUserProfileUI();
     }
@@ -312,23 +312,19 @@ const firebaseConfig = {
   }
   
   function signOut() {
-    if (!firebase.auth) {
-      showErrorMessage('Authentication service not available');
-      return Promise.reject(new Error('Authentication service not available'));
-    }
-  
+    if (!firebase.auth) { /* ... */ }
     return firebase.auth().signOut()
       .then(() => {
         console.log('User signed out successfully');
-        localStorage.removeItem('irisSessionId'); // <-- Also clear session ID here after explicit sign-out
-        // Optionally reset other app state if needed:
-        // resetAppState();
+        // localStorage.removeItem('irisSessionId'); // <<< REMOVE THIS LINE
+        const resumeInput = document.getElementById('resumeFile'); // Keep form reset
+        const jobDescriptionInput = document.getElementById('jobDescription');
+        if (resumeInput) resumeInput.value = null;
+        if (jobDescriptionInput) jobDescriptionInput.value = '';
+        const progressContainer = document.getElementById('uploadProgress'); // Keep progress reset
+         if (progressContainer) { /* ... reset progress bar ... */ }
       })
-      .catch(error => {
-        console.error('Sign out error:', error);
-        showErrorMessage(`Sign out failed: ${error.message}`);
-        throw error; // Re-throw the error for potential further handling
-      });
+      .catch(error => { /* ... */ });
   }
   
   // UI Helper functions
