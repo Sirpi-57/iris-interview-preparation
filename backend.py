@@ -1055,22 +1055,31 @@ def start_mock_interview():
             'sessionId': session_id, # Link back to the analysis session
             # 'userId': '...', # TODO: Add user ID when auth is implemented
             'interviewType': interview_type,
-            'system_prompt': system_prompt, # Store for reference, maybe? Can be large.
-            'conversation': [{'role': 'assistant', 'content': greeting, 'timestamp': firestore.SERVER_TIMESTAMP}], # Start conversation
+            'system_prompt_summary': system_prompt[:1000] + "...", # Store summary, not full prompt maybe
+            # === CORRECTED LINE BELOW ===
+            'conversation': [{'role': 'assistant', 'content': greeting, 'timestamp': datetime.now().isoformat()}], # Use standard datetime string
+            # === END CORRECTION ===
             'status': 'active',
             'start_time': datetime.now().isoformat(),
-            'last_updated': firestore.SERVER_TIMESTAMP,
+            'last_updated': firestore.SERVER_TIMESTAMP, # Top-level SERVER_TIMESTAMP is OK on set()
             'resume_data_snapshot': resume_data, # Snapshot data used for this interview
-            'job_data_snapshot': job_data
+            'job_data_snapshot': job_data,
+            'analysis_status': 'not_started', # Add initial analysis status
+            'analysis': None # Placeholder for analysis results
         }
-        interview_doc_ref.set(interview_data_to_save)
+        interview_doc_ref.set(interview_data_to_save) # Now this should work
         print(f"[{session_id}] Started interview {interview_id} of type {interview_type}.")
 
         return jsonify({'interviewId': interview_id, 'sessionId': session_id, 'interviewType': interview_type, 'greeting': greeting})
+
+    # Add specific exception handling for Firestore errors if needed
     except Exception as e:
         print(f"Error in /start-mock-interview: {e}")
         traceback.print_exc()
-        return jsonify({'error': f'Server error: {str(e)}'}), 500
+        # Check if it's the specific TypeError we saw
+        if isinstance(e, TypeError) and 'Cannot convert to a Firestore Value' in str(e):
+             return jsonify({'error': f'Server error preparing interview data: {str(e)}'}), 500
+        return jsonify({'error': f'Server error starting interview: {str(e)}'}), 500
 
 
 @app.route('/interview-response', methods=['POST'])
