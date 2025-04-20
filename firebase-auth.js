@@ -58,67 +58,87 @@ const firebaseConfig = {
   }
   
   function handleAuthStateChanged(user) {
-    console.log('Auth state changed:', user ? `User ${user.email} signed in` : 'User signed out');
-    authState.user = user;
-    if (user) {
-      loadUserProfile(user); // This now becomes crucial for loading the session ID
-      showAppView();
-      updateUserProfileUI(user);
-    } else {
-      authState.userProfile = null;
-      // localStorage.removeItem('irisSessionId'); // <<< REMOVE THIS LINE
-      const resumeInput = document.getElementById('resumeFile'); // Keep form reset
-      const jobDescriptionInput = document.getElementById('jobDescription');
-      if (resumeInput) resumeInput.value = null;
-      if (jobDescriptionInput) jobDescriptionInput.value = '';
-      const progressContainer = document.getElementById('uploadProgress'); // Keep progress reset
-       if (progressContainer) { /* ... reset progress bar ... */ }
-      showPublicView();
-      clearUserProfileUI();
-    }
+      console.log('Auth state changed:', user ? `User ${user.email} signed in` : 'User signed out');
+      authState.user = user;
+
+      if (user) {
+          // User is signed in - Load profile FIRST, then initialize app state
+          loadUserProfile(user) // loadUserProfile already handles success/failure internally
+              .finally(() => {
+                  // This block runs *after* loadUserProfile finishes or fails
+                  console.log("Profile load attempt finished. Current profile state:", authState.userProfile);
+                  showAppView(); // Show the app view
+                  updateUserProfileUI(user); // Update UI with basic auth info
+                  // Initialize app logic *after* profile attempt and showing view
+                  if (typeof initializeIRISApp === 'function') {
+                      initializeIRISApp(); // Now safe to check authState.userProfile
+                  }
+              });
+      } else {
+          // User is signed out
+          authState.userProfile = null;
+          // Remove localStorage item if it was ever used (belt-and-suspenders, though we stopped setting it)
+          // localStorage.removeItem('irisSessionId');
+          // Reset form fields
+          const resumeInput = document.getElementById('resumeFile');
+          const jobDescriptionInput = document.getElementById('jobDescription');
+          if (resumeInput) resumeInput.value = null;
+          if (jobDescriptionInput) jobDescriptionInput.value = '';
+          const progressContainer = document.getElementById('uploadProgress');
+          if (progressContainer) { /* ... reset progress bar ... */ }
+          // Reset other app state if needed
+          // resetAppState();
+          showPublicView();
+          clearUserProfileUI();
+      }
   }
+
   
   function loadUserProfile(user) {
-    // Only load if we have a valid user and Firestore is available
-    if (!user || !firebase.firestore) return;
-    
-    const db = firebase.firestore();
-    db.collection('users').doc(user.uid)
-      .get()
-      .then(doc => {
-        if (doc.exists) {
-          authState.userProfile = doc.data();
-          console.log('User profile loaded:', authState.userProfile);
-          updateUserProfileUI(user);
-        } else {
-          // Create a new user profile if none exists
-          console.log('No user profile found, creating one');
-          const newProfile = {
-            uid: user.uid,
-            email: user.email,
-            displayName: user.displayName || user.email.split('@')[0],
-            photoURL: user.photoURL,
-            createdAt: new Date().toISOString(),
-            // Default to free plan for now
-            plan: 'free',
-            // Add other default fields as needed
-          };
-          
-          // Save the new profile
-          db.collection('users').doc(user.uid)
-            .set(newProfile)
-            .then(() => {
-              authState.userProfile = newProfile;
-              updateUserProfileUI(user);
-            })
-            .catch(error => {
-              console.error('Error creating user profile:', error);
-            });
-        }
-      })
-      .catch(error => {
-        console.error('Error loading user profile:', error);
-      });
+      // Only load if we have a valid user and Firestore is available
+      if (!user || typeof firebase === 'undefined' || !firebase.firestore) {
+          console.warn("Cannot load profile: User null or Firebase/Firestore not available.");
+          authState.userProfile = null; // Ensure profile is null
+          return Promise.resolve(); // Return resolved promise so .finally() runs
+      }
+
+      const db = firebase.firestore();
+      console.log(`Attempting to load profile for user: ${user.uid}`); // Add log
+
+      // Return the promise chain
+      return db.collection('users').doc(user.uid).get()
+          .then(doc => {
+              if (doc.exists) {
+                  authState.userProfile = doc.data();
+                  console.log('User profile loaded successfully:', authState.userProfile);
+              } else {
+                  console.log('No user profile found in Firestore, attempting to create one');
+                  const newProfile = {
+                      uid: user.uid,
+                      email: user.email,
+                      displayName: user.displayName || user.email.split('@')[0],
+                      photoURL: user.photoURL || null, // Store null if no photoURL
+                      createdAt: new Date().toISOString(),
+                      plan: 'free', // Default plan
+                      // lastActiveSessionId: null // Initialize explicitly if needed
+                  };
+                  // Attempt to save the new profile (this might fail if rules deny create)
+                  return db.collection('users').doc(user.uid).set(newProfile)
+                      .then(() => {
+                          authState.userProfile = newProfile;
+                          console.log("New user profile created successfully:", authState.userProfile);
+                      })
+                      .catch(createError => {
+                          console.error(`Error creating user profile (check Firestore rules for 'create'):`, createError);
+                          authState.userProfile = null; // Ensure profile is null if creation fails
+                      });
+              }
+          })
+          .catch(error => {
+              console.error('Error loading user profile (check Firestore rules for \'read\'):', error);
+              authState.userProfile = null; // Ensure profile is null on error
+              // Don't re-throw here, let .finally() handle the next step
+          });
   }
   
   // Replace this entire function in firebase-auth.js
