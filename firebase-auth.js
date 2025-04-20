@@ -59,9 +59,9 @@ const firebaseConfig = {
   
   function handleAuthStateChanged(user) {
     console.log('Auth state changed:', user ? `User ${user.email} signed in` : 'User signed out');
-    
+  
     authState.user = user;
-    
+  
     if (user) {
       // User is signed in
       loadUserProfile(user);
@@ -70,6 +70,9 @@ const firebaseConfig = {
     } else {
       // User is signed out
       authState.userProfile = null;
+      localStorage.removeItem('irisSessionId'); // <-- Clears session ID on sign-out
+      // Optionally reset other app state if needed:
+      // resetAppState();
       showPublicView();
       clearUserProfileUI();
     }
@@ -118,49 +121,82 @@ const firebaseConfig = {
       });
   }
   
+  // Replace this entire function in firebase-auth.js
   function updateUserProfileUI(user) {
     // Update UI elements showing user info
     const userDisplayElements = document.querySelectorAll('.user-display-name');
     const userEmailElements = document.querySelectorAll('.user-email');
     const userAvatarElements = document.querySelectorAll('.user-avatar');
-    
+
     const displayName = user.displayName || authState.userProfile?.displayName || user.email.split('@')[0];
     const email = user.email;
     const photoURL = user.photoURL || 'https://i.stack.imgur.com/34AD2.jpg'; // Default avatar
-    
+
     userDisplayElements.forEach(el => el.textContent = displayName);
     userEmailElements.forEach(el => el.textContent = email);
     userAvatarElements.forEach(el => {
-      if (el.tagName === 'IMG') {
-        el.src = photoURL;
-        el.alt = displayName;
-      }
+        if (el.tagName === 'IMG') {
+            el.src = photoURL;
+            el.alt = displayName;
+        }
     });
-    
+
     // Update plan info if available
     const planElements = document.querySelectorAll('.user-plan');
-    if (authState.userProfile && planElements) {
-      const planName = authState.userProfile.plan || 'free';
-      planElements.forEach(el => el.textContent = planName.charAt(0).toUpperCase() + planName.slice(1));
+    const userPlanBadgeElements = document.querySelectorAll('.user-plan-badge'); // Added selector for sidebar badge
+    if (authState.userProfile && (planElements.length > 0 || userPlanBadgeElements.length > 0)) {
+        const planName = authState.userProfile.plan || 'free';
+        const formattedPlanName = planName.charAt(0).toUpperCase() + planName.slice(1);
+        planElements.forEach(el => el.textContent = formattedPlanName);
+        userPlanBadgeElements.forEach(el => el.textContent = formattedPlanName); // Update sidebar badge too
+    }
+
+    // Show/Hide Password Buttons based on providers
+    const addPasswordBtn = document.getElementById('addPasswordBtn');
+    const changePasswordBtn = document.getElementById('changePasswordBtn');
+    if (user && addPasswordBtn && changePasswordBtn) {
+        // Check if 'password' is listed in the providerData array
+        const hasPasswordProvider = user.providerData.some(provider => provider.providerId === 'password');
+
+        // Show "Add Password" if NO password provider exists
+        addPasswordBtn.style.display = hasPasswordProvider ? 'none' : 'block';
+        // Show "Change Password" if a password provider DOES exist
+        changePasswordBtn.style.display = hasPasswordProvider ? 'block' : 'none';
+
+        console.log("User providers:", user.providerData.map(p => p.providerId)); // For debugging
+        console.log("Password provider exists:", hasPasswordProvider); // For debugging
+    } else {
+        // Ensure buttons are hidden if user/elements aren't ready
+        if(addPasswordBtn) addPasswordBtn.style.display = 'none';
+        if(changePasswordBtn) changePasswordBtn.style.display = 'none';
     }
   }
   
+  // Replace this entire function in firebase-auth.js
   function clearUserProfileUI() {
     // Clear user-related UI elements
     const userDisplayElements = document.querySelectorAll('.user-display-name');
     const userEmailElements = document.querySelectorAll('.user-email');
     const userAvatarElements = document.querySelectorAll('.user-avatar');
     const planElements = document.querySelectorAll('.user-plan');
-    
-    userDisplayElements.forEach(el => el.textContent = '');
-    userEmailElements.forEach(el => el.textContent = '');
+    const userPlanBadgeElements = document.querySelectorAll('.user-plan-badge');
+
+    userDisplayElements.forEach(el => el.textContent = '...'); // Use placeholder
+    userEmailElements.forEach(el => el.textContent = '...'); // Use placeholder
     userAvatarElements.forEach(el => {
-      if (el.tagName === 'IMG') {
-        el.src = 'https://i.stack.imgur.com/34AD2.jpg'; // Default placeholder
-        el.alt = 'User';
-      }
+        if (el.tagName === 'IMG') {
+            el.src = 'https://i.stack.imgur.com/34AD2.jpg'; // Default placeholder
+            el.alt = 'User';
+        }
     });
     planElements.forEach(el => el.textContent = '');
+    userPlanBadgeElements.forEach(el => el.textContent = ''); // Clear sidebar badge
+
+    // Reset Password Buttons visibility
+    const addPasswordBtn = document.getElementById('addPasswordBtn');
+    const changePasswordBtn = document.getElementById('changePasswordBtn');
+    if(addPasswordBtn) addPasswordBtn.style.display = 'none'; // Hide when logged out
+    if(changePasswordBtn) changePasswordBtn.style.display = 'none'; // Hide when logged out
   }
   
   // View switching logic
@@ -280,15 +316,18 @@ const firebaseConfig = {
       showErrorMessage('Authentication service not available');
       return Promise.reject(new Error('Authentication service not available'));
     }
-    
+  
     return firebase.auth().signOut()
       .then(() => {
         console.log('User signed out successfully');
+        localStorage.removeItem('irisSessionId'); // <-- Also clear session ID here after explicit sign-out
+        // Optionally reset other app state if needed:
+        // resetAppState();
       })
       .catch(error => {
         console.error('Sign out error:', error);
         showErrorMessage(`Sign out failed: ${error.message}`);
-        throw error;
+        throw error; // Re-throw the error for potential further handling
       });
   }
   

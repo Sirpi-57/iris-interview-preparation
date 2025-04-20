@@ -469,8 +469,11 @@
                                     </div>
                                     <div class="card-body">
                                         <div class="d-grid gap-3">
-                                            <button class="btn btn-outline-primary" id="changePasswordBtn">
+                                            <button class="btn btn-outline-primary" id="changePasswordBtn" style="display: none;">
                                                 <i class="fas fa-lock me-2"></i> Change Password
+                                            </button>
+                                            <button class="btn btn-outline-secondary" id="addPasswordBtn" style="display: none;">
+                                                 <i class="fas fa-key me-2"></i> Enable Email/Password Sign-in
                                             </button>
                                             <button class="btn btn-outline-secondary" id="twoFactorBtn">
                                                 <i class="fas fa-shield-alt me-2"></i> Enable Two-Factor Authentication
@@ -1135,6 +1138,34 @@
                         </div>
                         <div class="d-grid">
                             <button type="submit" class="btn btn-primary">Update Password</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="add-password-modal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Enable Email/Password Sign-in</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p>Set a password for your account (<span id="add-password-email" class="fw-bold"></span>) to enable signing in directly with your email and this password.</p>
+                    <form id="add-password-form">
+                        <div class="mb-3">
+                            <label for="add-new-password" class="form-label">New Password</label>
+                            <input type="password" class="form-control" id="add-new-password" required minlength="6">
+                             <div class="form-text">Password must be at least 6 characters long.</div>
+                        </div>
+                        <div class="mb-3">
+                            <label for="add-confirm-new-password" class="form-label">Confirm New Password</label>
+                            <input type="password" class="form-control" id="add-confirm-new-password" required minlength="6">
+                        </div>
+                        <div class="d-grid">
+                            <button type="submit" class="btn btn-primary">Set Password</button>
                         </div>
                     </form>
                 </div>
