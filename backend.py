@@ -152,16 +152,22 @@ def add_conversation_message(interview_id, role, content):
     if not db: return False
     try:
         interview_ref = db.collection('interviews').document(interview_id)
-        message = {'role': role, 'content': content, 'timestamp': firestore.SERVER_TIMESTAMP}
+        # === CORRECTED LINE BELOW ===
+        message = {'role': role, 'content': content, 'timestamp': datetime.now().isoformat()} # Use standard datetime string
+        # === END CORRECTION ===
         interview_ref.update({
             'conversation': firestore.ArrayUnion([message]),
-            'last_updated': firestore.SERVER_TIMESTAMP
+            'last_updated': firestore.SERVER_TIMESTAMP # This top-level one is fine
         })
+        # Optional: Add logging on success
+        # print(f"[{interview_id}] Added '{role}' message to conversation.")
         return True
     except Exception as e:
         print(f"ERROR: Failed to add message to interview {interview_id}: {e}")
+        # Check if it's the specific TypeError
+        if isinstance(e, TypeError) and 'Cannot convert to a Firestore Value' in str(e):
+             print(f"[{interview_id}] Likely caused by nested timestamp issue during ArrayUnion.")
         return False
-
 # === Existing Helper Functions (Keep implementations as they were) ===
 
 def extract_text_from_pdf(file_path):
