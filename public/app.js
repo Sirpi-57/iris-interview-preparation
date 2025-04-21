@@ -13,8 +13,6 @@ const state = {
     videoStream: null,
     interviewType: 'general',
     conversationHistory: [],
-
-    // Voice detection state
     isInterviewActive: false,
     isAIResponding: false,
     silenceTimer: null,
@@ -25,6 +23,19 @@ const state = {
     audioDataArray: null,
     vadAnimationFrameId: null,
     speechDetectedInChunk: false,
+
+    // ---- NEW: User Plan State ----
+    currentUserPlan: 'free', // Default assumption
+    resumeCreditsRemaining: 0,
+    mockInterviewsRemaining: 0,
+    planDetails: { // Define limits per plan
+        free: { resumeMax: 2, mockMax: 0 },
+        starter: { resumeMax: 5, mockMax: 1 },
+        standard: { resumeMax: 10, mockMax: 3 }, // Updated Standard
+        pro: { resumeMax: 10, mockMax: 5 } // Updated Pro
+        // College plan uses Pro limits per student, handled backend mainly
+    }
+    // ---- END NEW ----
 };
 
 // VAD Constants
@@ -69,35 +80,47 @@ document.addEventListener('DOMContentLoaded', function() {
 // Replace this function in app.js
 function initializeIRISApp() {
     console.log('Initializing IRIS app for authenticated user...');
-
     // Reset global state potentially tied to previous user/session
-    state.sessionId = null;
-    state.interviewId = null;
-    // Add any other state resets needed here
+    state.sessionId = null; // Keep session reset
+    state.interviewId = null; // Keep interview reset
+    // Reset plan state too, will be set by profile loading
+    state.currentUserPlan = 'free';
+    state.resumeCreditsRemaining = 0;
+    state.mockInterviewsRemaining = 0;
+
 
     const userProfile = irisAuth?.getUserProfile(); // Get profile loaded by auth module
 
-    // Check if user profile and Firestore DB object are available
-    // (Assuming 'db' is globally accessible if needed in checkAndLoadSessionStatus error handling)
-     if (!userProfile) {
-         console.warn("User profile not loaded yet, cannot check for last session.");
-         // This might happen on initial fast load. The profile should load shortly after.
-         // You could add a small delay/retry or rely on UI state being locked initially.
-         lockAllSections(); // Ensure sections start locked
-         navigateTo('upload'); // Default view
-         return;
-     }
+    if (!userProfile) {
+        console.warn("User profile not loaded yet for app init.");
+        lockAllSections(); // Ensure sections start locked
+        navigateTo('upload'); // Default view
+        return;
+    }
 
+    // --- NEW: Update global state from loaded profile ---
+    state.currentUserPlan = userProfile.plan || 'free';
+    // Use existing credits if present, otherwise default based on plan (especially for initial load)
+    const planMax = state.planDetails[state.currentUserPlan] || state.planDetails.free;
+    state.resumeCreditsRemaining = userProfile.resumeCreditsRemaining !== undefined ? userProfile.resumeCreditsRemaining : planMax.resumeMax;
+    state.mockInterviewsRemaining = userProfile.mockInterviewsRemaining !== undefined ? userProfile.mockInterviewsRemaining : planMax.mockMax;
+    console.log(`Updated app state: Plan=<span class="math-inline">\{state\.currentUserPlan\}, Resumes\=</span>{state.resumeCreditsRemaining}, Mocks=${state.mockInterviewsRemaining}`);
+    // --- END NEW ---
+
+    // Now update UI based on the state
+    updateUsageDisplay(); // NEW: Update counters
+    updateFeatureAccess(); // NEW: Lock/unlock features
+
+    // Check for last session (existing logic)
     const lastSessionId = userProfile.lastActiveSessionId;
-
     if (lastSessionId) {
         console.log(`Found last active session ID from user profile: ${lastSessionId}`);
-        // Check the status of this session
+        // *** IMPORTANT: We set state.sessionId HERE if loading previous analysis ***
+        // checkAndLoadSessionStatus will handle unlocking etc. based on its findings
         checkAndLoadSessionStatus(lastSessionId);
     } else {
         console.log("No last active session found for this user. Starting fresh.");
-        // Ensure sections are locked if no session ID found
-        lockAllSections(); // Use helper to lock all dependent sections
+         // Sections are already locked/unlocked by updateFeatureAccess based on plan
         navigateTo('upload'); // Start on upload page
     }
 }
@@ -3105,6 +3128,37 @@ function checkAndUnlockHistorySections(sessionIdToCheck) {
              lockSection('performance'); // Lock on error
              lockSection('history');
           });
+}
+
+// Corrected function in app.js
+function updateUsageDisplay() {
+    const resumeDisplay = document.getElementById('resume-credits-display');
+    const mockDisplay = document.getElementById('mock-credits-display');
+
+    if (!resumeDisplay || !mockDisplay) {
+        console.warn("Usage display elements not found.");
+        return;
+    }
+
+    // Get current plan details and limits from state
+    const currentPlan = state.currentUserPlan || 'free';
+    const planLimits = state.planDetails[currentPlan] || state.planDetails.free; // Fallback to free limits
+    // Ensure remaining credits are treated as numbers, default to 0 if undefined
+    const resumeRemaining = Number(state.resumeCreditsRemaining) || 0;
+    const mockRemaining = Number(state.mockInterviewsRemaining) || 0;
+
+
+    // --- FIXED Template Literal Syntax ---
+    const resumeText = `Resumes: <span class="math-inline">\{resumeRemaining\}/</span>{planLimits.resumeMax}`;
+    const mockText = `Mocks: <span class="math-inline">\{mockRemaining\}/</span>{planLimits.mockMax}`;
+    // --- END FIX ---
+
+    // Update the UI using textContent for safety
+    resumeDisplay.textContent = resumeText;
+    mockDisplay.textContent = mockText;
+
+    // Keep the console log for debugging
+    console.log(`UI Updated: Usage Display - ${resumeText}, ${mockText}`);
 }
 
 // NEW Helper function in app.js to lock sections dependent on analysis
