@@ -271,6 +271,8 @@ function showAppView() {
   console.log("Attempting to show App View...");
   document.getElementById('public-view').style.display = 'none';
   document.getElementById('app-view').style.display = 'flex';
+
+  console.log("View display updated. public:none, app:flex");
   
   // Initialize IRIS app if needed
   if (typeof initializeIRISApp === 'function') {
