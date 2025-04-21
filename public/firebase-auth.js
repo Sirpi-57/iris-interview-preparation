@@ -94,74 +94,51 @@ function handleAuthStateChanged(user) {
 }
 
 
-// Replace this entire function in firebase-auth.js
 function loadUserProfile(user) {
-  // Only load if we have a valid user and Firestore is available
-  if (!user || typeof firebase === 'undefined' || !firebase.firestore) {
-      console.warn("Cannot load profile: User null or Firebase/Firestore not available.");
-      authState.userProfile = null; // Ensure profile is null
-      return Promise.resolve(); // Return resolved promise so .finally() runs
-  }
+    // Only load if we have a valid user and Firestore is available
+    if (!user || typeof firebase === 'undefined' || !firebase.firestore) {
+        console.warn("Cannot load profile: User null or Firebase/Firestore not available.");
+        authState.userProfile = null; // Ensure profile is null
+        return Promise.resolve(); // Return resolved promise so .finally() runs
+    }
 
-  const db = firebase.firestore();
-  const userRef = db.collection('users').doc(user.uid);
-  console.log(`Attempting to load profile for user: ${user.uid}`);
+    const db = firebase.firestore();
+    console.log(`Attempting to load profile for user: ${user.uid}`); // Add log
 
-  // Return the promise chain
-  return userRef.get()
-      .then(doc => {
-          if (doc.exists) {
-              // Document exists, load data and check for plan fields
-              const profileData = doc.data();
-              // Set defaults if fields are missing from existing document
-              profileData.plan = profileData.plan || 'free';
-              profileData.resumeCreditsRemaining = profileData.resumeCreditsRemaining !== undefined ? profileData.resumeCreditsRemaining : 2;
-              profileData.mockInterviewsRemaining = profileData.mockInterviewsRemaining !== undefined ? profileData.mockInterviewsRemaining : 0;
-
-              authState.userProfile = profileData;
-              console.log('User profile loaded successfully:', authState.userProfile);
-              // If defaults were added, update the document (optional, but good practice)
-              if (profileData.plan === 'free' && (profileData.resumeCreditsRemaining === 2 || profileData.mockInterviewsRemaining === 0) && (!doc.data().plan || doc.data().resumeCreditsRemaining === undefined || doc.data().mockInterviewsRemaining === undefined)) {
-                console.log("Updating existing profile with default plan/credit fields.");
-                return userRef.update({
-                    plan: profileData.plan,
-                    resumeCreditsRemaining: profileData.resumeCreditsRemaining,
-                    mockInterviewsRemaining: profileData.mockInterviewsRemaining
-                }).catch(updateError => {
-                    console.error("Error updating existing profile with defaults:", updateError);
-                    // Continue even if update fails, profile is loaded in authState
-                });
-              }
-
-          } else {
-              // Document doesn't exist, create a new one with defaults
-              console.log('No user profile found in Firestore, creating one with default free plan');
-              const newProfile = {
-                  uid: user.uid,
-                  email: user.email,
-                  displayName: user.displayName || user.email.split('@')[0],
-                  photoURL: user.photoURL || null,
-                  createdAt: new Date().toISOString(),
-                  plan: 'free', // Default plan
-                  resumeCreditsRemaining: 2, // Default free limit
-                  mockInterviewsRemaining: 0 // Default free limit
-              };
-              // Attempt to save the new profile
-              return userRef.set(newProfile) // Use set() for creation
-                  .then(() => {
-                      authState.userProfile = newProfile;
-                      console.log("New user profile created successfully:", authState.userProfile);
-                  })
-                  .catch(createError => {
-                      console.error(`Error creating user profile (check Firestore rules for 'create'):`, createError);
-                      authState.userProfile = null; // Ensure profile is null if creation fails
-                  });
-          }
-      })
-      .catch(error => {
-          console.error('Error loading/creating user profile (check Firestore rules for \'read\'/\'write\'):', error);
-          authState.userProfile = null; // Ensure profile is null on error
-      });
+    // Return the promise chain
+    return db.collection('users').doc(user.uid).get()
+        .then(doc => {
+            if (doc.exists) {
+                authState.userProfile = doc.data();
+                console.log('User profile loaded successfully:', authState.userProfile);
+            } else {
+                console.log('No user profile found in Firestore, attempting to create one');
+                const newProfile = {
+                    uid: user.uid,
+                    email: user.email,
+                    displayName: user.displayName || user.email.split('@')[0],
+                    photoURL: user.photoURL || null, // Store null if no photoURL
+                    createdAt: new Date().toISOString(),
+                    plan: 'free', // Default plan
+                    // lastActiveSessionId: null // Initialize explicitly if needed
+                };
+                // Attempt to save the new profile (this might fail if rules deny create)
+                return db.collection('users').doc(user.uid).set(newProfile)
+                    .then(() => {
+                        authState.userProfile = newProfile;
+                        console.log("New user profile created successfully:", authState.userProfile);
+                    })
+                    .catch(createError => {
+                        console.error(`Error creating user profile (check Firestore rules for 'create'):`, createError);
+                        authState.userProfile = null; // Ensure profile is null if creation fails
+                    });
+            }
+        })
+        .catch(error => {
+            console.error('Error loading user profile (check Firestore rules for \'read\'):', error);
+            authState.userProfile = null; // Ensure profile is null on error
+            // Don't re-throw here, let .finally() handle the next step
+        });
 }
 
 // Replace this entire function in firebase-auth.js
@@ -171,10 +148,9 @@ function updateUserProfileUI(user) {
   const userEmailElements = document.querySelectorAll('.user-email');
   const userAvatarElements = document.querySelectorAll('.user-avatar');
 
-  // Use profile data if available, otherwise fallback to auth user data
-  const displayName = authState.userProfile?.displayName || user.displayName || user.email?.split('@')[0] || 'User';
-  const email = user.email || authState.userProfile?.email || 'No Email';
-  const photoURL = authState.userProfile?.photoURL || user.photoURL || 'https://i.stack.imgur.com/34AD2.jpg'; // Default avatar
+  const displayName = user.displayName || authState.userProfile?.displayName || user.email.split('@')[0];
+  const email = user.email;
+  const photoURL = user.photoURL || 'https://i.stack.imgur.com/34AD2.jpg'; // Default avatar
 
   userDisplayElements.forEach(el => el.textContent = displayName);
   userEmailElements.forEach(el => el.textContent = email);
@@ -185,46 +161,32 @@ function updateUserProfileUI(user) {
       }
   });
 
-  // --- MODIFIED PLAN DISPLAY ---
-  const planBadgeElements = document.querySelectorAll('.user-plan-badge'); // Target only the badges
-  if (authState.userProfile) { // Check if profile is loaded
-      const planName = authState.userProfile.plan || 'free'; // Default to 'free' if plan field missing
+  // Update plan info if available
+  const planElements = document.querySelectorAll('.user-plan');
+  const userPlanBadgeElements = document.querySelectorAll('.user-plan-badge'); // Added selector for sidebar badge
+  if (authState.userProfile && (planElements.length > 0 || userPlanBadgeElements.length > 0)) {
+      const planName = authState.userProfile.plan || 'free';
       const formattedPlanName = planName.charAt(0).toUpperCase() + planName.slice(1);
-      planBadgeElements.forEach(el => {
-          el.textContent = formattedPlanName;
-          // Optional: Add classes based on plan for different colors?
-          el.className = 'user-plan-badge badge rounded-pill p-2'; // Reset classes
-          if (planName === 'free') {
-              el.classList.add('bg-secondary'); // Example style for free
-          } else if (planName === 'starter') {
-              el.classList.add('bg-info');
-          } else if (planName === 'standard') {
-              el.classList.add('bg-primary');
-          } else if (planName === 'pro') {
-              el.classList.add('bg-success');
-          } else {
-              el.classList.add('bg-secondary'); // Default fallback
-          }
-      });
-      console.log(`UI Updated: Displaying plan - ${formattedPlanName}`);
-  } else {
-      // If profile hasn't loaded yet, maybe show loading or default
-      planBadgeElements.forEach(el => el.textContent = '...');
-      console.log("UI Update: User profile not yet loaded for plan display.");
+      planElements.forEach(el => el.textContent = formattedPlanName);
+      userPlanBadgeElements.forEach(el => el.textContent = formattedPlanName); // Update sidebar badge too
   }
-  // --- END MODIFIED PLAN DISPLAY ---
-
 
   // Show/Hide Password Buttons based on providers
   const addPasswordBtn = document.getElementById('addPasswordBtn');
   const changePasswordBtn = document.getElementById('changePasswordBtn');
   if (user && addPasswordBtn && changePasswordBtn) {
+      // Check if 'password' is listed in the providerData array
       const hasPasswordProvider = user.providerData.some(provider => provider.providerId === 'password');
+
+      // Show "Add Password" if NO password provider exists
       addPasswordBtn.style.display = hasPasswordProvider ? 'none' : 'block';
+      // Show "Change Password" if a password provider DOES exist
       changePasswordBtn.style.display = hasPasswordProvider ? 'block' : 'none';
-      // console.log("User providers:", user.providerData.map(p => p.providerId)); // Debugging
-      // console.log("Password provider exists:", hasPasswordProvider); // Debugging
+
+      console.log("User providers:", user.providerData.map(p => p.providerId)); // For debugging
+      console.log("Password provider exists:", hasPasswordProvider); // For debugging
   } else {
+      // Ensure buttons are hidden if user/elements aren't ready
       if(addPasswordBtn) addPasswordBtn.style.display = 'none';
       if(changePasswordBtn) changePasswordBtn.style.display = 'none';
   }
@@ -268,26 +230,8 @@ function showPublicView() {
 }
 
 function showAppView() {
-  console.log("About to show App View - DOM elements:");
-  console.log("public-view:", document.getElementById('public-view'));
-  console.log("app-view:", document.getElementById('app-view'));
-  console.log("sidebar:", document.getElementById('sidebar'));
-  console.log("content:", document.getElementById('content'));
-  
   document.getElementById('public-view').style.display = 'none';
   document.getElementById('app-view').style.display = 'flex';
-  
-  console.log("View display updated. public:none, app:flex");
-  
-  // Add these lines to check if elements are visible after style changes
-  setTimeout(() => {
-      console.log("Element visibility check (1 second after display change):");
-      console.log("app-view display:", getComputedStyle(document.getElementById('app-view')).display);
-      console.log("app-view visibility:", getComputedStyle(document.getElementById('app-view')).visibility);
-      console.log("app-view height:", document.getElementById('app-view').offsetHeight);
-      console.log("sidebar visibility:", document.getElementById('sidebar') ? getComputedStyle(document.getElementById('sidebar')).display : "element not found");
-      console.log("content visibility:", document.getElementById('content') ? getComputedStyle(document.getElementById('content')).display : "element not found");
-  }, 1000);
   
   // Initialize IRIS app if needed
   if (typeof initializeIRISApp === 'function') {
