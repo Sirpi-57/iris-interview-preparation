@@ -107,7 +107,7 @@ function initializeIRISApp() {
     state.mockInterviewsRemaining = userProfile.mockInterviewsRemaining !== undefined ? userProfile.mockInterviewsRemaining : planMax.mockMax;
 
     // --- CORRECTED console.log ---
-    console.log(`Updated app state: Plan=<span class="math-inline">\{state\.currentUserPlan\}, Resumes\=</span>{state.resumeCreditsRemaining}, Mocks=${state.mockInterviewsRemaining}`);
+    console.log(`Updated app state: Plan=${state.currentUserPlan}, Resumes=${state.resumeCreditsRemaining}, Mocks=${state.mockInterviewsRemaining}`);
     // --- END CORRECTION ---
 
     // Now update UI based on the state
@@ -3157,19 +3157,16 @@ function updateUsageDisplay() {
     const resumeRemaining = Number(state.resumeCreditsRemaining) || 0;
     const mockRemaining = Number(state.mockInterviewsRemaining) || 0;
 
-
-    // --- CORRECT Template Literal Syntax ---
-    const resumeText = `Resumes: <span class="math-inline">\{resumeRemaining\}/</span>{planLimits.resumeMax}`;
-    const mockText = `Mocks: <span class="math-inline">\{mockRemaining\}/</span>{planLimits.mockMax}`;
-    // --- END CORRECTION ---
+    // Fix: Proper template string syntax without escaping the curly braces
+    const resumeText = `Resumes: ${resumeRemaining}/${planLimits.resumeMax}`;
+    const mockText = `Mocks: ${mockRemaining}/${planLimits.mockMax}`;
 
     // Update the UI using textContent for safety
     resumeDisplay.textContent = resumeText;
     mockDisplay.textContent = mockText;
 
-    // --- CORRECTED Console Log ---
-    console.log(`UI Updated: Usage Display - Resumes: <span class="math-inline">\{resumeRemaining\}/</span>{planLimits.resumeMax}, Mocks: <span class="math-inline">\{mockRemaining\}/</span>{planLimits.mockMax}`);
-    // --- END CORRECTION ---
+    // Correct console log
+    console.log(`UI Updated: Usage Display - Resumes: ${resumeRemaining}/${planLimits.resumeMax}, Mocks: ${mockRemaining}/${planLimits.mockMax}`);
 }
 
 // NEW Function in app.js to control feature access based on plan/credits
