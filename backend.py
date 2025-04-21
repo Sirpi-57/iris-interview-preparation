@@ -114,7 +114,7 @@ except Exception as e:
 # --- End Firebase Initialization ---
 
 # --- Flask App Setup ---
-app = Flask(__name__)
+app = Flask(__name__, static_folder='public', static_url_path='')
 # Update allowed_origin for deployed frontend later, use "*" for initial testing if needed, but be specific for production
 allowed_origin = "*" # Use Render URL or custom domain later: os.environ.get("FRONTEND_URL", "*")
 CORS(app, origins=[allowed_origin], supports_credentials=True)
