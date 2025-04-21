@@ -672,7 +672,42 @@ function navigateTo(sectionId) {
         targetElement.style.display = 'block';
         
         console.log(`Successfully activated section: ${sectionId}`);
-        // The rest of your function...
+        
+        // Special actions after navigation
+        if (sectionId === 'history') {
+            loadProgressHistory(); // Load history data when navigating to history tab
+        }
+        
+        // Emergency opacity fix
+        function fixVisibility() {
+            const appView = document.getElementById('app-view');
+            const activeSection = document.querySelector('.content-section.active');
+            const sidebar = document.getElementById('sidebar');
+            const content = document.getElementById('content');
+            
+            if (appView) {
+                appView.style.cssText = 'display: flex !important; visibility: visible !important; opacity: 1 !important; height: auto !important;';
+            }
+            
+            if (content) {
+                content.style.cssText = 'flex: 1; display: block !important; visibility: visible !important; opacity: 1 !important;';
+            }
+            
+            if (sidebar) {
+                sidebar.style.cssText = 'display: flex !important; visibility: visible !important; opacity: 1 !important;';
+            }
+            
+            if (activeSection) {
+                activeSection.style.cssText = 'display: block !important; visibility: visible !important; opacity: 1 !important;';
+                console.log(`Emergency visibility fix applied to ${activeSection.id}`);
+            }
+        }
+
+        // Apply fix immediately and again after a slight delay (to override any animations)
+        fixVisibility();
+        setTimeout(fixVisibility, 100);
+        setTimeout(fixVisibility, 500);
+        
     } else {
         console.error(`Navigation target element not found for ID: ${sectionId}`);
     }

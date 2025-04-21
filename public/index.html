@@ -1398,5 +1398,20 @@
     <!-- Application Scripts -->
     <script src="firebase-auth.js"></script>
     <script src="app.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+          setTimeout(function() {
+            document.querySelectorAll('.content-section').forEach(function(section) {
+              section.style.opacity = '1';
+            });
+            
+            if (document.getElementById('app-view')) {
+              document.getElementById('app-view').style.opacity = '1';
+            }
+            
+            console.log('Emergency opacity fix applied via inline script');
+          }, 1000);
+        });
+        </script>
 </body>
 </html>
