@@ -3161,6 +3161,91 @@ function updateUsageDisplay() {
     console.log(`UI Updated: Usage Display - ${resumeText}, ${mockText}`);
 }
 
+// NEW Function in app.js to control feature access based on plan/credits
+function updateFeatureAccess() {
+    console.log("Updating feature access based on state:", state);
+
+    const analyzeBtn = document.getElementById('analyzeBtn');
+    const startInterviewBtn = document.getElementById('startInterviewBtn');
+    const mockInterviewNav = document.getElementById('nav-interview'); // Sidebar nav item
+
+    if (!authState.userProfile) {
+        console.log("No user profile loaded, ensuring features are locked/disabled.");
+        // Lock/disable everything that requires a plan check
+        if (analyzeBtn) analyzeBtn.disabled = true; analyzeBtn.textContent = 'Analyze Resume';
+        if (startInterviewBtn) startInterviewBtn.disabled = true;
+        lockSection('mock-interview'); // Use lockSection helper
+        // Potentially lock others too, although analysis/prep plan depend more on session status
+        lockSection('analysis');
+        lockSection('prep-plan');
+        lockSection('performance');
+        lockSection('history');
+        return;
+    }
+
+    // Get current state
+    const plan = state.currentUserPlan || 'free';
+    const resumeRemaining = state.resumeCreditsRemaining;
+    const mockRemaining = state.mockInterviewsRemaining;
+    const planLimits = state.planDetails[plan] || state.planDetails.free;
+    const maxMocks = planLimits.mockMax;
+
+    // --- Resume Analysis Button ---
+    if (analyzeBtn) {
+        if (resumeRemaining > 0) {
+            analyzeBtn.disabled = false;
+            analyzeBtn.textContent = 'Analyze Resume';
+            analyzeBtn.classList.remove('btn-secondary'); // Ensure it's primary style
+            analyzeBtn.classList.add('btn-primary');
+        } else {
+            analyzeBtn.disabled = true;
+            analyzeBtn.textContent = 'Resume Limit Reached';
+            analyzeBtn.classList.remove('btn-primary');
+            analyzeBtn.classList.add('btn-secondary'); // Make it look disabled
+            // TODO: Optionally show an adjacent "Buy More (₹15)" button here
+        }
+    }
+
+    // --- Mock Interview Button & Nav ---
+    if (startInterviewBtn) {
+        if (maxMocks > 0 && mockRemaining > 0) {
+            startInterviewBtn.disabled = false;
+            startInterviewBtn.textContent = 'Start Mock Interview Now';
+            startInterviewBtn.classList.remove('btn-secondary');
+            startInterviewBtn.classList.add('btn-primary');
+        } else if (maxMocks > 0 && mockRemaining <= 0) {
+            startInterviewBtn.disabled = true;
+            startInterviewBtn.textContent = 'Mock Limit Reached';
+             startInterviewBtn.classList.remove('btn-primary');
+            startInterviewBtn.classList.add('btn-secondary');
+             // TODO: Optionally show an adjacent "Buy More (₹70)" button here
+        } else { // maxMocks is 0 (Free plan)
+            startInterviewBtn.disabled = true;
+            startInterviewBtn.textContent = 'Upgrade for Mock Interviews';
+            startInterviewBtn.classList.remove('btn-primary');
+            startInterviewBtn.classList.add('btn-secondary');
+        }
+    }
+
+    if (mockInterviewNav) {
+        if (maxMocks > 0) {
+            // If the plan allows mocks, unlock the nav link (access to section)
+            // The button inside controls starting a *new* one based on credits
+            unlockSection('mock-interview');
+             // Also unlock performance since mocks are possible
+            // (History unlock depends on actual past interviews, handled elsewhere)
+            // Check if user HAS completed interviews before unlocking performance
+             checkAndUnlockHistorySections(state.sessionId); // Re-check based on session
+        } else {
+            // Lock nav link if plan doesn't allow mocks at all
+            lockSection('mock-interview');
+            lockSection('performance'); // Lock performance if no mocks possible
+        }
+    }
+
+    console.log("Feature access updated.");
+}
+
 // NEW Helper function in app.js to lock sections dependent on analysis
 function lockAllSections() {
    lockSection('analysis');
