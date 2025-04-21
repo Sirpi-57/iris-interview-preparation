@@ -78,6 +78,7 @@ document.addEventListener('DOMContentLoaded', function() {
 // --- Authentication-related Functions ---
 
 // Replace this function in app.js
+// Replace this ENTIRE function in app.js
 function initializeIRISApp() {
     console.log('Initializing IRIS app for authenticated user...');
     // Reset global state potentially tied to previous user/session
@@ -104,8 +105,10 @@ function initializeIRISApp() {
     const planMax = state.planDetails[state.currentUserPlan] || state.planDetails.free;
     state.resumeCreditsRemaining = userProfile.resumeCreditsRemaining !== undefined ? userProfile.resumeCreditsRemaining : planMax.resumeMax;
     state.mockInterviewsRemaining = userProfile.mockInterviewsRemaining !== undefined ? userProfile.mockInterviewsRemaining : planMax.mockMax;
+
+    // --- CORRECTED console.log ---
     console.log(`Updated app state: Plan=<span class="math-inline">\{state\.currentUserPlan\}, Resumes\=</span>{state.resumeCreditsRemaining}, Mocks=${state.mockInterviewsRemaining}`);
-    // --- END NEW ---
+    // --- END CORRECTION ---
 
     // Now update UI based on the state
     updateUsageDisplay(); // NEW: Update counters
@@ -3131,7 +3134,7 @@ function checkAndUnlockHistorySections(sessionIdToCheck) {
 }
 
 // Corrected function in app.js
-// Corrected function in app.js (fixes console log and linter warnings)
+// Replace this ENTIRE function in app.js
 function updateUsageDisplay() {
     const resumeDisplay = document.getElementById('resume-credits-display');
     const mockDisplay = document.getElementById('mock-credits-display');
@@ -3158,9 +3161,9 @@ function updateUsageDisplay() {
     resumeDisplay.textContent = resumeText;
     mockDisplay.textContent = mockText;
 
-    // --- FIXED Console Log to Use Original Variables ---
+    // --- CORRECTED Console Log ---
     console.log(`UI Updated: Usage Display - Resumes: <span class="math-inline">\{resumeRemaining\}/</span>{planLimits.resumeMax}, Mocks: <span class="math-inline">\{mockRemaining\}/</span>{planLimits.mockMax}`);
-    // --- END FIX ---
+    // --- END CORRECTION ---
 }
 
 // NEW Function in app.js to control feature access based on plan/credits
