@@ -1024,3 +1024,55 @@ deo-card, .avatar-card {
 .mb-4 {
     margin-bottom: 20px;
 }
+
+.hero-section {
+    padding-bottom: 0; /* Reduce bottom padding if sections follow directly */
+}
+
+.features-grid {
+    margin-bottom: 3rem; /* Add space below features grid */
+}
+
+/* Style for the numbered steps */
+.step-number {
+    display: inline-block;
+    width: 40px;
+    height: 40px;
+    line-height: 40px;
+    border-radius: 50%;
+    background-color: var(--primary-color);
+    color: white;
+    font-weight: bold;
+    font-size: 1.2rem;
+    text-align: center;
+    margin-bottom: 15px;
+}
+
+/* Spacing between new sections */
+#welcome-tab > .container.py-5,
+#welcome-tab > .bg-light.py-5 {
+    margin-bottom: 3rem; /* Add space between content blocks */
+}
+
+/* Ensure consistent icon colors if needed */
+.text-primary {
+    color: var(--primary-color) !important;
+}
+.text-success {
+     color: var(--success-color) !important;
+}
+.text-danger {
+    color: var(--danger-color) !important;
+}
+
+/* Add some padding to new text sections */
+.container.py-5 h2 + p {
+    margin-top: 1rem;
+}
+.container.py-5 ul {
+    margin-top: 1.5rem;
+    padding-left: 1rem; /* Adjust bullet point indentation */
+}
+.container.py-5 ul li {
+    margin-bottom: 0.75rem;
+}
