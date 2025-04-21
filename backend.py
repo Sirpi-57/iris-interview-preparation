@@ -113,8 +113,14 @@ except Exception as e:
     traceback.print_exc()
 # --- End Firebase Initialization ---
 
-# --- Flask App Setup ---
-app = Flask(__name__, static_folder='public', static_url_path='')
+# Get the absolute path to the directory where backend.py is located
+BASE_DIR = os.path.abspath(os.path.dirname(__file__))
+# Define the absolute path to the 'public' folder
+STATIC_FOLDER_PATH = os.path.join(BASE_DIR, 'public')
+
+# Configure Flask to serve static files from that absolute path
+app = Flask(__name__, static_folder=STATIC_FOLDER_PATH, static_url_path='')
+
 # Update allowed_origin for deployed frontend later, use "*" for initial testing if needed, but be specific for production
 allowed_origin = "*" # Use Render URL or custom domain later: os.environ.get("FRONTEND_URL", "*")
 CORS(app, origins=[allowed_origin], supports_credentials=True)
