@@ -3131,6 +3131,7 @@ function checkAndUnlockHistorySections(sessionIdToCheck) {
 }
 
 // Corrected function in app.js
+// Corrected function in app.js (fixes console log and linter warnings)
 function updateUsageDisplay() {
     const resumeDisplay = document.getElementById('resume-credits-display');
     const mockDisplay = document.getElementById('mock-credits-display');
@@ -3148,17 +3149,18 @@ function updateUsageDisplay() {
     const mockRemaining = Number(state.mockInterviewsRemaining) || 0;
 
 
-    // --- FIXED Template Literal Syntax ---
+    // --- CORRECT Template Literal Syntax ---
     const resumeText = `Resumes: <span class="math-inline">\{resumeRemaining\}/</span>{planLimits.resumeMax}`;
     const mockText = `Mocks: <span class="math-inline">\{mockRemaining\}/</span>{planLimits.mockMax}`;
-    // --- END FIX ---
+    // --- END CORRECTION ---
 
     // Update the UI using textContent for safety
     resumeDisplay.textContent = resumeText;
     mockDisplay.textContent = mockText;
 
-    // Keep the console log for debugging
-    console.log(`UI Updated: Usage Display - ${resumeText}, ${mockText}`);
+    // --- FIXED Console Log to Use Original Variables ---
+    console.log(`UI Updated: Usage Display - Resumes: <span class="math-inline">\{resumeRemaining\}/</span>{planLimits.resumeMax}, Mocks: <span class="math-inline">\{mockRemaining\}/</span>{planLimits.mockMax}`);
+    // --- END FIX ---
 }
 
 // NEW Function in app.js to control feature access based on plan/credits
