@@ -13,6 +13,8 @@ const state = {
     videoStream: null,
     interviewType: 'general',
     conversationHistory: [],
+
+    // Voice detection state
     isInterviewActive: false,
     isAIResponding: false,
     silenceTimer: null,
@@ -23,19 +25,6 @@ const state = {
     audioDataArray: null,
     vadAnimationFrameId: null,
     speechDetectedInChunk: false,
-
-    // ---- NEW: User Plan State ----
-    currentUserPlan: 'free', // Default assumption
-    resumeCreditsRemaining: 0,
-    mockInterviewsRemaining: 0,
-    planDetails: { // Define limits per plan
-        free: { resumeMax: 2, mockMax: 0 },
-        starter: { resumeMax: 5, mockMax: 1 },
-        standard: { resumeMax: 10, mockMax: 3 }, // Updated Standard
-        pro: { resumeMax: 10, mockMax: 5 } // Updated Pro
-        // College plan uses Pro limits per student, handled backend mainly
-    }
-    // ---- END NEW ----
 };
 
 // VAD Constants
@@ -78,52 +67,37 @@ document.addEventListener('DOMContentLoaded', function() {
 // --- Authentication-related Functions ---
 
 // Replace this function in app.js
-// Replace this ENTIRE function in app.js
 function initializeIRISApp() {
     console.log('Initializing IRIS app for authenticated user...');
-    // Reset global state potentially tied to previous user/session
-    state.sessionId = null; // Keep session reset
-    state.interviewId = null; // Keep interview reset
-    // Reset plan state too, will be set by profile loading
-    state.currentUserPlan = 'free';
-    state.resumeCreditsRemaining = 0;
-    state.mockInterviewsRemaining = 0;
 
+    // Reset global state potentially tied to previous user/session
+    state.sessionId = null;
+    state.interviewId = null;
+    // Add any other state resets needed here
 
     const userProfile = irisAuth?.getUserProfile(); // Get profile loaded by auth module
 
-    if (!userProfile) {
-        console.warn("User profile not loaded yet for app init.");
-        lockAllSections(); // Ensure sections start locked
-        navigateTo('upload'); // Default view
-        return;
-    }
+    // Check if user profile and Firestore DB object are available
+    // (Assuming 'db' is globally accessible if needed in checkAndLoadSessionStatus error handling)
+     if (!userProfile) {
+         console.warn("User profile not loaded yet, cannot check for last session.");
+         // This might happen on initial fast load. The profile should load shortly after.
+         // You could add a small delay/retry or rely on UI state being locked initially.
+         lockAllSections(); // Ensure sections start locked
+         navigateTo('upload'); // Default view
+         return;
+     }
 
-    // --- NEW: Update global state from loaded profile ---
-    state.currentUserPlan = userProfile.plan || 'free';
-    // Use existing credits if present, otherwise default based on plan (especially for initial load)
-    const planMax = state.planDetails[state.currentUserPlan] || state.planDetails.free;
-    state.resumeCreditsRemaining = userProfile.resumeCreditsRemaining !== undefined ? userProfile.resumeCreditsRemaining : planMax.resumeMax;
-    state.mockInterviewsRemaining = userProfile.mockInterviewsRemaining !== undefined ? userProfile.mockInterviewsRemaining : planMax.mockMax;
-
-    // --- CORRECTED console.log ---
-    console.log(`Updated app state: Plan=${state.currentUserPlan}, Resumes=${state.resumeCreditsRemaining}, Mocks=${state.mockInterviewsRemaining}`);
-    // --- END CORRECTION ---
-
-    // Now update UI based on the state
-    updateUsageDisplay(); // NEW: Update counters
-    updateFeatureAccess(); // NEW: Lock/unlock features
-
-    // Check for last session (existing logic)
     const lastSessionId = userProfile.lastActiveSessionId;
+
     if (lastSessionId) {
         console.log(`Found last active session ID from user profile: ${lastSessionId}`);
-        // *** IMPORTANT: We set state.sessionId HERE if loading previous analysis ***
-        // checkAndLoadSessionStatus will handle unlocking etc. based on its findings
+        // Check the status of this session
         checkAndLoadSessionStatus(lastSessionId);
     } else {
         console.log("No last active session found for this user. Starting fresh.");
-         // Sections are already locked/unlocked by updateFeatureAccess based on plan
+        // Ensure sections are locked if no session ID found
+        lockAllSections(); // Use helper to lock all dependent sections
         navigateTo('upload'); // Start on upload page
     }
 }
@@ -601,10 +575,7 @@ function initForms() {
 
 // --- UI Navigation & State ---
 
-// Replace this function in app.js
 function navigateTo(sectionId) {
-    console.log(`Attempting navigation to section: ${sectionId}`); // <-- ADDED LOG
-
     document.querySelectorAll('.nav-item').forEach(item => {
         item.classList.remove('active');
         if (item.getAttribute('data-target') === sectionId) {
@@ -612,25 +583,22 @@ function navigateTo(sectionId) {
         }
     });
 
-    console.log('Hiding currently active content sections...'); // <-- ADDED LOG
     document.querySelectorAll('.content-section').forEach(section => {
         section.classList.remove('active');
     });
-
     const targetElement = document.getElementById(sectionId);
-    console.log(`Target element for ID '${sectionId}':`, targetElement); // <-- ADDED LOG
-
     if (targetElement) {
         targetElement.classList.add('active');
-        console.log(`Successfully activated section: ${sectionId}`); // <-- ADDED LOG
         // Special actions after navigation
         if (sectionId === 'history') {
-            loadProgressHistory(); // Load history data when navigating to history tab
+             loadProgressHistory(); // Load history data when navigating to history tab
         }
-        // Removed the check for mock-interview & !state.videoStream here,
-        // as permissions are handled explicitly by buttons now.
+         if (sectionId === 'mock-interview' && !state.videoStream) {
+            // If navigating to interview and stream isn't setup, prompt for permissions
+            // showPermissionsModal(); // This is now triggered by buttons explicitly
+        }
     } else {
-        console.error(`Navigation target element not found for ID: ${sectionId}`); // <-- ADDED LOG
+        console.error(`Navigation target not found: ${sectionId}`);
     }
 }
 
@@ -3137,121 +3105,6 @@ function checkAndUnlockHistorySections(sessionIdToCheck) {
              lockSection('performance'); // Lock on error
              lockSection('history');
           });
-}
-
-// Corrected function in app.js
-// Replace this ENTIRE function in app.js
-function updateUsageDisplay() {
-    const resumeDisplay = document.getElementById('resume-credits-display');
-    const mockDisplay = document.getElementById('mock-credits-display');
-
-    if (!resumeDisplay || !mockDisplay) {
-        console.warn("Usage display elements not found.");
-        return;
-    }
-
-    // Get current plan details and limits from state
-    const currentPlan = state.currentUserPlan || 'free';
-    const planLimits = state.planDetails[currentPlan] || state.planDetails.free; // Fallback to free limits
-    // Ensure remaining credits are treated as numbers, default to 0 if undefined
-    const resumeRemaining = Number(state.resumeCreditsRemaining) || 0;
-    const mockRemaining = Number(state.mockInterviewsRemaining) || 0;
-
-    // Fix: Proper template string syntax without escaping the curly braces
-    const resumeText = `Resumes: ${resumeRemaining}/${planLimits.resumeMax}`;
-    const mockText = `Mocks: ${mockRemaining}/${planLimits.mockMax}`;
-
-    // Update the UI using textContent for safety
-    resumeDisplay.textContent = resumeText;
-    mockDisplay.textContent = mockText;
-
-    // Correct console log
-    console.log(`UI Updated: Usage Display - Resumes: ${resumeRemaining}/${planLimits.resumeMax}, Mocks: ${mockRemaining}/${planLimits.mockMax}`);
-}
-
-// NEW Function in app.js to control feature access based on plan/credits
-function updateFeatureAccess() {
-    console.log("Updating feature access based on state:", state);
-
-    const analyzeBtn = document.getElementById('analyzeBtn');
-    const startInterviewBtn = document.getElementById('startInterviewBtn');
-    const mockInterviewNav = document.getElementById('nav-interview'); // Sidebar nav item
-
-    if (!authState.userProfile) {
-        console.log("No user profile loaded, ensuring features are locked/disabled.");
-        // Lock/disable everything that requires a plan check
-        if (analyzeBtn) analyzeBtn.disabled = true; analyzeBtn.textContent = 'Analyze Resume';
-        if (startInterviewBtn) startInterviewBtn.disabled = true;
-        lockSection('mock-interview'); // Use lockSection helper
-        // Potentially lock others too, although analysis/prep plan depend more on session status
-        lockSection('analysis');
-        lockSection('prep-plan');
-        lockSection('performance');
-        lockSection('history');
-        return;
-    }
-
-    // Get current state
-    const plan = state.currentUserPlan || 'free';
-    const resumeRemaining = state.resumeCreditsRemaining;
-    const mockRemaining = state.mockInterviewsRemaining;
-    const planLimits = state.planDetails[plan] || state.planDetails.free;
-    const maxMocks = planLimits.mockMax;
-
-    // --- Resume Analysis Button ---
-    if (analyzeBtn) {
-        if (resumeRemaining > 0) {
-            analyzeBtn.disabled = false;
-            analyzeBtn.textContent = 'Analyze Resume';
-            analyzeBtn.classList.remove('btn-secondary'); // Ensure it's primary style
-            analyzeBtn.classList.add('btn-primary');
-        } else {
-            analyzeBtn.disabled = true;
-            analyzeBtn.textContent = 'Resume Limit Reached';
-            analyzeBtn.classList.remove('btn-primary');
-            analyzeBtn.classList.add('btn-secondary'); // Make it look disabled
-            // TODO: Optionally show an adjacent "Buy More (₹15)" button here
-        }
-    }
-
-    // --- Mock Interview Button & Nav ---
-    if (startInterviewBtn) {
-        if (maxMocks > 0 && mockRemaining > 0) {
-            startInterviewBtn.disabled = false;
-            startInterviewBtn.textContent = 'Start Mock Interview Now';
-            startInterviewBtn.classList.remove('btn-secondary');
-            startInterviewBtn.classList.add('btn-primary');
-        } else if (maxMocks > 0 && mockRemaining <= 0) {
-            startInterviewBtn.disabled = true;
-            startInterviewBtn.textContent = 'Mock Limit Reached';
-             startInterviewBtn.classList.remove('btn-primary');
-            startInterviewBtn.classList.add('btn-secondary');
-             // TODO: Optionally show an adjacent "Buy More (₹70)" button here
-        } else { // maxMocks is 0 (Free plan)
-            startInterviewBtn.disabled = true;
-            startInterviewBtn.textContent = 'Upgrade for Mock Interviews';
-            startInterviewBtn.classList.remove('btn-primary');
-            startInterviewBtn.classList.add('btn-secondary');
-        }
-    }
-
-    if (mockInterviewNav) {
-        if (maxMocks > 0) {
-            // If the plan allows mocks, unlock the nav link (access to section)
-            // The button inside controls starting a *new* one based on credits
-            unlockSection('mock-interview');
-             // Also unlock performance since mocks are possible
-            // (History unlock depends on actual past interviews, handled elsewhere)
-            // Check if user HAS completed interviews before unlocking performance
-             checkAndUnlockHistorySections(state.sessionId); // Re-check based on session
-        } else {
-            // Lock nav link if plan doesn't allow mocks at all
-            lockSection('mock-interview');
-            lockSection('performance'); // Lock performance if no mocks possible
-        }
-    }
-
-    console.log("Feature access updated.");
 }
 
 // NEW Helper function in app.js to lock sections dependent on analysis
