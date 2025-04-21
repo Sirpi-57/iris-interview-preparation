@@ -268,6 +268,7 @@ const firebaseConfig = {
   }
   
   function showAppView() {
+    console.log("Attempting to show App View...");
     document.getElementById('public-view').style.display = 'none';
     document.getElementById('app-view').style.display = 'flex';
     

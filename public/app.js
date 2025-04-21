@@ -601,7 +601,10 @@ function initForms() {
 
 // --- UI Navigation & State ---
 
+// Replace this function in app.js
 function navigateTo(sectionId) {
+    console.log(`Attempting navigation to section: ${sectionId}`); // <-- ADDED LOG
+
     document.querySelectorAll('.nav-item').forEach(item => {
         item.classList.remove('active');
         if (item.getAttribute('data-target') === sectionId) {
@@ -609,22 +612,25 @@ function navigateTo(sectionId) {
         }
     });
 
+    console.log('Hiding currently active content sections...'); // <-- ADDED LOG
     document.querySelectorAll('.content-section').forEach(section => {
         section.classList.remove('active');
     });
+
     const targetElement = document.getElementById(sectionId);
+    console.log(`Target element for ID '${sectionId}':`, targetElement); // <-- ADDED LOG
+
     if (targetElement) {
         targetElement.classList.add('active');
+        console.log(`Successfully activated section: ${sectionId}`); // <-- ADDED LOG
         // Special actions after navigation
         if (sectionId === 'history') {
-             loadProgressHistory(); // Load history data when navigating to history tab
+            loadProgressHistory(); // Load history data when navigating to history tab
         }
-         if (sectionId === 'mock-interview' && !state.videoStream) {
-            // If navigating to interview and stream isn't setup, prompt for permissions
-            // showPermissionsModal(); // This is now triggered by buttons explicitly
-        }
+        // Removed the check for mock-interview & !state.videoStream here,
+        // as permissions are handled explicitly by buttons now.
     } else {
-        console.error(`Navigation target not found: ${sectionId}`);
+        console.error(`Navigation target element not found for ID: ${sectionId}`); // <-- ADDED LOG
     }
 }
 
