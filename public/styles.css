@@ -318,11 +318,12 @@ body {
     display: none;
     padding: 30px 20px;
     min-height: 100vh;
+    opacity: 1; /* Add this line to ensure default opacity */
 }
 
 .content-section.active {
     display: block;
-    animation: fadeIn 0.5s;
+    animation: fadeIn 0.5s forwards; /* Add 'forwards' to maintain final state */
 }
 
 .section-description {
@@ -945,8 +946,8 @@ video {
 
 /* Animations */
 @keyframes fadeIn {
-    from { opacity: 0; }
-    to { opacity: 1; }
+    0% { opacity: 0; }
+    100% { opacity: 1; }
 }
 
 /* Error Messages */
