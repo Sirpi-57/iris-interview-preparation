@@ -126,7 +126,49 @@ function initializeIRISApp() {
          // Sections are already locked/unlocked by updateFeatureAccess based on plan
         navigateTo('upload'); // Start on upload page
     }
+
+    // Add these debugging logs at the end of the function
+    console.log("App initialization complete - checking DOM structure:");
+    console.log("app-view exists:", !!document.getElementById('app-view'));
+    console.log("upload exists:", !!document.getElementById('upload'));
+    console.log("upload children count:", document.getElementById('upload') ? document.getElementById('upload').children.length : 0);
+    
+    setTimeout(() => {
+        console.log("DOM structure after 2 seconds:");
+        const appView = document.getElementById('app-view');
+        const uploadSection = document.getElementById('upload');
+        
+        console.log("app-view computed style:", {
+            display: getComputedStyle(appView).display,
+            visibility: getComputedStyle(appView).visibility,
+            opacity: getComputedStyle(appView).opacity,
+            height: getComputedStyle(appView).height,
+            position: getComputedStyle(appView).position,
+            zIndex: getComputedStyle(appView).zIndex
+        });
+        
+        console.log("upload section computed style:", {
+            display: getComputedStyle(uploadSection).display,
+            visibility: getComputedStyle(uploadSection).visibility,
+            opacity: getComputedStyle(uploadSection).opacity
+        });
+        
+        // Force visibility as a diagnostic test
+        console.log("Attempting to force visibility...");
+        appView.style.display = 'block';
+        appView.style.visibility = 'visible';
+        appView.style.opacity = '1';
+        appView.style.background = 'lightblue';
+        
+        uploadSection.style.display = 'block';
+        uploadSection.style.visibility = 'visible';
+        uploadSection.style.opacity = '1';
+        uploadSection.style.background = 'lightgreen';
+        
+        console.log("Forced visibility applied");
+    }, 2000);
 }
+
 
 // Replace this entire function in app.js
 function initProfilePage() {
@@ -601,9 +643,8 @@ function initForms() {
 
 // --- UI Navigation & State ---
 
-// Replace this function in app.js
 function navigateTo(sectionId) {
-    console.log(`Attempting navigation to section: ${sectionId}`); // <-- ADDED LOG
+    console.log(`Attempting navigation to section: ${sectionId}`);
 
     document.querySelectorAll('.nav-item').forEach(item => {
         item.classList.remove('active');
@@ -612,25 +653,28 @@ function navigateTo(sectionId) {
         }
     });
 
-    console.log('Hiding currently active content sections...'); // <-- ADDED LOG
+    console.log('Hiding currently active content sections...');
     document.querySelectorAll('.content-section').forEach(section => {
         section.classList.remove('active');
+        console.log(`Removed 'active' class from: ${section.id}`);
     });
 
     const targetElement = document.getElementById(sectionId);
-    console.log(`Target element for ID '${sectionId}':`, targetElement); // <-- ADDED LOG
+    console.log(`Target element for ID '${sectionId}':`, targetElement);
 
     if (targetElement) {
         targetElement.classList.add('active');
-        console.log(`Successfully activated section: ${sectionId}`); // <-- ADDED LOG
-        // Special actions after navigation
-        if (sectionId === 'history') {
-            loadProgressHistory(); // Load history data when navigating to history tab
-        }
-        // Removed the check for mock-interview & !state.videoStream here,
-        // as permissions are handled explicitly by buttons now.
+        console.log(`Added 'active' class to: ${sectionId}`);
+        console.log(`Element visibility after adding 'active': display=${getComputedStyle(targetElement).display}, visibility=${getComputedStyle(targetElement).visibility}`);
+        
+        // Try forcing display
+        console.log("Forcing display:block on target element");
+        targetElement.style.display = 'block';
+        
+        console.log(`Successfully activated section: ${sectionId}`);
+        // The rest of your function...
     } else {
-        console.error(`Navigation target element not found for ID: ${sectionId}`); // <-- ADDED LOG
+        console.error(`Navigation target element not found for ID: ${sectionId}`);
     }
 }
 

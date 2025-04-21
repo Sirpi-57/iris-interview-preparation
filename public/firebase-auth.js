@@ -268,11 +268,26 @@ function showPublicView() {
 }
 
 function showAppView() {
-  console.log("Attempting to show App View...");
+  console.log("About to show App View - DOM elements:");
+  console.log("public-view:", document.getElementById('public-view'));
+  console.log("app-view:", document.getElementById('app-view'));
+  console.log("sidebar:", document.getElementById('sidebar'));
+  console.log("content:", document.getElementById('content'));
+  
   document.getElementById('public-view').style.display = 'none';
   document.getElementById('app-view').style.display = 'flex';
-
+  
   console.log("View display updated. public:none, app:flex");
+  
+  // Add these lines to check if elements are visible after style changes
+  setTimeout(() => {
+      console.log("Element visibility check (1 second after display change):");
+      console.log("app-view display:", getComputedStyle(document.getElementById('app-view')).display);
+      console.log("app-view visibility:", getComputedStyle(document.getElementById('app-view')).visibility);
+      console.log("app-view height:", document.getElementById('app-view').offsetHeight);
+      console.log("sidebar visibility:", document.getElementById('sidebar') ? getComputedStyle(document.getElementById('sidebar')).display : "element not found");
+      console.log("content visibility:", document.getElementById('content') ? getComputedStyle(document.getElementById('content')).display : "element not found");
+  }, 1000);
   
   // Initialize IRIS app if needed
   if (typeof initializeIRISApp === 'function') {
