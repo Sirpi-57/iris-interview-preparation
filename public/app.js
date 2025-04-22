@@ -662,7 +662,7 @@ function uploadResumeAndAnalyze() {
     if (!checkFeatureAccess('resumeAnalyses')) {
         return;
     }
-    
+
     // Get user authentication data
     const user = firebase.auth().currentUser;
     if (!user) {
@@ -691,10 +691,10 @@ function uploadResumeAndAnalyze() {
     // Basic validation - Check if file exists in FormData
     const resumeFile = formData.get('resumeFile');
     if (!resumeFile || typeof resumeFile === 'string' || resumeFile.size === 0) {
-         showMessage("Please select a resume file.", 'warning');
-         return;
-     }
-     if (!formData.get('jobDescription')) {
+        showMessage("Please select a resume file.", 'warning');
+        return;
+    }
+    if (!formData.get('jobDescription')) {
         showMessage("Please provide a job description.", 'warning');
         return;
     }
@@ -711,7 +711,7 @@ function uploadResumeAndAnalyze() {
 
     // Disable button during upload
     const analyzeBtn = document.getElementById('analyzeBtn');
-    if(analyzeBtn) analyzeBtn.disabled = true; analyzeBtn.textContent = 'Analyzing...';
+    if (analyzeBtn) analyzeBtn.disabled = true; analyzeBtn.textContent = 'Analyzing...';
 
     fetch(`${API_BASE_URL}/analyze-resume`, {
         method: 'POST',
@@ -721,48 +721,78 @@ function uploadResumeAndAnalyze() {
         if (!response.ok) {
             // Attempt to read error message from backend JSON response
             return response.json().then(errData => {
-                 // Throw an error with the message from backend if available
-                 throw new Error(errData.error || `Analysis request failed (${response.status})`);
+                // Throw an error with the message from backend if available
+                // Also check for limitReached flag
+                if (errData.limitReached) {
+                     // Trigger upgrade modal if limit was reached on backend check
+                     showMessage(errData.error || 'Usage limit reached.', 'warning');
+                     showUpgradeModal('resumeAnalyses');
+                     throw new Error('Limit Reached'); // Throw specific error type if needed
+                }
+                throw new Error(errData.error || `Analysis request failed (${response.status})`);
             }).catch((jsonParseError) => {
-                 // If backend didn't send valid JSON error, throw generic HTTP error
-                 console.error("Could not parse error JSON from backend:", jsonParseError);
-                 throw new Error(`Analysis request failed (${response.status} ${response.statusText})`);
+                // If backend didn't send valid JSON error, throw generic HTTP error
+                console.error("Could not parse error JSON from backend:", jsonParseError);
+                // Check if the specific error thrown was 'Limit Reached'
+                if (jsonParseError.message === 'Limit Reached') {
+                    throw jsonParseError; // Re-throw the specific error
+                }
+                throw new Error(`Analysis request failed (${response.status} ${response.statusText})`);
             });
         }
         return response.json();
     })
-    .then(data => {
+    .then(data => { // 'data' is the successful response from /analyze-resume
         console.log('Upload response:', data);
         if (!data.sessionId) {
             throw new Error("Backend did not return a valid session ID.");
         }
-        
-        // Increment usage counter in Firebase
-        return irisAuth.incrementUsageCounter('resumeAnalyses')
-            .then(usageResult => {
-                // Set session ID in the global state (used for polling)
-                state.sessionId = data.sessionId;
-                console.log("Session ID stored in state. Resume analysis count updated:", usageResult);
-                
-                // Update usage display
-                updateUsageDisplay();
-                
-                progressMessage.textContent = 'Analyzing resume...';
-                pollAnalysisStatus(data.sessionId);
-                
-                return data; // Pass through the original data
-            });
+
+        // ** NO LONGER INCREMENTING COUNTER ON FRONTEND **
+        // The backend /analyze-resume route now handles the increment.
+
+        // Set session ID in the global state (used for polling)
+        state.sessionId = data.sessionId;
+        console.log("Session ID stored in state:", state.sessionId);
+
+        // --- OPTIONAL IMPROVEMENT ---
+        // TODO: If backend sends back updated usage info in 'data' (e.g., data.usageInfo),
+        // update the local state here:
+        // if (data.usageInfo && authState.userProfile?.usage?.resumeAnalyses) {
+        //     authState.userProfile.usage.resumeAnalyses.used = data.usageInfo.used;
+        //     authState.userProfile.usage.resumeAnalyses.limit = data.usageInfo.limit;
+        //     console.log("Updated local usage state from backend response.");
+        // }
+        // --- END OPTIONAL IMPROVEMENT ---
+
+        // Update usage display (will show the count *before* this analysis until profile reloads,
+        // unless the optional improvement above is implemented)
+        updateUsageDisplay();
+
+        progressMessage.textContent = 'Analyzing resume...';
+        pollAnalysisStatus(data.sessionId); // Start polling backend for analysis progress
+
+        // Note: analyzeBtn remains disabled until polling finishes or fails.
     })
     .catch(error => {
         console.error('Error uploading resume:', error);
-        if(progressMessage) progressMessage.textContent = `Error: ${error.message}`;
-        if(progressBar) progressBar.classList.add('bg-danger'); progressBar.style.width = '100%';
-        showMessage(`Error uploading resume: ${error.message}`, 'danger');
+
+        // Don't show generic error if it was a limit reached error (already handled)
+        if (error.message !== 'Limit Reached') {
+             if(progressMessage) progressMessage.textContent = `Error: ${error.message}`;
+             if(progressBar) progressBar.classList.add('bg-danger'); progressBar.style.width = '100%';
+             showMessage(`Error uploading resume: ${error.message}`, 'danger');
+        } else {
+             // If limit reached, just reset progress bar visuals
+              if(progressMessage) progressMessage.textContent = `Limit reached. Please upgrade.`;
+              if(progressBar) progressBar.classList.add('bg-warning'); progressBar.style.width = '100%';
+        }
+
 
         // Re-enable button on error
-        if(analyzeBtn) analyzeBtn.disabled = false; analyzeBtn.textContent = 'Analyze Resume';
+        if (analyzeBtn) analyzeBtn.disabled = false; analyzeBtn.textContent = 'Analyze Resume';
     });
-}                                                       
+}                                        
 
 function pollAnalysisStatus(sessionId) {
     const progressContainer = document.getElementById('uploadProgress');
@@ -1712,17 +1742,17 @@ function setupMediaRecorder(stream) {
 
 // --- Updated startMockInterview function ---
 function startMockInterview() {
-    // Check feature access first
+    // Check feature access first (already done before calling setupMediaDevices typically, but good practice)
     if (!checkFeatureAccess('mockInterviews')) {
         return;
     }
 
     if (!state.sessionId) {
-        alert('No active session. Please analyze a resume first.');
+        alert('No active analysis session found. Please analyze a resume first.');
         navigateTo('upload');
         return;
     }
-    
+
     if (!state.mediaRecorder) {
         alert('Audio recorder not initialized. Please grant microphone permissions.');
         showPermissionsModal();
@@ -1735,9 +1765,14 @@ function startMockInterview() {
     state.conversationHistory = [];
 
     const conversationContainer = document.getElementById('conversationContainer');
-    if(conversationContainer) conversationContainer.innerHTML = '';
+    if (conversationContainer) conversationContainer.innerHTML = '';
 
     addMessageToConversation("system", `Starting ${state.interviewType} interview...`);
+
+    // Show loading/starting state
+    const startBtn = document.getElementById('startInterviewBtn'); // Or relevant button
+    if(startBtn) startBtn.disabled = true; startBtn.textContent = 'Starting...';
+
 
     fetch(`${API_BASE_URL}/start-mock-interview`, {
         method: 'POST',
@@ -1748,39 +1783,82 @@ function startMockInterview() {
         })
     })
     .then(response => {
-        if (!response.ok) throw new Error(`Network response was not ok (${response.status})`);
+        if (!response.ok) {
+             // Attempt to read error message from backend JSON response
+             return response.json().then(errData => {
+                // Throw an error with the message from backend if available
+                // Also check for limitReached flag
+                if (errData.limitReached) {
+                     // Trigger upgrade modal if limit was reached on backend check
+                     showMessage(errData.error || 'Usage limit reached.', 'warning');
+                     showUpgradeModal('mockInterviews');
+                     throw new Error('Limit Reached'); // Throw specific error type if needed
+                }
+                throw new Error(errData.error || `Failed to start interview (${response.status})`);
+            }).catch((jsonParseError) => {
+                console.error("Could not parse error JSON from backend:", jsonParseError);
+                 // Check if the specific error thrown was 'Limit Reached'
+                 if (jsonParseError.message === 'Limit Reached') {
+                    throw jsonParseError; // Re-throw the specific error
+                }
+                throw new Error(`Failed to start interview (${response.status} ${response.statusText})`);
+            });
+        }
         return response.json();
     })
-    .then(data => {
+    .then(data => { // 'data' is the successful response from /start-mock-interview
         console.log('Interview started response:', data);
         if (!data.interviewId || !data.greeting) {
             throw new Error("Invalid response from start-mock-interview");
         }
-        
-        // Increment usage counter in Firebase
-        return irisAuth.incrementUsageCounter('mockInterviews')
-            .then(usageResult => {
-                state.interviewId = data.interviewId;
-                
-                // Update usage display
-                updateUsageDisplay();
-                
-                // Remove "Starting..." message
-                const systemMessages = conversationContainer.querySelectorAll('.message.system');
-                systemMessages.forEach(msg => msg.remove());
-                
-                // Display and speak greeting
-                addMessageToConversation('interviewer', data.greeting);
-                generateAndPlayTTS(data.greeting);
-                
-                return data;
-            });
+
+        // ** NO LONGER INCREMENTING COUNTER ON FRONTEND **
+        // The backend /start-mock-interview route now handles the increment.
+
+        state.interviewId = data.interviewId;
+
+         // --- OPTIONAL IMPROVEMENT ---
+         // TODO: If backend sends back updated usage info in 'data' (e.g., data.usageInfo),
+         // update the local state here:
+         // if (data.usageInfo && authState.userProfile?.usage?.mockInterviews) {
+         //     authState.userProfile.usage.mockInterviews.used = data.usageInfo.used;
+         //     authState.userProfile.usage.mockInterviews.limit = data.usageInfo.limit;
+         //     console.log("Updated local mock interview usage state from backend response.");
+         // }
+         // --- END OPTIONAL IMPROVEMENT ---
+
+        // Update usage display (will show the count *before* this interview until profile reloads,
+        // unless the optional improvement above is implemented)
+        updateUsageDisplay();
+
+        // Remove "Starting..." message
+        const systemMessages = conversationContainer?.querySelectorAll('.message.system');
+        systemMessages?.forEach(msg => msg.remove());
+
+        // Display and speak greeting
+        addMessageToConversation('interviewer', data.greeting);
+        generateAndPlayTTS(data.greeting); // This will trigger automatic listening when done
+
+        // Reset button state (or maybe hide it now?)
+        if(startBtn) startBtn.disabled = false; startBtn.textContent = 'Start Interview';
+
+        return data; // Keep promise chain going if needed elsewhere
     })
     .catch(error => {
         console.error('Error starting interview:', error);
-        alert(`Error starting interview: ${error.message}`);
-        state.isInterviewActive = false;
-        addMessageToConversation("system", `Error starting interview: ${error.message}. Please try again.`);
+        state.isInterviewActive = false; // Ensure interview state is reset
+
+         // Don't show generic error if it was a limit reached error (already handled)
+         if (error.message !== 'Limit Reached') {
+             alert(`Error starting interview: ${error.message}`);
+             addMessageToConversation("system", `Error starting interview: ${error.message}. Please try again.`);
+         } else {
+              addMessageToConversation("system", `Mock interview limit reached. Please upgrade your plan.`);
+         }
+
+
+        // Reset button state on error
+         if(startBtn) startBtn.disabled = false; startBtn.textContent = 'Start Interview';
     });
 }
 

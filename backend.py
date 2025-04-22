@@ -1025,47 +1025,48 @@ def analyze_resume():
     """
     Analyzes resume against JD, enforces usage limits,
     increments usage counter, creates session in Firestore, starts background analysis,
-    AND updates user profile with lastActiveSessionId.
+    updates user profile with lastActiveSessionId, AND returns updated usage info.
     """
     session_id = None
     temp_session_dir = None
     temp_resume_path = None
     user_id = None
-    
+
     try:
         start_time = time.time()
 
         # --- Validate Request ---
-        if 'resumeFile' not in request.files: 
+        if 'resumeFile' not in request.files:
             return jsonify({'error': 'No resume file'}), 400
-            
+
         resume_file = request.files['resumeFile']
         job_description = request.form.get('jobDescription')
         user_id = request.form.get('userId')
 
-        if not job_description: 
+        if not job_description:
             return jsonify({'error': 'Job description required'}), 400
-            
-        if not resume_file or not resume_file.filename: 
+
+        if not resume_file or not resume_file.filename:
             return jsonify({'error': 'Invalid resume file'}), 400
-            
-        if not user_id: 
+
+        if not user_id:
             return jsonify({'error': 'User ID required for session tracking'}), 400
 
         resume_filename = secure_filename(resume_file.filename)
         if not (resume_file.content_type == 'application/pdf' or resume_filename.lower().endswith('.pdf')):
-             return jsonify({'error': 'Only PDF resumes supported'}), 400
-             
-        if not db: 
+            return jsonify({'error': 'Only PDF resumes supported'}), 400
+
+        if not db:
             return jsonify({'error': 'Database unavailable'}), 503
         # --- End Validation ---
 
         # --- Check usage limits ---
         access_check = check_feature_access(user_id, 'resumeAnalyses')
         if not access_check.get('allowed', False):
+            # Return specific error indicating limit reached
             return jsonify({
                 'error': access_check.get('error', 'Usage limit reached'),
-                'limitReached': True,
+                'limitReached': True, # Flag for frontend
                 'used': access_check.get('used', 0),
                 'limit': access_check.get('limit', 0),
                 'plan': access_check.get('plan', 'free')
@@ -1089,6 +1090,7 @@ def analyze_resume():
         # === End File Handling ===
 
         # --- Increment Usage Counter (BEFORE creating session, in case of errors) ---
+        # This function now returns {'success': True/False, 'used': N, 'limit': M, 'remaining': X}
         increment_result = increment_usage_counter(user_id, 'resumeAnalyses')
         if not increment_result.get('success', False):
             error_msg = increment_result.get('error', 'Failed to update usage counter')
@@ -1114,7 +1116,7 @@ def analyze_resume():
             'results': {},
             'errors': [],
             'last_updated': firestore.SERVER_TIMESTAMP,
-            # Add usage tracking to session for reference
+             # Add usage tracking to session for reference (using data from increment_result)
             'usage_info': {
                 'feature': 'resumeAnalyses',
                 'used': increment_result.get('used', 0),
@@ -1134,10 +1136,11 @@ def analyze_resume():
             })
             print(f"[{session_id}] Updated user {user_id} profile with lastActiveSessionId.")
         except Exception as profile_update_err:
-             print(f"[{session_id}] WARNING: Failed to update user {user_id} profile with last session ID: {profile_update_err}")
+            print(f"[{session_id}] WARNING: Failed to update user {user_id} profile with last session ID: {profile_update_err}")
         # --- End User Profile Update ---
 
         # --- Define background task ---
+        # (Keep the existing process_resume_background function definition as is)
         def process_resume_background(current_session_id, resume_local_path, jd, associated_user_id):
             session_status = 'failed'; error_list = []
             try:
@@ -1149,19 +1152,13 @@ def analyze_resume():
                 update_session_data(current_session_id, {'progress': 30, 'status_detail': 'Parsing resume'})
                 parsed_resume = parse_resume_with_claude(resume_text)
                 if not parsed_resume or not parsed_resume.get("name"): raise ValueError("Failed to parse resume.")
-                # NOTE: Don't update session with full parsed data, results below contain it.
-                # update_session_data(current_session_id, {'parsed_resume_data': parsed_resume}) # Redundant?
                 update_session_data(current_session_id, {'progress': 50, 'status_detail': 'Matching resume/JD'})
                 match_results = match_resume_jd_with_gemini(parsed_resume, jd)
                 if match_results.get("error"): raise ValueError(f"JD matching failed: {match_results['error']}")
                 match_results['parsedResume'] = parsed_resume # Add parsed data here for context
-                # NOTE: Don't update session with full match data, results below contain it.
-                # update_session_data(current_session_id, {'match_results_data': match_results}) # Redundant?
                 update_session_data(current_session_id, {'progress': 80, 'status_detail': 'Generating prep plan'})
                 prep_plan = generate_interview_prep_plan(match_results)
                 if not prep_plan: raise ValueError("Failed to generate prep plan.")
-                # NOTE: Don't update session with full prep plan data, results below contain it.
-                # update_session_data(current_session_id, {'prep_plan_data': prep_plan}) # Redundant?
                 final_results = { 'parsed_resume': parsed_resume, 'match_results': match_results, 'prep_plan': prep_plan }
                 update_session_data(current_session_id, { 'results': final_results, 'status': 'completed', 'progress': 100, 'status_detail': 'Analysis complete', 'end_time': datetime.now().isoformat() })
                 session_status = 'completed'
@@ -1184,27 +1181,31 @@ def analyze_resume():
         processing_thread.start()
 
         print(f"[{session_id}] /analyze-resume request completed in {time.time() - start_time:.2f}s (background running).")
+
+        # *** CORRECTED RETURN VALUE ***
+        # Return the latest usage info obtained from increment_result
         return jsonify({
-            'sessionId': session_id, 
-            'status': 'processing', 
+            'sessionId': session_id,
+            'status': 'processing',
             'message': 'Resume analysis started',
-            'usageInfo': {
+            'usageInfo': { # Include updated usage info
+                'feature': 'resumeAnalyses',
                 'used': increment_result.get('used', 0),
                 'limit': increment_result.get('limit', 0),
                 'remaining': increment_result.get('remaining', 0)
             }
-        }), 202
+        }), 202 # Accepted
 
     except Exception as e:
         print(f"Error in /analyze-resume route: {e}")
         traceback.print_exc()
-        if session_id and db: 
+        if session_id and db:
             update_session_data(session_id, {'status': 'failed', 'errors': firestore.ArrayUnion([f'Route level error: {str(e)}'])})
         if temp_resume_path and os.path.exists(os.path.dirname(temp_resume_path)):
-             try: 
-                 shutil.rmtree(os.path.dirname(temp_resume_path))
-             except Exception as cleanup_err: 
-                 print(f"Error cleaning up temp dir during route exception: {cleanup_err}")
+            try:
+                shutil.rmtree(os.path.dirname(temp_resume_path))
+            except Exception as cleanup_err:
+                print(f"Error cleaning up temp dir during route exception: {cleanup_err}")
         return jsonify({'error': f'Server error: {str(e)}'}), 500
 
 @app.route('/get-analysis-status/<session_id>', methods=['GET'])
@@ -1331,9 +1332,13 @@ def rewrite_resume_section_route():
         return jsonify({'error': f'Server error: {str(e)}'}), 500
 
 
+# Replace this entire route function in backend.py
 @app.route('/start-mock-interview', methods=['POST'])
 def start_mock_interview():
-    """Initializes a new mock interview session in Firestore, with usage limit checks."""
+    """
+    Initializes a new mock interview session in Firestore, with usage limit checks,
+    increments counter, and returns updated usage info.
+    """
     try:
         data = request.get_json()
         if not data: return jsonify({'error': 'Invalid JSON payload'}), 400
@@ -1346,28 +1351,30 @@ def start_mock_interview():
         session_data = get_session_data(session_id)
         if session_data is None: return jsonify({'error': 'Session not found or expired'}), 404
         if session_data.get('status') != 'completed': return jsonify({'error': 'Analysis not completed'}), 400
-        
+
         # Get user ID from session
         user_id = session_data.get('userId')
         if not user_id: return jsonify({'error': 'User ID not found in session'}), 400
-        
+
         # --- Check usage limits for mock interviews ---
         access_check = check_feature_access(user_id, 'mockInterviews')
         if not access_check.get('allowed', False):
+            # Return specific error indicating limit reached
             return jsonify({
                 'error': access_check.get('error', 'Usage limit reached for mock interviews'),
-                'limitReached': True,
+                'limitReached': True, # Flag for frontend
                 'used': access_check.get('used', 0),
                 'limit': access_check.get('limit', 0),
                 'plan': access_check.get('plan', 'free')
             }), 403  # Forbidden due to limits
-        
+
         # --- Fetch data required for the interview ---
         resume_data = session_data.get('results', {}).get('parsed_resume')
         job_data = session_data.get('results', {}).get('match_results')
         if not resume_data or not job_data: return jsonify({'error': 'Required analysis data missing'}), 500
 
         # --- Increment Usage Counter BEFORE creating interview ---
+        # This function now returns {'success': True/False, 'used': N, 'limit': M, 'remaining': X}
         increment_result = increment_usage_counter(user_id, 'mockInterviews')
         if not increment_result.get('success', False):
             error_msg = increment_result.get('error', 'Failed to update usage counter')
@@ -1404,7 +1411,7 @@ def start_mock_interview():
             'job_data_snapshot': job_data,
             'analysis_status': 'not_started',
             'analysis': None,
-            # Add usage tracking info to interview
+            # Add usage tracking info to interview (using data from increment_result)
             'usage_info': {
                 'feature': 'mockInterviews',
                 'used': increment_result.get('used', 0),
@@ -1414,17 +1421,20 @@ def start_mock_interview():
         interview_doc_ref.set(interview_data_to_save)
         print(f"[{session_id}] Started interview {interview_id} of type {interview_type} for user {user_id}.")
 
+        # *** CORRECTED RETURN VALUE ***
+        # Return the latest usage info obtained from increment_result
         return jsonify({
-            'interviewId': interview_id, 
-            'sessionId': session_id, 
-            'interviewType': interview_type, 
+            'interviewId': interview_id,
+            'sessionId': session_id,
+            'interviewType': interview_type,
             'greeting': greeting,
-            'usageInfo': {
+            'usageInfo': { # Include updated usage info
+                'feature': 'mockInterviews',
                 'used': increment_result.get('used', 0),
                 'limit': increment_result.get('limit', 0),
                 'remaining': increment_result.get('remaining', 0)
             }
-        })
+        }) # OK (200)
 
     except Exception as e:
         print(f"Error in /start-mock-interview: {e}")
