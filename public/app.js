@@ -706,12 +706,12 @@ function uploadResumeAndAnalyze() {
     // Reset and show progress bar
     progressContainer.style.display = 'block';
     progressBar.style.width = '10%';
-    progressBar.classList.remove('bg-success', 'bg-danger');
+    progressBar.classList.remove('bg-success', 'bg-danger', 'bg-warning'); // Reset colors
     progressMessage.textContent = 'Uploading files...';
 
     // Disable button during upload
     const analyzeBtn = document.getElementById('analyzeBtn');
-    if (analyzeBtn) analyzeBtn.disabled = true; analyzeBtn.textContent = 'Analyzing...';
+    if (analyzeBtn) analyzeBtn.disabled = true; analyzeBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Analyzing...'; // Add spinner
 
     fetch(`${API_BASE_URL}/analyze-resume`, {
         method: 'POST',
@@ -719,92 +719,91 @@ function uploadResumeAndAnalyze() {
     })
     .then(response => {
         if (!response.ok) {
-            // Attempt to read error message from backend JSON response
             return response.json().then(errData => {
-                // Throw an error with the message from backend if available
-                // Also check for limitReached flag
                 if (errData.limitReached) {
-                     // Trigger upgrade modal if limit was reached on backend check
                      showMessage(errData.error || 'Usage limit reached.', 'warning');
                      showUpgradeModal('resumeAnalyses');
-                     throw new Error('Limit Reached'); // Throw specific error type if needed
+                     throw new Error('Limit Reached');
                 }
                 throw new Error(errData.error || `Analysis request failed (${response.status})`);
             }).catch((jsonParseError) => {
-                // If backend didn't send valid JSON error, throw generic HTTP error
                 console.error("Could not parse error JSON from backend:", jsonParseError);
-                // Check if the specific error thrown was 'Limit Reached'
                 if (jsonParseError.message === 'Limit Reached') {
-                    throw jsonParseError; // Re-throw the specific error
+                    throw jsonParseError;
                 }
                 throw new Error(`Analysis request failed (${response.status} ${response.statusText})`);
             });
         }
         return response.json();
     })
-    .then(data => { // 'data' is the successful response from /analyze-resume
-        console.log('Upload response:', data);
+    .then(data => { // 'data' contains { sessionId, status, message, usageInfo }
+        console.log('Upload response:', data); // Log includes usageInfo now
         if (!data.sessionId) {
             throw new Error("Backend did not return a valid session ID.");
         }
 
-        // ** NO LONGER INCREMENTING COUNTER ON FRONTEND **
-        // The backend /analyze-resume route now handles the increment.
-
-        // Set session ID in the global state (used for polling)
+        // Set session ID in the global state
         state.sessionId = data.sessionId;
         console.log("Session ID stored in state:", state.sessionId);
 
-        // --- OPTIONAL IMPROVEMENT ---
-        // TODO: If backend sends back updated usage info in 'data' (e.g., data.usageInfo),
-        // update the local state here:
-        // if (data.usageInfo && authState.userProfile?.usage?.resumeAnalyses) {
-        //     authState.userProfile.usage.resumeAnalyses.used = data.usageInfo.used;
-        //     authState.userProfile.usage.resumeAnalyses.limit = data.usageInfo.limit;
-        //     console.log("Updated local usage state from backend response.");
-        // }
-        // --- END OPTIONAL IMPROVEMENT ---
+        // *** FIX ISSUE 1: Update local usage state from backend response ***
+        if (data.usageInfo && typeof irisAuth !== 'undefined' && irisAuth.getUserProfile()?.usage?.resumeAnalyses) {
+            // Update local auth state directly
+            authState.userProfile.usage.resumeAnalyses.used = data.usageInfo.used;
+            authState.userProfile.usage.resumeAnalyses.limit = data.usageInfo.limit; // Ensure limit is also synced if it changes
+            console.log("Updated local 'resumeAnalyses' usage state from backend response:", authState.userProfile.usage.resumeAnalyses);
+        } else {
+             console.warn("Could not update local usage state: usageInfo missing in response or local profile structure invalid.");
+             // Consider reloading the profile as a fallback if needed: irisAuth.loadUserProfile(user);
+        }
+        // *** END FIX ISSUE 1 ***
 
-        // Update usage display (will show the count *before* this analysis until profile reloads,
-        // unless the optional improvement above is implemented)
+        // Update usage display with the potentially updated local state
         updateUsageDisplay();
 
         progressMessage.textContent = 'Analyzing resume...';
         pollAnalysisStatus(data.sessionId); // Start polling backend for analysis progress
 
-        // Note: analyzeBtn remains disabled until polling finishes or fails.
+        // Note: analyzeBtn state is now handled within pollAnalysisStatus
     })
     .catch(error => {
-        console.error('Error uploading resume:', error);
+        console.error('Error initiating resume analysis:', error); // Changed log message
 
-        // Don't show generic error if it was a limit reached error (already handled)
+        // Don't show generic error if it was a limit reached error
         if (error.message !== 'Limit Reached') {
              if(progressMessage) progressMessage.textContent = `Error: ${error.message}`;
              if(progressBar) progressBar.classList.add('bg-danger'); progressBar.style.width = '100%';
-             showMessage(`Error uploading resume: ${error.message}`, 'danger');
+             showMessage(`Error starting analysis: ${error.message}`, 'danger');
         } else {
-             // If limit reached, just reset progress bar visuals
-              if(progressMessage) progressMessage.textContent = `Limit reached. Please upgrade.`;
-              if(progressBar) progressBar.classList.add('bg-warning'); progressBar.style.width = '100%';
+             if(progressMessage) progressMessage.textContent = `Limit reached. Please upgrade.`;
+             if(progressBar) progressBar.classList.add('bg-warning'); progressBar.style.width = '100%';
         }
 
-
-        // Re-enable button on error
-        if (analyzeBtn) analyzeBtn.disabled = false; analyzeBtn.textContent = 'Analyze Resume';
+        // *** FIX ISSUE 2 (Partial): Re-enable button on *initial* fetch error ***
+        if (analyzeBtn) {
+            analyzeBtn.disabled = false;
+            analyzeBtn.innerHTML = 'Analyze Resume'; // Reset text
+        }
     });
-}                                        
+}                                    
 
 function pollAnalysisStatus(sessionId) {
     const progressContainer = document.getElementById('uploadProgress');
     const progressBar = progressContainer?.querySelector('.progress-bar');
     const progressMessage = document.getElementById('progressMessage');
+    const analyzeBtn = document.getElementById('analyzeBtn'); // Get button reference
 
-     if (!progressContainer || !progressBar || !progressMessage) return; // Exit if elements aren't there
+    if (!progressContainer || !progressBar || !progressMessage) return; // Exit if elements aren't there
 
     const checkStatus = () => {
         // If session changed or cleared, stop polling
         if (state.sessionId !== sessionId) {
             console.log("Session changed, stopping polling for", sessionId);
+            // *** FIX ISSUE 2: Ensure button is reset if polling stops unexpectedly ***
+            if (analyzeBtn) {
+                analyzeBtn.disabled = false;
+                analyzeBtn.innerHTML = 'Analyze Resume';
+            }
             return;
         }
 
@@ -815,7 +814,7 @@ function pollAnalysisStatus(sessionId) {
                  throw new Error('Session not found or expired. Please upload again.');
             }
             if (!response.ok) {
-                throw new Error(`Network response was not ok (${response.status})`);
+                 throw new Error(`Network response was not ok (${response.status})`);
             }
             return response.json();
         })
@@ -834,20 +833,35 @@ function pollAnalysisStatus(sessionId) {
 
                 loadAnalysisResults(sessionId);
                 loadPreparationPlan(sessionId);
+                checkAndUnlockHistorySections(sessionId); // Check history before unlocking
+
+                // *** FIX ISSUE 2: Reset button on completion ***
+                if (analyzeBtn) {
+                    analyzeBtn.disabled = false;
+                    analyzeBtn.innerHTML = 'Analyze Resume';
+                }
 
                 setTimeout(() => {
                     navigateTo('analysis');
-                    progressContainer.style.display = 'none';
+                    progressContainer.style.display = 'none'; // Hide progress bar
                 }, 1500);
 
             } else if (statusData.status === 'failed') {
-                progressMessage.textContent = `Error: ${statusData.errors?.[0] || 'Analysis failed'}`;
+                const errorMsg = statusData.errors?.[0] || 'Analysis failed';
+                progressMessage.textContent = `Error: ${errorMsg}`;
                 progressBar.classList.add('bg-danger');
-                showMessage(`Analysis failed: ${statusData.errors?.[0] || 'Unknown error'}`, 'danger');
+                showMessage(`Analysis failed: ${errorMsg}`, 'danger');
+
+                // *** FIX ISSUE 2: Reset button on failure ***
+                if (analyzeBtn) {
+                    analyzeBtn.disabled = false;
+                    analyzeBtn.innerHTML = 'Analyze Resume';
+                }
+
             } else { // Still processing
                 progressMessage.textContent = `Analyzing resume (${statusData.progress || 0}%)...`;
                 // Schedule next poll only if still processing
-                 setTimeout(checkStatus, 3000); // Poll slightly less frequently
+                setTimeout(checkStatus, 3000); // Poll slightly less frequently
             }
         })
         .catch(error => {
@@ -855,8 +869,17 @@ function pollAnalysisStatus(sessionId) {
             progressMessage.textContent = `Error: ${error.message}`;
             progressBar.classList.add('bg-danger');
             showMessage(`Error checking analysis status: ${error.message}`, 'danger');
+
+             // *** FIX ISSUE 2: Reset button on polling error ***
+             if (analyzeBtn) {
+                analyzeBtn.disabled = false;
+                analyzeBtn.innerHTML = 'Analyze Resume';
+            }
+
             if (error.message.includes('Session not found')) {
-                 // Reset relevant UI?
+                 // Reset relevant UI? Maybe lock sections again.
+                 lockAllSections();
+                 navigateTo('upload');
             }
         });
     };
@@ -1742,10 +1765,7 @@ function setupMediaRecorder(stream) {
 
 // --- Updated startMockInterview function ---
 function startMockInterview() {
-    // Check feature access first (already done before calling setupMediaDevices typically, but good practice)
-    if (!checkFeatureAccess('mockInterviews')) {
-        return;
-    }
+    // Feature access checked before calling setupMediaDevices which calls this
 
     if (!state.sessionId) {
         alert('No active analysis session found. Please analyze a resume first.');
@@ -1770,9 +1790,13 @@ function startMockInterview() {
     addMessageToConversation("system", `Starting ${state.interviewType} interview...`);
 
     // Show loading/starting state
-    const startBtn = document.getElementById('startInterviewBtn'); // Or relevant button
-    if(startBtn) startBtn.disabled = true; startBtn.textContent = 'Starting...';
-
+    // Identify potential buttons that trigger this
+    const startBtn1 = document.getElementById('startInterviewBtn');
+    const startBtn2 = document.getElementById('startNewInterviewBtn');
+    const startBtn3 = document.getElementById('startAnotherInterviewBtn');
+    if(startBtn1) { startBtn1.disabled = true; startBtn1.textContent = 'Starting...'; }
+    if(startBtn2) { startBtn2.disabled = true; startBtn2.textContent = 'Starting...'; }
+    if(startBtn3) { startBtn3.disabled = true; startBtn3.textContent = 'Starting...'; }
 
     fetch(`${API_BASE_URL}/start-mock-interview`, {
         method: 'POST',
@@ -1784,51 +1808,43 @@ function startMockInterview() {
     })
     .then(response => {
         if (!response.ok) {
-             // Attempt to read error message from backend JSON response
              return response.json().then(errData => {
-                // Throw an error with the message from backend if available
-                // Also check for limitReached flag
                 if (errData.limitReached) {
-                     // Trigger upgrade modal if limit was reached on backend check
                      showMessage(errData.error || 'Usage limit reached.', 'warning');
                      showUpgradeModal('mockInterviews');
-                     throw new Error('Limit Reached'); // Throw specific error type if needed
+                     throw new Error('Limit Reached');
                 }
                 throw new Error(errData.error || `Failed to start interview (${response.status})`);
             }).catch((jsonParseError) => {
                 console.error("Could not parse error JSON from backend:", jsonParseError);
-                 // Check if the specific error thrown was 'Limit Reached'
                  if (jsonParseError.message === 'Limit Reached') {
-                    throw jsonParseError; // Re-throw the specific error
+                    throw jsonParseError;
                 }
                 throw new Error(`Failed to start interview (${response.status} ${response.statusText})`);
             });
         }
         return response.json();
     })
-    .then(data => { // 'data' is the successful response from /start-mock-interview
+    .then(data => { // data contains { interviewId, sessionId, interviewType, greeting, usageInfo }
         console.log('Interview started response:', data);
         if (!data.interviewId || !data.greeting) {
             throw new Error("Invalid response from start-mock-interview");
         }
 
-        // ** NO LONGER INCREMENTING COUNTER ON FRONTEND **
-        // The backend /start-mock-interview route now handles the increment.
-
         state.interviewId = data.interviewId;
 
-         // --- OPTIONAL IMPROVEMENT ---
-         // TODO: If backend sends back updated usage info in 'data' (e.g., data.usageInfo),
-         // update the local state here:
-         // if (data.usageInfo && authState.userProfile?.usage?.mockInterviews) {
-         //     authState.userProfile.usage.mockInterviews.used = data.usageInfo.used;
-         //     authState.userProfile.usage.mockInterviews.limit = data.usageInfo.limit;
-         //     console.log("Updated local mock interview usage state from backend response.");
-         // }
-         // --- END OPTIONAL IMPROVEMENT ---
+        // *** FIX ISSUE 1: Update local usage state from backend response ***
+        if (data.usageInfo && typeof irisAuth !== 'undefined' && irisAuth.getUserProfile()?.usage?.mockInterviews) {
+            // Update local auth state directly
+            authState.userProfile.usage.mockInterviews.used = data.usageInfo.used;
+            authState.userProfile.usage.mockInterviews.limit = data.usageInfo.limit;
+            console.log("Updated local 'mockInterviews' usage state from backend response:", authState.userProfile.usage.mockInterviews);
+        } else {
+             console.warn("Could not update local interview usage state: usageInfo missing in response or local profile structure invalid.");
+        }
+         // *** END FIX ISSUE 1 ***
 
-        // Update usage display (will show the count *before* this interview until profile reloads,
-        // unless the optional improvement above is implemented)
+        // Update usage display with the potentially updated local state
         updateUsageDisplay();
 
         // Remove "Starting..." message
@@ -1837,18 +1853,21 @@ function startMockInterview() {
 
         // Display and speak greeting
         addMessageToConversation('interviewer', data.greeting);
-        generateAndPlayTTS(data.greeting); // This will trigger automatic listening when done
+        generateAndPlayTTS(data.greeting); // Triggers listening when done
 
-        // Reset button state (or maybe hide it now?)
-        if(startBtn) startBtn.disabled = false; startBtn.textContent = 'Start Interview';
+        // Reset button states (or maybe hide/change function)
+        if(startBtn1) { startBtn1.disabled = false; startBtn1.textContent = 'Start Interview'; }
+        if(startBtn2) { startBtn2.disabled = false; startBtn2.textContent = 'Start New Interview'; }
+        if(startBtn3) { startBtn3.disabled = false; startBtn3.textContent = 'Start Another Interview'; }
+        // Consider navigating to the interview screen here if not already done
+        // navigateTo('mock-interview');
 
-        return data; // Keep promise chain going if needed elsewhere
+        return data;
     })
     .catch(error => {
         console.error('Error starting interview:', error);
-        state.isInterviewActive = false; // Ensure interview state is reset
+        state.isInterviewActive = false; // Reset state
 
-         // Don't show generic error if it was a limit reached error (already handled)
          if (error.message !== 'Limit Reached') {
              alert(`Error starting interview: ${error.message}`);
              addMessageToConversation("system", `Error starting interview: ${error.message}. Please try again.`);
@@ -1856,9 +1875,10 @@ function startMockInterview() {
               addMessageToConversation("system", `Mock interview limit reached. Please upgrade your plan.`);
          }
 
-
-        // Reset button state on error
-         if(startBtn) startBtn.disabled = false; startBtn.textContent = 'Start Interview';
+        // Reset button states on error
+        if(startBtn1) { startBtn1.disabled = false; startBtn1.textContent = 'Start Interview'; }
+        if(startBtn2) { startBtn2.disabled = false; startBtn2.textContent = 'Start New Interview'; }
+        if(startBtn3) { startBtn3.disabled = false; startBtn3.textContent = 'Start Another Interview'; }
     });
 }
 
