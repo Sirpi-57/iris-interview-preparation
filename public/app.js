@@ -66,39 +66,35 @@ document.addEventListener('DOMContentLoaded', function() {
 
 // --- Authentication-related Functions ---
 
-// Replace this function in app.js
+// --- Updated initializeIRISApp function ---
 function initializeIRISApp() {
     console.log('Initializing IRIS app for authenticated user...');
 
     // Reset global state potentially tied to previous user/session
     state.sessionId = null;
     state.interviewId = null;
-    // Add any other state resets needed here
 
-    const userProfile = irisAuth?.getUserProfile(); // Get profile loaded by auth module
+    const userProfile = irisAuth?.getUserProfile();
 
-    // Check if user profile and Firestore DB object are available
-    // (Assuming 'db' is globally accessible if needed in checkAndLoadSessionStatus error handling)
      if (!userProfile) {
          console.warn("User profile not loaded yet, cannot check for last session.");
-         // This might happen on initial fast load. The profile should load shortly after.
-         // You could add a small delay/retry or rely on UI state being locked initially.
-         lockAllSections(); // Ensure sections start locked
-         navigateTo('upload'); // Default view
+         lockAllSections();
+         navigateTo('upload');
          return;
      }
+     
+     // Update usage display
+     updateUsageDisplay();
 
     const lastSessionId = userProfile.lastActiveSessionId;
 
     if (lastSessionId) {
         console.log(`Found last active session ID from user profile: ${lastSessionId}`);
-        // Check the status of this session
         checkAndLoadSessionStatus(lastSessionId);
     } else {
         console.log("No last active session found for this user. Starting fresh.");
-        // Ensure sections are locked if no session ID found
-        lockAllSections(); // Use helper to lock all dependent sections
-        navigateTo('upload'); // Start on upload page
+        lockAllSections();
+        navigateTo('upload');
     }
 }
 
@@ -361,16 +357,20 @@ function initProfilePage() {
         modal.show();
     }
 
+    updateUsageDisplay();
+
+    // --- Add upgrade button listener in profile page ---
+    document.getElementById('upgradePlanBtn')?.addEventListener('click', showPaymentModal);
+
 } // End of initProfilePage function definition
 
+// --- Replace showPaymentModal function ---
 function showPaymentModal() {
-    // Placeholder for Razorpay integration
-    alert('Payment processing will be implemented with Razorpay integration.');
-    // In the actual implementation, this would:
-    // 1. Create a Razorpay order on the backend
-    // 2. Show the Razorpay payment modal
-    // 3. Handle the payment success/failure
-    // 4. Update the user's subscription status
+    // Get the current plan
+    const currentPlan = irisAuth?.getUserProfile()?.plan || 'free';
+    
+    // Show the upgrade modal with appropriate features highlighted
+    showUpgradeModal(currentPlan === 'free' ? 'resumeAnalyses' : 'mockInterviews');
 }
 
 function downloadUserData() {
@@ -514,26 +514,34 @@ function initNavigation() {
 }
 
 function initButtons() {
-    // --- General Navigation ---
+    // --- General Navigation --- [Keep existing code]
     document.getElementById('getStartedBtn')?.addEventListener('click', () => navigateTo('upload'));
     document.getElementById('viewPrepPlanBtn')?.addEventListener('click', () => navigateTo('prep-plan'));
     document.getElementById('startInterviewBtn')?.addEventListener('click', () => {
-        navigateTo('mock-interview');
-        showPermissionsModal(); // Request permissions before starting
+        // Add feature check here
+        if (checkFeatureAccess('mockInterviews')) {
+            navigateTo('mock-interview');
+            showPermissionsModal();
+        }
     });
-     document.getElementById('startNewInterviewBtn')?.addEventListener('click', () => {
-        navigateTo('mock-interview');
-        showPermissionsModal();
+    document.getElementById('startNewInterviewBtn')?.addEventListener('click', () => {
+        // Add feature check here
+        if (checkFeatureAccess('mockInterviews')) {
+            navigateTo('mock-interview');
+            showPermissionsModal();
+        }
     });
-    document.getElementById('viewProgressBtn')?.addEventListener('click', () => navigateTo('history')); // History loading is handled in navigateTo/initNavigation
+    document.getElementById('viewProgressBtn')?.addEventListener('click', () => navigateTo('history'));
     document.getElementById('startAnotherInterviewBtn')?.addEventListener('click', () => {
-        navigateTo('mock-interview');
-        showPermissionsModal();
+        // Add feature check here
+        if (checkFeatureAccess('mockInterviews')) {
+            navigateTo('mock-interview');
+            showPermissionsModal();
+        }
     });
 
-
-    // --- Mock Interview Controls ---
-     document.getElementById('endInterviewBtn')?.addEventListener('click', endInterview); // End interview
+    // --- Mock Interview Controls --- [Keep existing code]
+    document.getElementById('endInterviewBtn')?.addEventListener('click', endInterview);
 
     const interviewTypeButtons = document.querySelectorAll('#interviewTypeSelector button');
     interviewTypeButtons.forEach(button => {
@@ -553,14 +561,17 @@ function initButtons() {
         if (event.key === 'Enter') sendTextReply();
     });
 
-     // Permissions Modal
+    // Permissions Modal
     document.getElementById('grantPermissionsBtn')?.addEventListener('click', setupMediaDevices);
 
     // Recording Buttons (hidden/repurposed for continuous mode)
     const voiceReplyBtn = document.getElementById('voiceReplyBtn');
     const stopRecordingBtn = document.getElementById('stopRecordingBtn');
-    if(voiceReplyBtn) voiceReplyBtn.style.display = 'none'; // Hide manual start
-    if(stopRecordingBtn) stopRecordingBtn.style.display = 'none'; // Hide manual stop
+    if(voiceReplyBtn) voiceReplyBtn.style.display = 'none';
+    if(stopRecordingBtn) stopRecordingBtn.style.display = 'none';
+    
+    // --- Add new event listener for Upgrade Plan button ---
+    document.getElementById('upgradePlanBtn')?.addEventListener('click', showPaymentModal);
 }
 
 function initForms() {
@@ -645,17 +656,19 @@ function checkForExistingSession() {
 // --- API Communication ---
 
 // Replace this entire function in app.js
+// --- Updated uploadResumeAndAnalyze function ---
 function uploadResumeAndAnalyze() {
-    // Check if user is authenticated
-    const user = firebase.auth().currentUser; // Get user first
-    if (!user) { // Check if user object exists
+    // Check feature access first
+    if (!checkFeatureAccess('resumeAnalyses')) {
+        return;
+    }
+    
+    // Get user authentication data
+    const user = firebase.auth().currentUser;
+    if (!user) {
         showMessage('Please sign in to use this feature', 'warning');
-        // Ensure irisAuth and showSignInModal are available globally or passed correctly
         if (typeof irisAuth !== 'undefined' && typeof irisAuth.showSignInModal === 'function') {
             irisAuth.showSignInModal();
-        } else {
-            console.error("irisAuth or showSignInModal not available.");
-            // Fallback or alternative handling needed here
         }
         return;
     }
@@ -677,7 +690,7 @@ function uploadResumeAndAnalyze() {
 
     // Basic validation - Check if file exists in FormData
     const resumeFile = formData.get('resumeFile');
-    if (!resumeFile || typeof resumeFile === 'string' || resumeFile.size === 0) { // Check if it's a real file
+    if (!resumeFile || typeof resumeFile === 'string' || resumeFile.size === 0) {
          showMessage("Please select a resume file.", 'warning');
          return;
      }
@@ -686,10 +699,9 @@ function uploadResumeAndAnalyze() {
         return;
     }
 
-
-    // Add user ID to request (already have 'user' from check above)
+    // Add user ID to request
     formData.append('userId', user.uid);
-    console.log(`Appending userId: ${user.uid} to FormData`); // Debug log
+    console.log(`Appending userId: ${user.uid} to FormData`);
 
     // Reset and show progress bar
     progressContainer.style.display = 'block';
@@ -701,11 +713,9 @@ function uploadResumeAndAnalyze() {
     const analyzeBtn = document.getElementById('analyzeBtn');
     if(analyzeBtn) analyzeBtn.disabled = true; analyzeBtn.textContent = 'Analyzing...';
 
-
     fetch(`${API_BASE_URL}/analyze-resume`, {
         method: 'POST',
         body: formData
-        // Note: No 'Content-Type' header needed for FormData, browser sets it
     })
     .then(response => {
         if (!response.ok) {
@@ -719,34 +729,40 @@ function uploadResumeAndAnalyze() {
                  throw new Error(`Analysis request failed (${response.status} ${response.statusText})`);
             });
         }
-        return response.json(); // Parse successful JSON response
+        return response.json();
     })
     .then(data => {
         console.log('Upload response:', data);
         if (!data.sessionId) {
             throw new Error("Backend did not return a valid session ID.");
         }
-        // Set session ID in the global state (used for polling)
-        state.sessionId = data.sessionId;
-
-        // ---> REMOVED localStorage.setItem('irisSessionId', data.sessionId); <---
-        console.log("Session ID stored in state, NOT localStorage.");
-
-        progressMessage.textContent = 'Analyzing resume...';
-        pollAnalysisStatus(data.sessionId); // Start polling using the received session ID
+        
+        // Increment usage counter in Firebase
+        return irisAuth.incrementUsageCounter('resumeAnalyses')
+            .then(usageResult => {
+                // Set session ID in the global state (used for polling)
+                state.sessionId = data.sessionId;
+                console.log("Session ID stored in state. Resume analysis count updated:", usageResult);
+                
+                // Update usage display
+                updateUsageDisplay();
+                
+                progressMessage.textContent = 'Analyzing resume...';
+                pollAnalysisStatus(data.sessionId);
+                
+                return data; // Pass through the original data
+            });
     })
     .catch(error => {
         console.error('Error uploading resume:', error);
-        if(progressMessage) progressMessage.textContent = `Error: ${error.message}`; // Display specific error
-        if(progressBar) progressBar.classList.add('bg-danger'); progressBar.style.width = '100%'; // Indicate error on progress bar
+        if(progressMessage) progressMessage.textContent = `Error: ${error.message}`;
+        if(progressBar) progressBar.classList.add('bg-danger'); progressBar.style.width = '100%';
         showMessage(`Error uploading resume: ${error.message}`, 'danger');
 
         // Re-enable button on error
-         if(analyzeBtn) analyzeBtn.disabled = false; analyzeBtn.textContent = 'Analyze Resume';
+        if(analyzeBtn) analyzeBtn.disabled = false; analyzeBtn.textContent = 'Analyze Resume';
     });
-     // Note: Button re-enabling on SUCCESS happens implicitly when polling finishes and navigates away,
-     // but you might want to explicitly re-enable it if the user stays on the upload page after success.
-}
+}                                                       
 
 function pollAnalysisStatus(sessionId) {
     const progressContainer = document.getElementById('uploadProgress');
@@ -1694,30 +1710,34 @@ function setupMediaRecorder(stream) {
 }
 
 
+// --- Updated startMockInterview function ---
 function startMockInterview() {
+    // Check feature access first
+    if (!checkFeatureAccess('mockInterviews')) {
+        return;
+    }
+
     if (!state.sessionId) {
         alert('No active session. Please analyze a resume first.');
         navigateTo('upload');
         return;
     }
-     if (!state.mediaRecorder) {
-         alert('Audio recorder not initialized. Please grant microphone permissions.');
-         // Attempt to re-initialize? Or guide user.
-         showPermissionsModal();
-         return;
-     }
+    
+    if (!state.mediaRecorder) {
+        alert('Audio recorder not initialized. Please grant microphone permissions.');
+        showPermissionsModal();
+        return;
+    }
 
     console.log(`Starting ${state.interviewType} interview for session: ${state.sessionId}`);
     state.isInterviewActive = true;
-    state.isAIResponding = false; // Ensure AI is not marked as responding initially
-    state.conversationHistory = []; // Clear previous history
+    state.isAIResponding = false;
+    state.conversationHistory = [];
 
     const conversationContainer = document.getElementById('conversationContainer');
-    if(conversationContainer) conversationContainer.innerHTML = ''; // Clear display
+    if(conversationContainer) conversationContainer.innerHTML = '';
 
-    // Add loading indicator?
     addMessageToConversation("system", `Starting ${state.interviewType} interview...`);
-
 
     fetch(`${API_BASE_URL}/start-mock-interview`, {
         method: 'POST',
@@ -1734,23 +1754,33 @@ function startMockInterview() {
     .then(data => {
         console.log('Interview started response:', data);
         if (!data.interviewId || !data.greeting) {
-             throw new Error("Invalid response from start-mock-interview");
+            throw new Error("Invalid response from start-mock-interview");
         }
-        state.interviewId = data.interviewId;
-
-        // Remove "Starting..." message
-        const systemMessages = conversationContainer.querySelectorAll('.message.system');
-        systemMessages.forEach(msg => msg.remove());
-
-        // Display and speak greeting
-        addMessageToConversation('interviewer', data.greeting);
-        generateAndPlayTTS(data.greeting); // This will trigger automatic listening on end
+        
+        // Increment usage counter in Firebase
+        return irisAuth.incrementUsageCounter('mockInterviews')
+            .then(usageResult => {
+                state.interviewId = data.interviewId;
+                
+                // Update usage display
+                updateUsageDisplay();
+                
+                // Remove "Starting..." message
+                const systemMessages = conversationContainer.querySelectorAll('.message.system');
+                systemMessages.forEach(msg => msg.remove());
+                
+                // Display and speak greeting
+                addMessageToConversation('interviewer', data.greeting);
+                generateAndPlayTTS(data.greeting);
+                
+                return data;
+            });
     })
     .catch(error => {
         console.error('Error starting interview:', error);
         alert(`Error starting interview: ${error.message}`);
-        state.isInterviewActive = false; // Reset state on error
-         addMessageToConversation("system", `Error starting interview: ${error.message}. Please try again.`);
+        state.isInterviewActive = false;
+        addMessageToConversation("system", `Error starting interview: ${error.message}. Please try again.`);
     });
 }
 
@@ -3106,6 +3136,310 @@ function checkAndUnlockHistorySections(sessionIdToCheck) {
              lockSection('history');
           });
 }
+
+// --- Function to check feature access before performing actions ---
+function checkFeatureAccess(featureType) {
+    // Check if user is authenticated
+    const user = firebase.auth().currentUser;
+    if (!user) {
+        showMessage('Please sign in to use this feature', 'warning');
+        if (typeof irisAuth !== 'undefined' && typeof irisAuth.showSignInModal === 'function') {
+            irisAuth.showSignInModal();
+        }
+        return false;
+    }
+    
+    // Check if user can use this feature based on their plan
+    if (!irisAuth.canUseFeature(featureType)) {
+        const usageInfo = irisAuth.getUserProfile()?.usage?.[featureType] || { used: 0, limit: 0 };
+        
+        // If they've hit their limit, show upgrade modal
+        if (usageInfo.used >= usageInfo.limit) {
+            showMessage(`You've reached your ${featureType === 'resumeAnalyses' ? 'resume analysis' : 'mock interview'} limit (${usageInfo.used}/${usageInfo.limit}). Please upgrade your plan to continue.`, 'warning');
+            showUpgradeModal(featureType);
+            return false;
+        }
+    }
+    
+    return true;
+}
+
+// --- New function to update usage display ---
+function updateUsageDisplay() {
+    const userProfile = irisAuth?.getUserProfile();
+    if (!userProfile || !userProfile.usage) return;
+    
+    // Update resume analyses counter
+    const resumeUsage = userProfile.usage.resumeAnalyses || { used: 0, limit: 0 };
+    const resumeCountElement = document.getElementById('resumeAnalysesCount');
+    const resumeProgressBar = document.querySelector('#resumeAnalysesCount + .progress .progress-bar');
+    
+    if (resumeCountElement) {
+        resumeCountElement.textContent = `${resumeUsage.used}/${resumeUsage.limit}`;
+    }
+    
+    if (resumeProgressBar) {
+        const percentUsed = resumeUsage.limit > 0 ? (resumeUsage.used / resumeUsage.limit) * 100 : 0;
+        resumeProgressBar.style.width = `${Math.min(100, percentUsed)}%`;
+        
+        // Add warning color if close to limit
+        if (percentUsed >= 85) {
+            resumeProgressBar.classList.add('bg-warning');
+        } else if (percentUsed >= 100) {
+            resumeProgressBar.classList.add('bg-danger');
+        } else {
+            resumeProgressBar.classList.remove('bg-warning', 'bg-danger');
+        }
+    }
+    
+    // Update mock interviews counter
+    const interviewUsage = userProfile.usage.mockInterviews || { used: 0, limit: 0 };
+    const interviewCountElement = document.getElementById('mockInterviewsCount');
+    const interviewProgressBar = document.querySelector('#mockInterviewsCount + .progress .progress-bar');
+    
+    if (interviewCountElement) {
+        interviewCountElement.textContent = `${interviewUsage.used}/${interviewUsage.limit}`;
+    }
+    
+    if (interviewProgressBar) {
+        const percentUsed = interviewUsage.limit > 0 ? (interviewUsage.used / interviewUsage.limit) * 100 : 0;
+        interviewProgressBar.style.width = `${Math.min(100, percentUsed)}%`;
+        
+        // Add warning color if close to limit
+        if (percentUsed >= 85) {
+            interviewProgressBar.classList.add('bg-warning');
+        } else if (percentUsed >= 100) {
+            interviewProgressBar.classList.add('bg-danger');
+        } else {
+            interviewProgressBar.classList.remove('bg-warning', 'bg-danger');
+        }
+    }
+    
+    // Update upgrade button visibility based on usage
+    const upgradePlanBtn = document.getElementById('upgradePlanBtn');
+    if (upgradePlanBtn) {
+        // Show more prominently if close to limits
+        if (resumeUsage.used >= resumeUsage.limit || interviewUsage.used >= interviewUsage.limit) {
+            upgradePlanBtn.classList.add('btn-danger');
+            upgradePlanBtn.classList.remove('btn-success');
+            upgradePlanBtn.innerHTML = '<i class="fas fa-crown me-2"></i> Upgrade Now - Limits Reached!';
+        } else if ((resumeUsage.limit > 0 && resumeUsage.used / resumeUsage.limit >= 0.7) || 
+                  (interviewUsage.limit > 0 && interviewUsage.used / interviewUsage.limit >= 0.7)) {
+            upgradePlanBtn.classList.add('btn-warning');
+            upgradePlanBtn.classList.remove('btn-success', 'btn-danger');
+            upgradePlanBtn.innerHTML = '<i class="fas fa-crown me-2"></i> Upgrade Soon - Limits Approaching';
+        } else {
+            upgradePlanBtn.classList.add('btn-success');
+            upgradePlanBtn.classList.remove('btn-warning', 'btn-danger');
+            upgradePlanBtn.innerHTML = '<i class="fas fa-crown me-2"></i> Upgrade Now';
+        }
+    }
+}
+
+// --- New function to show upgrade modal (continued) ---
+function showUpgradeModal(featureType) {
+    // Get current plan to determine what plans to highlight
+    const currentPlan = irisAuth?.getUserProfile()?.plan || 'free';
+    const modalContent = document.createElement('div');
+    
+    // Determine recommended plan based on feature and current plan
+    let recommendedPlan = 'standard'; // Default recommendation
+    
+    if (featureType === 'resumeAnalyses') {
+        if (currentPlan === 'free') {
+            recommendedPlan = 'starter'; // From free to starter for more resume analyses
+        } else if (currentPlan === 'starter') {
+            recommendedPlan = 'standard'; // From starter to standard for even more
+        }
+    } else if (featureType === 'mockInterviews') {
+        if (currentPlan === 'free' || currentPlan === 'starter') {
+            recommendedPlan = 'standard'; // From free/starter to standard for interviews
+        } else if (currentPlan === 'standard') {
+            recommendedPlan = 'pro'; // From standard to pro for more interviews
+        }
+    }
+    
+    // Dynamic heading based on feature
+    const heading = featureType === 'resumeAnalyses' 
+        ? 'Upgrade for More Resume Analyses'
+        : 'Upgrade for Mock Interviews';
+    
+    modalContent.innerHTML = `
+        <div class="modal fade" id="upgradeModal" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">${heading}</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="alert alert-info">
+                            <i class="fas fa-info-circle me-2"></i>
+                            <strong>You've reached your ${featureType === 'resumeAnalyses' ? 'resume analysis' : 'mock interview'} limit on your current plan (${currentPlan}).</strong>
+                            <p class="mb-0">Upgrade to continue your interview preparation journey.</p>
+                        </div>
+                        
+                        <div class="row mt-4">
+                            <!-- Starter Plan -->
+                            <div class="col-md-4 mb-4">
+                                <div class="card ${recommendedPlan === 'starter' ? 'border-primary' : ''}">
+                                    <div class="card-header">
+                                        <h3 class="my-0 font-weight-normal">Starter Pack</h3>
+                                        ${recommendedPlan === 'starter' ? '<span class="badge bg-primary position-absolute top-0 end-0 mt-2 me-2">Recommended</span>' : ''}
+                                    </div>
+                                    <div class="card-body">
+                                        <h2 class="card-title pricing-card-title text-center">₹299</h2>
+                                        <ul class="list-unstyled mt-3 mb-4">
+                                            <li><i class="fas fa-check text-success me-2"></i> <strong>5 Resume Analyses</strong></li>
+                                            <li><i class="fas fa-check text-success me-2"></i> <strong>1 Mock Interview</strong></li>
+                                            <li><i class="fas fa-check text-success me-2"></i> Detailed Prep Plan</li>
+                                            <li><i class="fas fa-check text-success me-2"></i> Detailed Performance Report</li>
+                                            <li><i class="fas fa-check text-success me-2"></i> Dynamic Timeline Generator</li>
+                                            <li class="text-muted"><i class="fas fa-times me-2"></i> Suggested Answers Library</li>
+                                        </ul>
+                                        <button type="button" class="btn btn-lg btn-block ${recommendedPlan === 'starter' ? 'btn-primary' : 'btn-outline-primary'} w-100 plan-select-btn" data-plan="starter">Select Starter</button>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Standard Plan -->
+                            <div class="col-md-4 mb-4">
+                                <div class="card ${recommendedPlan === 'standard' ? 'border-primary highlight-card' : ''}">
+                                    <div class="card-header">
+                                        <h3 class="my-0 font-weight-normal">Standard Pack</h3>
+                                        ${recommendedPlan === 'standard' ? '<span class="badge bg-primary position-absolute top-0 end-0 mt-2 me-2">Recommended</span>' : ''}
+                                    </div>
+                                    <div class="card-body">
+                                        <h2 class="card-title pricing-card-title text-center">₹499</h2>
+                                        <ul class="list-unstyled mt-3 mb-4">
+                                            <li><i class="fas fa-check text-success me-2"></i> <strong>10 Resume Analyses</strong></li>
+                                            <li><i class="fas fa-check text-success me-2"></i> <strong>3 Mock Interviews</strong></li>
+                                            <li><i class="fas fa-check text-success me-2"></i> Detailed Prep Plan</li>
+                                            <li><i class="fas fa-check text-success me-2"></i> Detailed Performance Reports</li>
+                                            <li><i class="fas fa-check text-success me-2"></i> Dynamic Timeline Generator</li>
+                                            <li><i class="fas fa-check text-success me-2"></i> Suggested Answers Library</li>
+                                        </ul>
+                                        <button type="button" class="btn btn-lg btn-block ${recommendedPlan === 'standard' ? 'btn-primary' : 'btn-outline-primary'} w-100 plan-select-btn" data-plan="standard">Choose Standard</button>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Pro Plan -->
+                            <div class="col-md-4 mb-4">
+                                <div class="card ${recommendedPlan === 'pro' ? 'border-primary' : ''}">
+                                    <div class="card-header">
+                                        <h3 class="my-0 font-weight-normal">Pro Pack</h3>
+                                        ${recommendedPlan === 'pro' ? '<span class="badge bg-primary position-absolute top-0 end-0 mt-2 me-2">Recommended</span>' : ''}
+                                    </div>
+                                    <div class="card-body">
+                                        <h2 class="card-title pricing-card-title text-center">₹899</h2>
+                                        <ul class="list-unstyled mt-3 mb-4">
+                                            <li><i class="fas fa-check text-success me-2"></i> <strong>10 Resume Analyses</strong></li>
+                                            <li><i class="fas fa-check text-success me-2"></i> <strong>5 Mock Interviews</strong></li>
+                                            <li><i class="fas fa-check text-success me-2"></i> Detailed Prep Plan</li>
+                                            <li><i class="fas fa-check text-success me-2"></i> Detailed Performance Reports</li>
+                                            <li><i class="fas fa-check text-success me-2"></i> Dynamic Timeline Generator</li>
+                                            <li><i class="fas fa-check text-success me-2"></i> Suggested Answers Library</li>
+                                        </ul>
+                                        <button type="button" class="btn btn-lg btn-block ${recommendedPlan === 'pro' ? 'btn-primary' : 'btn-outline-primary'} w-100 plan-select-btn" data-plan="pro">Go Pro</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    // Append modal to body
+    document.body.appendChild(modalContent);
+    
+    // Initialize Bootstrap modal
+    const upgradeModal = new bootstrap.Modal(document.getElementById('upgradeModal'));
+    upgradeModal.show();
+    
+    // Add event listeners to plan select buttons
+    document.querySelectorAll('.plan-select-btn').forEach(button => {
+        button.addEventListener('click', function() {
+            const planName = this.getAttribute('data-plan');
+            selectPlan(planName, upgradeModal);
+        });
+    });
+    
+    // Clean up when modal is hidden
+    document.getElementById('upgradeModal').addEventListener('hidden.bs.modal', function() {
+        document.body.removeChild(modalContent);
+    });
+}
+
+// --- Function to handle plan selection ---
+function selectPlan(planName, modalInstance) {
+    console.log(`Selected plan: ${planName}`);
+    
+    // Create payment processing modal (temporary, will be replaced with Razorpay integration)
+    const processingModalContent = document.createElement('div');
+    processingModalContent.innerHTML = `
+        <div class="modal fade" id="paymentProcessingModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Processing Payment</h5>
+                    </div>
+                    <div class="modal-body text-center">
+                        <div class="spinner-border text-primary mb-3" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                        <p>Processing your upgrade to the ${planName.charAt(0).toUpperCase() + planName.slice(1)} plan...</p>
+                        <div class="progress mt-3">
+                            <div id="payment-progress-bar" class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 0%"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    // Hide the upgrade modal
+    if (modalInstance) {
+        modalInstance.hide();
+    }
+    
+    // Append and show processing modal
+    document.body.appendChild(processingModalContent);
+    const processingModal = new bootstrap.Modal(document.getElementById('paymentProcessingModal'));
+    processingModal.show();
+    
+    // Simulate payment processing (for testing)
+    const progressBar = document.getElementById('payment-progress-bar');
+    let progress = 0;
+    
+    const progressInterval = setInterval(() => {
+        progress += 10;
+        progressBar.style.width = `${progress}%`;
+        
+        if (progress >= 100) {
+            clearInterval(progressInterval);
+            setTimeout(() => {
+                // Simulate successful payment
+                processingModal.hide();
+                
+                // Update the user's plan
+                irisAuth.updateUserPlan(planName)
+                    .then(() => {
+                        showMessage(`Successfully upgraded to ${planName.charAt(0).toUpperCase() + planName.slice(1)} plan!`, 'success');
+                        updateUsageDisplay();
+                        document.body.removeChild(processingModalContent);
+                    })
+                    .catch(error => {
+                        showMessage(`Error upgrading plan: ${error.message}`, 'danger');
+                        document.body.removeChild(processingModalContent);
+                    });
+            }, 1000);
+        }
+    }, 300);
+}
+
 
 // NEW Helper function in app.js to lock sections dependent on analysis
 function lockAllSections() {

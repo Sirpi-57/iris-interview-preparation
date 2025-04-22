@@ -812,6 +812,149 @@ def get_duration(start_time_str, end_time_str):
     except Exception: return "N/A"
 
 
+def get_user_usage(user_id):
+    """Retrieves user profile including usage data from Firestore."""
+    if not db or not user_id:
+        return None
+    
+    try:
+        user_ref = db.collection('users').document(user_id)
+        user_doc = user_ref.get()
+        
+        if user_doc.exists:
+            user_data = user_doc.to_dict()
+            
+            # Ensure usage data structure exists
+            if 'usage' not in user_data:
+                user_data['usage'] = {
+                    'resumeAnalyses': {'used': 0, 'limit': get_package_limit(user_data.get('plan', 'free'), 'resumeAnalyses')},
+                    'mockInterviews': {'used': 0, 'limit': get_package_limit(user_data.get('plan', 'free'), 'mockInterviews')}
+                }
+                # Update user document with default usage
+                user_ref.update({'usage': user_data['usage']})
+            
+            return user_data
+        else:
+            print(f"User {user_id} not found in Firestore")
+            return None
+            
+    except Exception as e:
+        print(f"Error retrieving user usage for {user_id}: {e}")
+        traceback.print_exc()
+        return None
+
+
+def get_package_limit(package_name, feature_type):
+    """Returns the limit for a specific feature based on package type."""
+    limits = {
+        'free': {
+            'resumeAnalyses': 2,
+            'mockInterviews': 0
+        },
+        'starter': {
+            'resumeAnalyses': 5,
+            'mockInterviews': 1
+        },
+        'standard': {
+            'resumeAnalyses': 10,
+            'mockInterviews': 3
+        },
+        'pro': {
+            'resumeAnalyses': 10,
+            'mockInterviews': 5
+        }
+    }
+    
+    # Default to free package if not found
+    if not package_name or package_name not in limits:
+        print(f"Warning: Unknown package '{package_name}', defaulting to free")
+        package_name = 'free'
+    
+    # Return the limit for the feature, or 0 if feature not found
+    return limits[package_name].get(feature_type, 0)
+
+
+def check_feature_access(user_id, feature_type):
+    """Checks if a user has access to a specific feature based on their plan."""
+    if not db or not user_id:
+        return {'allowed': False, 'error': 'Database or user ID not available'}
+    
+    try:
+        user_data = get_user_usage(user_id)
+        
+        if not user_data:
+            return {'allowed': False, 'error': 'User profile not found'}
+        
+        if 'usage' not in user_data or feature_type not in user_data['usage']:
+            return {'allowed': False, 'error': 'Usage data not found'}
+        
+        usage = user_data['usage'][feature_type]
+        currently_used = usage.get('used', 0)
+        limit = usage.get('limit', 0)
+        
+        # Check if user has used all their available resources
+        if currently_used >= limit:
+            return {
+                'allowed': False,
+                'error': f"Usage limit reached for {feature_type}",
+                'used': currently_used,
+                'limit': limit,
+                'plan': user_data.get('plan', 'free')
+            }
+        
+        return {
+            'allowed': True,
+            'used': currently_used,
+            'limit': limit,
+            'plan': user_data.get('plan', 'free')
+        }
+        
+    except Exception as e:
+        print(f"Error checking feature access for {user_id} ({feature_type}): {e}")
+        traceback.print_exc()
+        return {'allowed': False, 'error': f'Server error: {str(e)}'}
+
+
+def increment_usage_counter(user_id, feature_type):
+    """Increments usage counter for a specific feature."""
+    if not db or not user_id:
+        return {'success': False, 'error': 'Database or user ID not available'}
+    
+    try:
+        user_ref = db.collection('users').document(user_id)
+        
+        # Check if user exists
+        user_doc = user_ref.get()
+        if not user_doc.exists:
+            return {'success': False, 'error': 'User profile not found'}
+        
+        # Increment counter using atomic operation
+        update_field = f'usage.{feature_type}.used'
+        
+        # Perform the increment
+        user_ref.update({
+            update_field: firestore.Increment(1)
+        })
+        
+        # Get updated count
+        updated_user = user_ref.get().to_dict()
+        current_usage = updated_user.get('usage', {}).get(feature_type, {}).get('used', 0)
+        usage_limit = updated_user.get('usage', {}).get(feature_type, {}).get('limit', 0)
+        
+        return {
+            'success': True,
+            'used': current_usage,
+            'limit': usage_limit,
+            'remaining': max(0, usage_limit - current_usage)
+        }
+        
+    except Exception as e:
+        print(f"Error incrementing usage counter for {user_id} ({feature_type}): {e}")
+        traceback.print_exc()
+        return {'success': False, 'error': f'Server error: {str(e)}'}
+
+
+
 # === Flask Routes ===
 
 @app.route('/test', methods=['GET'])
@@ -840,32 +983,54 @@ def test_route():
 @app.route('/analyze-resume', methods=['POST'])
 def analyze_resume():
     """
-    Analyzes resume against JD, saves resume locally temporarily,
-    creates session in Firestore, starts background analysis,
+    Analyzes resume against JD, enforces usage limits,
+    increments usage counter, creates session in Firestore, starts background analysis,
     AND updates user profile with lastActiveSessionId.
     """
     session_id = None
     temp_session_dir = None
     temp_resume_path = None
-    user_id = None # Keep track of userId
+    user_id = None
+    
     try:
         start_time = time.time()
 
         # --- Validate Request ---
-        if 'resumeFile' not in request.files: return jsonify({'error': 'No resume file'}), 400
+        if 'resumeFile' not in request.files: 
+            return jsonify({'error': 'No resume file'}), 400
+            
         resume_file = request.files['resumeFile']
         job_description = request.form.get('jobDescription')
-        user_id = request.form.get('userId') # <<< Get userId passed from frontend
+        user_id = request.form.get('userId')
 
-        if not job_description: return jsonify({'error': 'Job description required'}), 400
-        if not resume_file or not resume_file.filename: return jsonify({'error': 'Invalid resume file'}), 400
-        if not user_id: return jsonify({'error': 'User ID required for session tracking'}), 400 # Make userId mandatory
+        if not job_description: 
+            return jsonify({'error': 'Job description required'}), 400
+            
+        if not resume_file or not resume_file.filename: 
+            return jsonify({'error': 'Invalid resume file'}), 400
+            
+        if not user_id: 
+            return jsonify({'error': 'User ID required for session tracking'}), 400
 
         resume_filename = secure_filename(resume_file.filename)
         if not (resume_file.content_type == 'application/pdf' or resume_filename.lower().endswith('.pdf')):
              return jsonify({'error': 'Only PDF resumes supported'}), 400
-        if not db: return jsonify({'error': 'Database unavailable'}), 503
+             
+        if not db: 
+            return jsonify({'error': 'Database unavailable'}), 503
         # --- End Validation ---
+
+        # --- Check usage limits ---
+        access_check = check_feature_access(user_id, 'resumeAnalyses')
+        if not access_check.get('allowed', False):
+            return jsonify({
+                'error': access_check.get('error', 'Usage limit reached'),
+                'limitReached': True,
+                'used': access_check.get('used', 0),
+                'limit': access_check.get('limit', 0),
+                'plan': access_check.get('plan', 'free')
+            }), 403  # Forbidden due to limits
+        # --- End usage limit check ---
 
         session_id = str(uuid.uuid4())
         print(f"[{session_id}] Received /analyze-resume request for file: {resume_filename} from user: {user_id}")
@@ -883,39 +1048,57 @@ def analyze_resume():
             return jsonify({'error': f'Server file system error: {str(file_err)}'}), 500
         # === End File Handling ===
 
+        # --- Increment Usage Counter (BEFORE creating session, in case of errors) ---
+        increment_result = increment_usage_counter(user_id, 'resumeAnalyses')
+        if not increment_result.get('success', False):
+            error_msg = increment_result.get('error', 'Failed to update usage counter')
+            print(f"[{session_id}] ERROR: {error_msg}")
+            # Clean up temp file if usage increment fails
+            if temp_session_dir and os.path.exists(temp_session_dir):
+                try:
+                    shutil.rmtree(temp_session_dir)
+                except Exception as cleanup_err:
+                    print(f"[{session_id}] Error during cleanup after usage error: {cleanup_err}")
+            return jsonify({'error': error_msg}), 500
+        # --- End Usage Increment ---
+
         # --- Initialize session doc in Firestore ---
         session_ref = db.collection('sessions').document(session_id)
         initial_session_data = {
             'status': 'processing',
             'progress': 5,
-            'userId': user_id, # <<< Store the userId in the session doc
+            'userId': user_id,
             'resume_filename_temp': resume_filename,
             'job_description': job_description,
             'start_time': datetime.now().isoformat(),
             'results': {},
             'errors': [],
-            'last_updated': firestore.SERVER_TIMESTAMP
+            'last_updated': firestore.SERVER_TIMESTAMP,
+            # Add usage tracking to session for reference
+            'usage_info': {
+                'feature': 'resumeAnalyses',
+                'used': increment_result.get('used', 0),
+                'limit': increment_result.get('limit', 0)
+            }
         }
         session_ref.set(initial_session_data)
         print(f"[{session_id}] Initial session created in Firestore for user {user_id}.")
         # --- End Firestore Init ---
 
-        # --- NEW: Update User Profile with lastActiveSessionId ---
+        # --- Update User Profile with lastActiveSessionId ---
         try:
             user_ref = db.collection('users').document(user_id)
             user_ref.update({
                 'lastActiveSessionId': session_id,
-                'lastSessionUpdate': firestore.SERVER_TIMESTAMP # Track when it was updated
+                'lastSessionUpdate': firestore.SERVER_TIMESTAMP
             })
             print(f"[{session_id}] Updated user {user_id} profile with lastActiveSessionId.")
         except Exception as profile_update_err:
-             # Log error but don't necessarily fail the whole request
              print(f"[{session_id}] WARNING: Failed to update user {user_id} profile with last session ID: {profile_update_err}")
-        # --- END NEW ---
+        # --- End User Profile Update ---
 
         # --- Define background task ---
-        # (Keep the existing process_resume_background function definition as is)
-        def process_resume_background(current_session_id, resume_local_path, jd, associated_user_id): # Pass userId too
+        def process_resume_background(current_session_id, resume_local_path, jd, associated_user_id):
             session_status = 'failed'; error_list = []
             try:
                 # (Existing background processing logic...)
@@ -956,21 +1139,33 @@ def analyze_resume():
         # --- End background task definition ---
 
         # Start background thread
-        processing_thread = threading.Thread(target=process_resume_background, args=(session_id, temp_resume_path, job_description, user_id)) # Pass user_id
+        processing_thread = threading.Thread(target=process_resume_background, args=(session_id, temp_resume_path, job_description, user_id))
         processing_thread.daemon = True
         processing_thread.start()
 
         print(f"[{session_id}] /analyze-resume request completed in {time.time() - start_time:.2f}s (background running).")
-        return jsonify({'sessionId': session_id, 'status': 'processing', 'message': 'Resume analysis started'}), 202
+        return jsonify({
+            'sessionId': session_id, 
+            'status': 'processing', 
+            'message': 'Resume analysis started',
+            'usageInfo': {
+                'used': increment_result.get('used', 0),
+                'limit': increment_result.get('limit', 0),
+                'remaining': increment_result.get('remaining', 0)
+            }
+        }), 202
 
     except Exception as e:
-        print(f"Error in /analyze-resume route: {e}"); traceback.print_exc()
-        if session_id and db: update_session_data(session_id, {'status': 'failed', 'errors': firestore.ArrayUnion([f'Route level error: {str(e)}'])})
+        print(f"Error in /analyze-resume route: {e}")
+        traceback.print_exc()
+        if session_id and db: 
+            update_session_data(session_id, {'status': 'failed', 'errors': firestore.ArrayUnion([f'Route level error: {str(e)}'])})
         if temp_resume_path and os.path.exists(os.path.dirname(temp_resume_path)):
-             try: shutil.rmtree(os.path.dirname(temp_resume_path))
-             except Exception as cleanup_err: print(f"Error cleaning up temp dir during route exception: {cleanup_err}")
+             try: 
+                 shutil.rmtree(os.path.dirname(temp_resume_path))
+             except Exception as cleanup_err: 
+                 print(f"Error cleaning up temp dir during route exception: {cleanup_err}")
         return jsonify({'error': f'Server error: {str(e)}'}), 500
-
 
 @app.route('/get-analysis-status/<session_id>', methods=['GET'])
 def get_analysis_status(session_id):
@@ -1098,7 +1293,7 @@ def rewrite_resume_section_route():
 
 @app.route('/start-mock-interview', methods=['POST'])
 def start_mock_interview():
-    """Initializes a new mock interview session in Firestore."""
+    """Initializes a new mock interview session in Firestore, with usage limit checks."""
     try:
         data = request.get_json()
         if not data: return jsonify({'error': 'Invalid JSON payload'}), 400
@@ -1107,18 +1302,43 @@ def start_mock_interview():
         if not session_id: return jsonify({'error': 'Session ID required'}), 400
         if not db: return jsonify({'error': 'Database unavailable'}), 503
 
+        # --- Get session data to retrieve user ID ---
         session_data = get_session_data(session_id)
         if session_data is None: return jsonify({'error': 'Session not found or expired'}), 404
         if session_data.get('status') != 'completed': return jsonify({'error': 'Analysis not completed'}), 400
-
+        
+        # Get user ID from session
+        user_id = session_data.get('userId')
+        if not user_id: return jsonify({'error': 'User ID not found in session'}), 400
+        
+        # --- Check usage limits for mock interviews ---
+        access_check = check_feature_access(user_id, 'mockInterviews')
+        if not access_check.get('allowed', False):
+            return jsonify({
+                'error': access_check.get('error', 'Usage limit reached for mock interviews'),
+                'limitReached': True,
+                'used': access_check.get('used', 0),
+                'limit': access_check.get('limit', 0),
+                'plan': access_check.get('plan', 'free')
+            }), 403  # Forbidden due to limits
+        
+        # --- Fetch data required for the interview ---
         resume_data = session_data.get('results', {}).get('parsed_resume')
         job_data = session_data.get('results', {}).get('match_results')
         if not resume_data or not job_data: return jsonify({'error': 'Required analysis data missing'}), 500
 
+        # --- Increment Usage Counter BEFORE creating interview ---
+        increment_result = increment_usage_counter(user_id, 'mockInterviews')
+        if not increment_result.get('success', False):
+            error_msg = increment_result.get('error', 'Failed to update usage counter')
+            print(f"[{session_id}] ERROR: {error_msg}")
+            return jsonify({'error': error_msg}), 500
+
+        # --- Create interview ID and generate system prompt ---
         interview_id = str(uuid.uuid4())
         system_prompt = create_mock_interviewer_prompt(resume_data, job_data, interview_type)
 
-        # Initial greeting generation
+        # --- Generate initial greeting ---
         initial_prompt = f"Start the '{interview_type}' interview with {resume_data.get('name', 'the candidate')}. Give a brief professional greeting and ask your first question."
         try:
             greeting = call_claude_api(
@@ -1129,36 +1349,46 @@ def start_mock_interview():
             print(f"[{session_id}] Error generating greeting for interview {interview_id}: {e}")
             greeting = f"Hello {resume_data.get('name', 'there')}. Welcome to your {interview_type} mock interview. Let's begin. Can you start by telling me a bit about yourself and your background?"
 
-        # Create interview document in Firestore
+        # --- Create interview document in Firestore ---
         interview_doc_ref = db.collection('interviews').document(interview_id)
         interview_data_to_save = {
-            'sessionId': session_id, # Link back to the analysis session
-            # 'userId': '...', # TODO: Add user ID when auth is implemented
+            'sessionId': session_id,
+            'userId': user_id,  # Store user ID directly in interview doc
             'interviewType': interview_type,
-            'system_prompt_summary': system_prompt[:1000] + "...", # Store summary, not full prompt maybe
-            # === CORRECTED LINE BELOW ===
-            'conversation': [{'role': 'assistant', 'content': greeting, 'timestamp': datetime.now().isoformat()}], # Use standard datetime string
-            # === END CORRECTION ===
+            'system_prompt_summary': system_prompt[:1000] + "...",
+            'conversation': [{'role': 'assistant', 'content': greeting, 'timestamp': datetime.now().isoformat()}],
             'status': 'active',
             'start_time': datetime.now().isoformat(),
-            'last_updated': firestore.SERVER_TIMESTAMP, # Top-level SERVER_TIMESTAMP is OK on set()
-            'resume_data_snapshot': resume_data, # Snapshot data used for this interview
+            'last_updated': firestore.SERVER_TIMESTAMP,
+            'resume_data_snapshot': resume_data,
             'job_data_snapshot': job_data,
-            'analysis_status': 'not_started', # Add initial analysis status
-            'analysis': None # Placeholder for analysis results
+            'analysis_status': 'not_started',
+            'analysis': None,
+            # Add usage tracking info to interview
+            'usage_info': {
+                'feature': 'mockInterviews',
+                'used': increment_result.get('used', 0),
+                'limit': increment_result.get('limit', 0)
+            }
         }
-        interview_doc_ref.set(interview_data_to_save) # Now this should work
-        print(f"[{session_id}] Started interview {interview_id} of type {interview_type}.")
+        interview_doc_ref.set(interview_data_to_save)
+        print(f"[{session_id}] Started interview {interview_id} of type {interview_type} for user {user_id}.")
 
-        return jsonify({'interviewId': interview_id, 'sessionId': session_id, 'interviewType': interview_type, 'greeting': greeting})
+        return jsonify({
+            'interviewId': interview_id, 
+            'sessionId': session_id, 
+            'interviewType': interview_type, 
+            'greeting': greeting,
+            'usageInfo': {
+                'used': increment_result.get('used', 0),
+                'limit': increment_result.get('limit', 0),
+                'remaining': increment_result.get('remaining', 0)
+            }
+        })
 
-    # Add specific exception handling for Firestore errors if needed
     except Exception as e:
         print(f"Error in /start-mock-interview: {e}")
         traceback.print_exc()
-        # Check if it's the specific TypeError we saw
-        if isinstance(e, TypeError) and 'Cannot convert to a Firestore Value' in str(e):
-             return jsonify({'error': f'Server error preparing interview data: {str(e)}'}), 500
         return jsonify({'error': f'Server error starting interview: {str(e)}'}), 500
 
 
@@ -1458,6 +1688,126 @@ def get_progress_history(session_id):
         print(f"Error in /get-progress-history for {session_id}: {e}")
         traceback.print_exc()
         return jsonify({'error': f'Server error retrieving progress: {str(e)}'}), 500
+
+@app.route('/check-feature-access', methods=['POST'])
+def check_feature_access_route():
+    """API endpoint to check if user can access a specific feature based on plan."""
+    try:
+        data = request.get_json()
+        if not data: return jsonify({'error': 'Invalid JSON payload'}), 400
+        
+        user_id = data.get('userId')
+        feature_type = data.get('feature')
+        
+        if not user_id: return jsonify({'error': 'User ID required'}), 400
+        if not feature_type: return jsonify({'error': 'Feature type required'}), 400
+        if not db: return jsonify({'error': 'Database unavailable'}), 503
+        
+        if feature_type not in ['resumeAnalyses', 'mockInterviews']:
+            return jsonify({'error': f'Invalid feature type: {feature_type}'}), 400
+            
+        # Check access
+        access_result = check_feature_access(user_id, feature_type)
+        
+        # Return the result directly
+        return jsonify(access_result)
+        
+    except Exception as e:
+        print(f"Error in /check-feature-access: {e}")
+        traceback.print_exc()
+        return jsonify({'error': f'Server error: {str(e)}', 'allowed': False}), 500
+
+
+@app.route('/update-user-plan', methods=['POST'])
+def update_user_plan():
+    """Updates a user's plan in Firestore."""
+    try:
+        data = request.get_json()
+        if not data: return jsonify({'error': 'Invalid JSON payload'}), 400
+        
+        user_id = data.get('userId')
+        plan_name = data.get('plan')
+        
+        if not user_id: return jsonify({'error': 'User ID required'}), 400
+        if not plan_name: return jsonify({'error': 'Plan name required'}), 400
+        if not db: return jsonify({'error': 'Database unavailable'}), 503
+        
+        # Validate plan name
+        valid_plans = ['free', 'starter', 'standard', 'pro']
+        if plan_name not in valid_plans:
+            return jsonify({'error': f'Invalid plan name: {plan_name}. Valid plans: {", ".join(valid_plans)}'}), 400
+            
+        # Get user profile to keep current usage 
+        user_data = get_user_usage(user_id)
+        if not user_data:
+            return jsonify({'error': f'User {user_id} not found'}), 404
+            
+        # Calculate new limits based on plan
+        resume_limit = get_package_limit(plan_name, 'resumeAnalyses')
+        interview_limit = get_package_limit(plan_name, 'mockInterviews')
+        
+        # Keep track of current usage (or default to 0)
+        current_resume_used = user_data.get('usage', {}).get('resumeAnalyses', {}).get('used', 0)
+        current_interview_used = user_data.get('usage', {}).get('mockInterviews', {}).get('used', 0)
+        
+        # Update user profile
+        user_ref = db.collection('users').document(user_id)
+        update_data = {
+            'plan': plan_name,
+            'planPurchasedAt': datetime.now().isoformat(),
+            'planExpiresAt': None,  # No expiration for now
+            'usage.resumeAnalyses.limit': resume_limit,
+            'usage.resumeAnalyses.used': current_resume_used,
+            'usage.mockInterviews.limit': interview_limit,
+            'usage.mockInterviews.used': current_interview_used,
+            'last_updated': firestore.SERVER_TIMESTAMP
+        }
+        
+        user_ref.update(update_data)
+        print(f"Updated user {user_id} to plan: {plan_name}")
+        
+        return jsonify({
+            'success': True,
+            'plan': plan_name,
+            'resumeLimit': resume_limit,
+            'interviewLimit': interview_limit,
+            'resumeUsed': current_resume_used,
+            'interviewUsed': current_interview_used
+        })
+        
+    except Exception as e:
+        print(f"Error in /update-user-plan: {e}")
+        traceback.print_exc()
+        return jsonify({'error': f'Server error: {str(e)}', 'success': False}), 500
+
+
+@app.route('/get-user-usage/<user_id>', methods=['GET'])
+def get_user_usage_route(user_id):
+    """Returns usage statistics for a user."""
+    try:
+        if not user_id: return jsonify({'error': 'User ID required'}), 400
+        if not db: return jsonify({'error': 'Database unavailable'}), 503
+        
+        user_data = get_user_usage(user_id)
+        if not user_data:
+            return jsonify({'error': f'User {user_id} not found'}), 404
+            
+        # Extract relevant information only
+        usage_data = {
+            'userId': user_id,
+            'plan': user_data.get('plan', 'free'),
+            'planPurchasedAt': user_data.get('planPurchasedAt'),
+            'planExpiresAt': user_data.get('planExpiresAt'),
+            'resumeAnalyses': user_data.get('usage', {}).get('resumeAnalyses', {'used': 0, 'limit': 0}),
+            'mockInterviews': user_data.get('usage', {}).get('mockInterviews', {'used': 0, 'limit': 0})
+        }
+        
+        return jsonify(usage_data)
+        
+    except Exception as e:
+        print(f"Error in /get-user-usage: {e}")
+        traceback.print_exc()
+        return jsonify({'error': f'Server error: {str(e)}'}), 500
 
 
 # --- Cleanup Function (Needs Review/Replacement with TTL) ---

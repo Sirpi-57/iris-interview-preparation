@@ -95,53 +95,232 @@ function handleAuthStateChanged(user) {
 
 
 function loadUserProfile(user) {
-    // Only load if we have a valid user and Firestore is available
-    if (!user || typeof firebase === 'undefined' || !firebase.firestore) {
-        console.warn("Cannot load profile: User null or Firebase/Firestore not available.");
-        authState.userProfile = null; // Ensure profile is null
-        return Promise.resolve(); // Return resolved promise so .finally() runs
-    }
+  // Only load if we have a valid user and Firestore is available
+  if (!user || typeof firebase === 'undefined' || !firebase.firestore) {
+      console.warn("Cannot load profile: User null or Firebase/Firestore not available.");
+      authState.userProfile = null; // Ensure profile is null
+      return Promise.resolve(); // Return resolved promise so .finally() runs
+  }
 
-    const db = firebase.firestore();
-    console.log(`Attempting to load profile for user: ${user.uid}`); // Add log
+  const db = firebase.firestore();
+  console.log(`Attempting to load profile for user: ${user.uid}`); // Add log
 
-    // Return the promise chain
-    return db.collection('users').doc(user.uid).get()
-        .then(doc => {
-            if (doc.exists) {
-                authState.userProfile = doc.data();
-                console.log('User profile loaded successfully:', authState.userProfile);
-            } else {
-                console.log('No user profile found in Firestore, attempting to create one');
-                const newProfile = {
-                    uid: user.uid,
-                    email: user.email,
-                    displayName: user.displayName || user.email.split('@')[0],
-                    photoURL: user.photoURL || null, // Store null if no photoURL
-                    createdAt: new Date().toISOString(),
-                    plan: 'free', // Default plan
-                    // lastActiveSessionId: null // Initialize explicitly if needed
-                };
-                // Attempt to save the new profile (this might fail if rules deny create)
-                return db.collection('users').doc(user.uid).set(newProfile)
-                    .then(() => {
-                        authState.userProfile = newProfile;
-                        console.log("New user profile created successfully:", authState.userProfile);
-                    })
-                    .catch(createError => {
-                        console.error(`Error creating user profile (check Firestore rules for 'create'):`, createError);
-                        authState.userProfile = null; // Ensure profile is null if creation fails
-                    });
-            }
-        })
-        .catch(error => {
-            console.error('Error loading user profile (check Firestore rules for \'read\'):', error);
-            authState.userProfile = null; // Ensure profile is null on error
-            // Don't re-throw here, let .finally() handle the next step
-        });
+  // Return the promise chain
+  return db.collection('users').doc(user.uid).get()
+      .then(doc => {
+          if (doc.exists) {
+              authState.userProfile = doc.data();
+              console.log('User profile loaded successfully:', authState.userProfile);
+              
+              // Ensure usage stats exist for existing profiles
+              if (!authState.userProfile.usage) {
+                  const usageUpdate = { 
+                      usage: {
+                          resumeAnalyses: { used: 0, limit: getPackageLimit('resumeAnalyses', authState.userProfile.plan || 'free') },
+                          mockInterviews: { used: 0, limit: getPackageLimit('mockInterviews', authState.userProfile.plan || 'free') }
+                      }
+                  };
+                  return db.collection('users').doc(user.uid).update(usageUpdate)
+                      .then(() => {
+                          authState.userProfile = {...authState.userProfile, ...usageUpdate};
+                          console.log("Added usage stats to existing profile:", authState.userProfile);
+                      })
+                      .catch(updateError => {
+                          console.error(`Error adding usage stats to profile:`, updateError);
+                      });
+              }
+          } else {
+              console.log('No user profile found in Firestore, attempting to create one');
+              const newProfile = {
+                  uid: user.uid,
+                  email: user.email,
+                  displayName: user.displayName || user.email.split('@')[0],
+                  photoURL: user.photoURL || null, // Store null if no photoURL
+                  createdAt: new Date().toISOString(),
+                  plan: 'free', // Default plan
+                  planPurchasedAt: new Date().toISOString(), // When free plan "started"
+                  planExpiresAt: null, // No expiration for free plan
+                  usage: {
+                      resumeAnalyses: { used: 0, limit: getPackageLimit('resumeAnalyses', 'free') },
+                      mockInterviews: { used: 0, limit: getPackageLimit('mockInterviews', 'free') }
+                  },
+                  // lastActiveSessionId: null // Initialize explicitly if needed
+              };
+              // Attempt to save the new profile (this might fail if rules deny create)
+              return db.collection('users').doc(user.uid).set(newProfile)
+                  .then(() => {
+                      authState.userProfile = newProfile;
+                      console.log("New user profile created successfully:", authState.userProfile);
+                  })
+                  .catch(createError => {
+                      console.error(`Error creating user profile (check Firestore rules for 'create'):`, createError);
+                      authState.userProfile = null; // Ensure profile is null if creation fails
+                  });
+          }
+      })
+      .catch(error => {
+          console.error('Error loading user profile (check Firestore rules for \'read\'):', error);
+          authState.userProfile = null; // Ensure profile is null on error
+          // Don't re-throw here, let .finally() handle the next step
+      });
 }
 
-// Replace this entire function in firebase-auth.js
+function getPackageLimit(feature, packageName) {
+  const limits = {
+      free: {
+          resumeAnalyses: 2,
+          mockInterviews: 0
+      },
+      starter: {
+          resumeAnalyses: 5,
+          mockInterviews: 1
+      },
+      standard: {
+          resumeAnalyses: 10,
+          mockInterviews: 3
+      },
+      pro: {
+          resumeAnalyses: 10,
+          mockInterviews: 5
+      }
+  };
+  
+  // Default to free package limits if package not found
+  if (!packageName || !limits[packageName]) {
+      console.warn(`Unknown package: ${packageName}, defaulting to free`);
+      packageName = 'free';
+  }
+  
+  // Return the limit for the specified feature, or 0 if feature not found
+  return limits[packageName][feature] || 0;
+}
+
+// --- New function to update user profile with plan change ---
+function updateUserPlan(planName, expiresAt = null) {
+  const user = firebase.auth().currentUser;
+  if (!user || !firebase.firestore) {
+      console.error("Cannot update plan: user not logged in or Firestore not available");
+      return Promise.reject(new Error("Authentication or database error"));
+  }
+  
+  const db = firebase.firestore();
+  
+  // Calculate new usage limits based on the plan
+  const resumeLimit = getPackageLimit('resumeAnalyses', planName);
+  const interviewLimit = getPackageLimit('mockInterviews', planName);
+  
+  // Keep track of current usage
+  let currentResumeUsage = 0;
+  let currentInterviewUsage = 0;
+  
+  if (authState.userProfile && authState.userProfile.usage) {
+      currentResumeUsage = authState.userProfile.usage.resumeAnalyses.used || 0;
+      currentInterviewUsage = authState.userProfile.usage.mockInterviews.used || 0;
+  }
+  
+  // Update profile with new plan and limits
+  const planUpdate = {
+      plan: planName,
+      planPurchasedAt: new Date().toISOString(),
+      planExpiresAt: expiresAt, // null for free/no expiration
+      'usage.resumeAnalyses.limit': resumeLimit,
+      'usage.resumeAnalyses.used': currentResumeUsage,
+      'usage.mockInterviews.limit': interviewLimit, 
+      'usage.mockInterviews.used': currentInterviewUsage
+  };
+  
+  return db.collection('users').doc(user.uid).update(planUpdate)
+      .then(() => {
+          // Update local state
+          if (authState.userProfile) {
+              authState.userProfile.plan = planName;
+              authState.userProfile.planPurchasedAt = planUpdate.planPurchasedAt;
+              authState.userProfile.planExpiresAt = expiresAt;
+              
+              // Ensure usage object exists
+              if (!authState.userProfile.usage) {
+                  authState.userProfile.usage = {};
+              }
+              
+              // Update usage limits
+              if (!authState.userProfile.usage.resumeAnalyses) {
+                  authState.userProfile.usage.resumeAnalyses = { used: currentResumeUsage, limit: resumeLimit };
+              } else {
+                  authState.userProfile.usage.resumeAnalyses.limit = resumeLimit;
+              }
+              
+              if (!authState.userProfile.usage.mockInterviews) {
+                  authState.userProfile.usage.mockInterviews = { used: currentInterviewUsage, limit: interviewLimit };
+              } else {
+                  authState.userProfile.usage.mockInterviews.limit = interviewLimit;
+              }
+          }
+          
+          // Update UI elements
+          updateUserProfileUI(user);
+          return { success: true, plan: planName };
+      })
+      .catch(error => {
+          console.error("Error updating user plan:", error);
+          return Promise.reject(error);
+      });
+}
+
+// --- New function to increment usage counter ---
+function incrementUsageCounter(featureType) {
+  const user = firebase.auth().currentUser;
+  if (!user || !firebase.firestore) {
+      console.error("Cannot increment usage: user not logged in or Firestore not available");
+      return Promise.reject(new Error("Authentication or database error"));
+  }
+  
+  // Validate feature type
+  if (!['resumeAnalyses', 'mockInterviews'].includes(featureType)) {
+      return Promise.reject(new Error(`Invalid feature type: ${featureType}`));
+  }
+  
+  const db = firebase.firestore();
+  
+  // Increment usage counter with atomic operation
+  const updateField = `usage.${featureType}.used`;
+  
+  return db.collection('users').doc(user.uid).update({
+      [updateField]: firebase.firestore.FieldValue.increment(1)
+  })
+  .then(() => {
+      // Update local state
+      if (authState.userProfile && authState.userProfile.usage && authState.userProfile.usage[featureType]) {
+          authState.userProfile.usage[featureType].used += 1;
+          
+          // Return updated usage info
+          return {
+              success: true,
+              feature: featureType,
+              used: authState.userProfile.usage[featureType].used,
+              limit: authState.userProfile.usage[featureType].limit,
+              canUseMore: authState.userProfile.usage[featureType].used < authState.userProfile.usage[featureType].limit
+          };
+      }
+      
+      return { success: true, feature: featureType };
+  })
+  .catch(error => {
+      console.error(`Error incrementing ${featureType} usage:`, error);
+      return Promise.reject(error);
+  });
+}
+
+// --- New function to check if user can use a feature ---
+function canUseFeature(featureType) {
+  // If no profile loaded or no usage stats, default to false
+  if (!authState.userProfile || !authState.userProfile.usage || !authState.userProfile.usage[featureType]) {
+      return false;
+  }
+  
+  const usage = authState.userProfile.usage[featureType];
+  return usage.used < usage.limit;
+}
+
 function updateUserProfileUI(user) {
   // Update UI elements showing user info
   const userDisplayElements = document.querySelectorAll('.user-display-name');
@@ -163,12 +342,61 @@ function updateUserProfileUI(user) {
 
   // Update plan info if available
   const planElements = document.querySelectorAll('.user-plan');
-  const userPlanBadgeElements = document.querySelectorAll('.user-plan-badge'); // Added selector for sidebar badge
+  const userPlanBadgeElements = document.querySelectorAll('.user-plan-badge');
   if (authState.userProfile && (planElements.length > 0 || userPlanBadgeElements.length > 0)) {
       const planName = authState.userProfile.plan || 'free';
       const formattedPlanName = planName.charAt(0).toUpperCase() + planName.slice(1);
       planElements.forEach(el => el.textContent = formattedPlanName);
-      userPlanBadgeElements.forEach(el => el.textContent = formattedPlanName); // Update sidebar badge too
+      userPlanBadgeElements.forEach(el => el.textContent = formattedPlanName);
+  }
+
+  // Update usage counters
+  if (authState.userProfile && authState.userProfile.usage) {
+      // Resume analyses usage
+      const resumeUsage = authState.userProfile.usage.resumeAnalyses || { used: 0, limit: 0 };
+      const resumeCountElement = document.getElementById('resumeAnalysesCount');
+      const resumeProgressBar = document.querySelector('#resumeAnalysesCount + .progress .progress-bar');
+      
+      if (resumeCountElement) {
+          resumeCountElement.textContent = `${resumeUsage.used}/${resumeUsage.limit}`;
+      }
+      
+      if (resumeProgressBar) {
+          const percentUsed = resumeUsage.limit > 0 ? (resumeUsage.used / resumeUsage.limit) * 100 : 0;
+          resumeProgressBar.style.width = `${Math.min(100, percentUsed)}%`;
+          
+          // Add warning color if close to limit
+          if (percentUsed >= 85) {
+              resumeProgressBar.classList.add('bg-warning');
+          } else if (percentUsed >= 100) {
+              resumeProgressBar.classList.add('bg-danger');
+          } else {
+              resumeProgressBar.classList.remove('bg-warning', 'bg-danger');
+          }
+      }
+      
+      // Mock interviews usage
+      const interviewUsage = authState.userProfile.usage.mockInterviews || { used: 0, limit: 0 };
+      const interviewCountElement = document.getElementById('mockInterviewsCount');
+      const interviewProgressBar = document.querySelector('#mockInterviewsCount + .progress .progress-bar');
+      
+      if (interviewCountElement) {
+          interviewCountElement.textContent = `${interviewUsage.used}/${interviewUsage.limit}`;
+      }
+      
+      if (interviewProgressBar) {
+          const percentUsed = interviewUsage.limit > 0 ? (interviewUsage.used / interviewUsage.limit) * 100 : 0;
+          interviewProgressBar.style.width = `${Math.min(100, percentUsed)}%`;
+          
+          // Add warning color if close to limit
+          if (percentUsed >= 85) {
+              interviewProgressBar.classList.add('bg-warning');
+          } else if (percentUsed >= 100) {
+              interviewProgressBar.classList.add('bg-danger');
+          } else {
+              interviewProgressBar.classList.remove('bg-warning', 'bg-danger');
+          }
+      }
   }
 
   // Show/Hide Password Buttons based on providers
@@ -182,9 +410,6 @@ function updateUserProfileUI(user) {
       addPasswordBtn.style.display = hasPasswordProvider ? 'none' : 'block';
       // Show "Change Password" if a password provider DOES exist
       changePasswordBtn.style.display = hasPasswordProvider ? 'block' : 'none';
-
-      console.log("User providers:", user.providerData.map(p => p.providerId)); // For debugging
-      console.log("Password provider exists:", hasPasswordProvider); // For debugging
   } else {
       // Ensure buttons are hidden if user/elements aren't ready
       if(addPasswordBtn) addPasswordBtn.style.display = 'none';
@@ -459,5 +684,10 @@ window.irisAuth = {
   getCurrentUser: () => authState.user,
   getUserProfile: () => authState.userProfile,
   showSignInModal: () => showAuthModal('signin'),
-  showSignUpModal: () => showAuthModal('signup')
+  showSignUpModal: () => showAuthModal('signup'),
+  // Add new functions to the exported object
+  canUseFeature,
+  incrementUsageCounter,
+  updateUserPlan,
+  getPackageLimit
 };

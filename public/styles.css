@@ -1076,3 +1076,178 @@ deo-card, .avatar-card {
 .container.py-5 ul li {
     margin-bottom: 0.75rem;
 }
+
+/* ==== CSS Updates for Package-Based Implementation ==== */
+
+/* Subscription Card Enhancements */
+.subscription-details {
+    position: relative;
+}
+
+.current-plan {
+    border-bottom: 1px solid #eee;
+    padding-bottom: 15px;
+    margin-bottom: 15px;
+}
+
+.plan-description {
+    color: #666;
+    font-size: 0.9rem;
+}
+
+.user-plan {
+    font-size: 0.875rem;
+    font-weight: 600;
+}
+
+.usage-section .progress {
+    height: 8px;
+    border-radius: 4px;
+    background-color: #eee;
+}
+
+.usage-section .progress-bar {
+    background: linear-gradient(to right, var(--gradient-start), var(--gradient-end));
+    transition: width 0.5s ease-in-out;
+}
+
+.usage-section .progress-bar.bg-warning {
+    background: linear-gradient(to right, #ffc107, #ffb838);
+}
+
+.usage-section .progress-bar.bg-danger {
+    background: linear-gradient(to right, #dc3545, #f56565);
+}
+
+/* Plan upgrade section */
+.plan-upgrade {
+    border-top: 1px solid #eee;
+    padding-top: 15px;
+    margin-top: 15px;
+}
+
+.plan-upgrade ul li {
+    margin-bottom: 8px;
+}
+
+.plan-upgrade .btn-success:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px rgba(40, 167, 69, 0.3);
+}
+
+.plan-upgrade .btn-danger:hover,
+.plan-upgrade .btn-warning:hover {
+    transform: translateY(-2px);
+}
+
+/* ==== Upgrade Modal Styling ==== */
+.modal-dialog.modal-lg {
+    max-width: 900px;
+}
+
+.modal .pricing-card {
+    transition: transform 0.3s, box-shadow 0.3s;
+}
+
+.modal .pricing-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
+}
+
+.modal .pricing-card.border-primary {
+    border-width: 2px !important;
+    box-shadow: 0 5px 15px rgba(74, 111, 220, 0.2);
+}
+
+.badge.position-absolute {
+    z-index: 2;
+}
+
+/* Payment Success Modal Styling */
+.checkmark-circle {
+    width: 100px;
+    height: 100px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: #28a745;
+    margin: 0 auto;
+    color: white;
+    font-size: 50px;
+    margin-top: 1rem;
+}
+
+/* ==== Feature Lock/Unlock Indicators ==== */
+.status-indicator.locked,
+.status-indicator.unlocked {
+    transition: all 0.3s ease;
+}
+
+.status-indicator.locked {
+    background-color: rgba(0, 0, 0, 0.3);
+    color: rgba(255, 255, 255, 0.7);
+}
+
+.status-indicator.unlocked {
+    background-color: var(--success-color);
+    animation: pulse-success 2s;
+}
+
+@keyframes pulse-success {
+    0% {
+        box-shadow: 0 0 0 0 rgba(40, 167, 69, 0.7);
+    }
+    70% {
+        box-shadow: 0 0 0 10px rgba(40, 167, 69, 0);
+    }
+    100% {
+        box-shadow: 0 0 0 0 rgba(40, 167, 69, 0);
+    }
+}
+
+/* Feature Card Modifications */
+.feature-card.locked {
+    opacity: 0.7;
+    position: relative;
+}
+
+.feature-card.locked::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.1);
+    z-index: 1;
+}
+
+.feature-card.locked .lock-icon {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    color: #dc3545;
+    font-size: 1.25rem;
+    z-index: 2;
+}
+
+/* Limit Modal */
+#limitReachedModal .modal-header.bg-warning {
+    color: #212529;
+}
+
+#limitReachedModal .btn-primary {
+    background: linear-gradient(to right, var(--gradient-start), var(--gradient-end));
+    border: none;
+}
+
+/* Payment Processing Modal */
+#paymentProcessingModal .progress {
+    height: 10px;
+    border-radius: 5px;
+}
+
+#paymentProcessingModal .progress-bar {
+    background: linear-gradient(to right, var(--gradient-start), var(--gradient-end));
+}

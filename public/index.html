@@ -266,11 +266,11 @@
                 <div class="container py-5">
                     <h1 class="text-center mb-5">Choose Your Preparation Pack</h1>
                     <p class="text-center text-muted mb-5">One-time purchases designed for students. Get interview-ready without recurring subscriptions.</p>
-            
+
                     <div class="row justify-content-center">
-            
+
                         <div class="col-lg-3 col-md-6 mb-4 d-flex">
-                            <div class="card pricing-card w-100">
+                            <div class="card pricing-card w-100" data-plan="free" data-resume-limit="2" data-interview-limit="0">
                                 <div class="card-header">
                                     <h3 class="my-0 font-weight-normal">Free</h3>
                                 </div>
@@ -284,13 +284,13 @@
                                         <li class="text-muted"><i class="fas fa-times me-2"></i> Basic Feedback Only</li>
                                         <li class="text-muted"><i class="fas fa-times me-2"></i> No Suggested Answers</li>
                                     </ul>
-                                    <button type="button" class="btn btn-lg btn-block btn-outline-primary w-100 mt-auto" data-auth="signup">Sign Up Free</button>
+                                    <button type="button" class="btn btn-lg btn-block btn-outline-primary w-100 mt-auto plan-select-btn" data-plan="free" data-auth="signup">Sign Up Free</button>
                                 </div>
                             </div>
                         </div>
-            
+
                         <div class="col-lg-3 col-md-6 mb-4 d-flex">
-                            <div class="card pricing-card w-100">
+                            <div class="card pricing-card w-100" data-plan="starter" data-resume-limit="5" data-interview-limit="1">
                                 <div class="card-header">
                                     <h3 class="my-0 font-weight-normal">Starter Pack</h3>
                                 </div>
@@ -304,13 +304,13 @@
                                         <li><i class="fas fa-check text-success me-2"></i> Dynamic Timeline Generator</li>
                                         <li class="text-muted"><i class="fas fa-times me-2"></i> Suggested Answers Library</li>
                                     </ul>
-                                    <button type="button" class="btn btn-lg btn-block btn-primary w-100 mt-auto" data-auth="signup">Get Started</button>
+                                    <button type="button" class="btn btn-lg btn-block btn-primary w-100 mt-auto plan-select-btn" data-plan="starter">Get Started</button>
                                 </div>
                             </div>
                         </div>
-            
+
                         <div class="col-lg-3 col-md-6 mb-4 d-flex">
-                            <div class="card pricing-card highlight-card w-100">
+                            <div class="card pricing-card highlight-card w-100" data-plan="standard" data-resume-limit="10" data-interview-limit="3">
                                 <div class="card-header">
                                     <h3 class="my-0 font-weight-normal">Standard Pack</h3>
                                     <span class="badge bg-warning text-dark position-absolute top-0 start-50 translate-middle mt-2">Popular</span>
@@ -318,20 +318,20 @@
                                 <div class="card-body d-flex flex-column">
                                     <h2 class="card-title pricing-card-title text-center">₹499</h2>
                                     <ul class="list-unstyled mt-3 mb-4 flex-grow-1">
-                                        <li><i class="fas fa-check text-success me-2"></i> 10 Resume Analyses (Full)</li> {/* Updated */}
-                                        <li><i class="fas fa-check text-success me-2"></i> 3 Full Mock Interviews</li> {/* Updated */}
+                                        <li><i class="fas fa-check text-success me-2"></i> 10 Resume Analyses (Full)</li> 
+                                        <li><i class="fas fa-check text-success me-2"></i> 3 Full Mock Interviews</li>
                                         <li><i class="fas fa-check text-success me-2"></i> Detailed Prep Plan</li>
                                         <li><i class="fas fa-check text-success me-2"></i> Detailed Performance Reports</li>
                                         <li><i class="fas fa-check text-success me-2"></i> Dynamic Timeline Generator</li>
                                         <li><i class="fas fa-check text-success me-2"></i> Suggested Answers Library</li>
                                     </ul>
-                                    <button type="button" class="btn btn-lg btn-block btn-primary w-100 mt-auto" data-auth="signup">Choose Standard</button>
+                                    <button type="button" class="btn btn-lg btn-block btn-primary w-100 mt-auto plan-select-btn" data-plan="standard">Choose Standard</button>
                                 </div>
                             </div>
                         </div>
-            
+
                         <div class="col-lg-3 col-md-6 mb-4 d-flex">
-                            <div class="card pricing-card w-100">
+                            <div class="card pricing-card w-100" data-plan="pro" data-resume-limit="10" data-interview-limit="5">
                                 <div class="card-header">
                                     <h3 class="my-0 font-weight-normal">Pro Pack</h3>
                                 </div>
@@ -345,24 +345,24 @@
                                         <li><i class="fas fa-check text-success me-2"></i> Dynamic Timeline Generator</li>
                                         <li><i class="fas fa-check text-success me-2"></i> Suggested Answers Library</li>
                                     </ul>
-                                    <button type="button" class="btn btn-lg btn-block btn-primary w-100 mt-auto" data-auth="signup">Go Pro</button>
+                                    <button type="button" class="btn btn-lg btn-block btn-primary w-100 mt-auto plan-select-btn" data-plan="pro">Go Pro</button>
                                 </div>
                             </div>
                         </div>
-            
+
                     </div>
-            
+
                     <div class="text-center mt-4 text-muted">
                         <p><small>Need just a bit more? Individual Mock Interviews (₹79) and Resume Analyses (₹9) available after signup.</small></p> 
                     </div>
-            
+
                     <div class="mt-5 pt-5 border-top text-center">
                         <h2>For Colleges & Institutions</h2>
                         <p class="lead">Partner with IRIS to provide comprehensive placement preparation for your students.</p>
                         <p>Offer includes bulk access to the Pro Pack features (10 Resume Analyses, 5 Mock Interviews per student) at special institutional pricing (Starting at ₹799 per student for 300+).</p>
                         <button type="button" class="btn btn-lg btn-outline-primary" onclick="window.location.href='mailto:info@irisapp.co?subject=Institutional Partnership Inquiry'">Contact Us for Bulk Pricing</button>
                     </div>
-            
+
                 </div>
             </div>
         </div>
@@ -644,14 +644,17 @@
                                         <div class="subscription-details">
                                             <div class="current-plan mb-3">
                                                 <h4>Current Plan</h4>
-                                                <div class="d-flex align-items-center">
+                                                <div class="d-flex align-items-center mb-2">
                                                     <span class="badge rounded-pill bg-primary me-2 p-2 user-plan">Free</span>
                                                     <span class="text-muted" id="planExpiryDate"></span>
                                                 </div>
+                                                <p class="plan-description" id="planDescription">
+                                                    Your free plan includes 2 resume analyses and 0 mock interviews.
+                                                </p>
                                             </div>
                                             
                                             <div class="usage-section mb-3">
-                                                <h5>Usage This Month</h5>
+                                                <h5>Usage</h5>
                                                 <div class="mb-3">
                                                     <div class="d-flex justify-content-between mb-1">
                                                         <span>Resume Analyses</span>
@@ -664,7 +667,7 @@
                                                 <div class="mb-3">
                                                     <div class="d-flex justify-content-between mb-1">
                                                         <span>Mock Interviews</span>
-                                                        <span id="mockInterviewsCount">0/4</span>
+                                                        <span id="mockInterviewsCount">0/0</span>
                                                     </div>
                                                     <div class="progress" style="height: 8px;">
                                                         <div class="progress-bar" role="progressbar" style="width: 0%"></div>
@@ -673,10 +676,10 @@
                                             </div>
                                             
                                             <div class="plan-upgrade">
-                                                <h5>Upgrade to Premium</h5>
+                                                <h5>Upgrade Your Plan</h5>
                                                 <ul class="list-unstyled mb-3">
-                                                    <li><i class="fas fa-check text-success me-2"></i> Unlimited resume analyses</li>
-                                                    <li><i class="fas fa-check text-success me-2"></i> Unlimited mock interviews</li>
+                                                    <li><i class="fas fa-check text-success me-2"></i> More resume analyses</li>
+                                                    <li><i class="fas fa-check text-success me-2"></i> Unlock mock interviews</li>
                                                     <li><i class="fas fa-check text-success me-2"></i> Advanced analytics</li>
                                                     <li><i class="fas fa-check text-success me-2"></i> Suggested answers for all questions</li>
                                                 </ul>
@@ -1374,6 +1377,77 @@
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                     <button type="button" class="btn btn-primary" id="grantPermissionsBtn">Grant Access</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add this at the end of body, before the scripts -->
+    <div class="modal fade" id="limitReachedModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-warning">
+                    <h5 class="modal-title"><i class="fas fa-exclamation-triangle me-2"></i> Limit Reached</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p id="limitReachedMessage">You've reached the limit for this feature on your current plan.</p>
+                    <div class="alert alert-info">
+                        <strong>Upgrade your plan to continue using this feature.</strong>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    <button type="button" class="btn btn-primary" id="limitReachedUpgradeBtn">Upgrade Now</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add a payment processing spinner modal -->
+    <div class="modal fade" id="paymentProcessingModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="fas fa-cog fa-spin me-2"></i> Processing Payment</h5>
+                </div>
+                <div class="modal-body text-center">
+                    <div class="spinner-border text-primary mb-3" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <p id="paymentProcessingMessage">Processing your payment...</p>
+                    <div class="progress mt-3">
+                        <div id="payment-progress-bar" class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 0%"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add a payment success modal -->
+    <div class="modal fade" id="paymentSuccessModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-success text-white">
+                    <h5 class="modal-title"><i class="fas fa-check-circle me-2"></i> Payment Successful</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body text-center">
+                    <div class="checkmark-circle">
+                        <i class="fas fa-check"></i>
+                    </div>
+                    <h4 class="mt-4">Thank You!</h4>
+                    <p id="paymentSuccessMessage">Your plan has been upgraded successfully.</p>
+                    <div class="alert alert-info">
+                        <strong>New limits:</strong>
+                        <ul class="mb-0 mt-2 text-start">
+                            <li>Resume Analyses: <span id="newResumeLimit">0</span></li>
+                            <li>Mock Interviews: <span id="newInterviewLimit">0</span></li>
+                        </ul>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-primary" data-bs-dismiss="modal">Continue</button>
                 </div>
             </div>
         </div>
