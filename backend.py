@@ -813,31 +813,71 @@ def get_duration(start_time_str, end_time_str):
 
 
 def get_user_usage(user_id):
-    """Retrieves user profile including usage data from Firestore."""
+    """Retrieves user profile including usage data from Firestore. Ensures default structure exists."""
     if not db or not user_id:
         return None
-    
+
     try:
         user_ref = db.collection('users').document(user_id)
         user_doc = user_ref.get()
-        
+
         if user_doc.exists:
             user_data = user_doc.to_dict()
-            
-            # Ensure usage data structure exists
+            needs_update = False
+
+            # Ensure 'plan' exists, default to 'free'
+            if 'plan' not in user_data:
+                user_data['plan'] = 'free'
+                # Note: We might not want to update the plan here,
+                # just use 'free' for limit calculation.
+                # Let's assume plan exists or is handled during user creation.
+
+            current_plan = user_data.get('plan', 'free')
+
+            # Ensure 'usage' map exists
             if 'usage' not in user_data:
-                user_data['usage'] = {
-                    'resumeAnalyses': {'used': 0, 'limit': get_package_limit(user_data.get('plan', 'free'), 'resumeAnalyses')},
-                    'mockInterviews': {'used': 0, 'limit': get_package_limit(user_data.get('plan', 'free'), 'mockInterviews')}
+                user_data['usage'] = {}
+                needs_update = True
+
+            # Ensure 'resumeAnalyses' structure exists
+            if 'resumeAnalyses' not in user_data['usage']:
+                user_data['usage']['resumeAnalyses'] = {'used': 0, 'limit': get_package_limit(current_plan, 'resumeAnalyses')}
+                needs_update = True
+            elif 'used' not in user_data['usage']['resumeAnalyses'] or 'limit' not in user_data['usage']['resumeAnalyses']:
+                # If partially missing, reset it based on current plan
+                user_data['usage']['resumeAnalyses'] = {
+                    'used': user_data['usage']['resumeAnalyses'].get('used', 0), # Keep existing used count if possible
+                    'limit': get_package_limit(current_plan, 'resumeAnalyses')
                 }
-                # Update user document with default usage
-                user_ref.update({'usage': user_data['usage']})
-            
+                needs_update = True
+
+            # Ensure 'mockInterviews' structure exists
+            if 'mockInterviews' not in user_data['usage']:
+                 user_data['usage']['mockInterviews'] = {'used': 0, 'limit': get_package_limit(current_plan, 'mockInterviews')}
+                 needs_update = True
+            elif 'used' not in user_data['usage']['mockInterviews'] or 'limit' not in user_data['usage']['mockInterviews']:
+                 user_data['usage']['mockInterviews'] = {
+                     'used': user_data['usage']['mockInterviews'].get('used', 0),
+                     'limit': get_package_limit(current_plan, 'mockInterviews')
+                 }
+                 needs_update = True
+
+            # If the structure needed fixing, update the document in Firestore
+            if needs_update:
+                print(f"[{user_id}] Initializing/Fixing usage structure in Firestore.")
+                try:
+                    user_ref.update({'usage': user_data['usage']})
+                except Exception as update_err:
+                     print(f"[{user_id}] WARNING: Failed to update usage structure: {update_err}")
+                     # Proceed with potentially stale data, or return None?
+                     # For now, proceed. The increment might still fail if update failed.
+
             return user_data
         else:
             print(f"User {user_id} not found in Firestore")
+            # If user doc doesn't exist, should we create it? No, auth should handle that.
             return None
-            
+
     except Exception as e:
         print(f"Error retrieving user usage for {user_id}: {e}")
         traceback.print_exc()
