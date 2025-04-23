@@ -16,12 +16,12 @@
         "destination": "/teacher_dashboard/index.html"
       },
       {
-        "source": "/teachers/**",
-        "destination": "/teacher_dashboard/index.html"
+        "source": "/teachers/js/**",
+        "destination": "/teacher_dashboard/js/**"
       },
       {
-        "source": "/teachers/:path*",
-        "destination": "/teacher_dashboard/:path"
+        "source": "/teachers/css/**",
+        "destination": "/teacher_dashboard/css/**"
       },
       {
         "source": "**",
