@@ -105,38 +105,81 @@ function initProfilePage() {
         document.getElementById('profileViewMode').style.display = 'none';
         document.getElementById('profileEditForm').style.display = 'block';
         const user = irisAuth?.getCurrentUser();
-        const profile = irisAuth?.getUserProfile();
-        if (user) {
-            document.getElementById('profileName').value = user.displayName || profile?.displayName || '';
+        const profile = irisAuth?.getUserProfile(); // Use getter from irisAuth module
+
+        if (user && profile) { // Ensure profile exists
+            document.getElementById('profileName').value = profile.displayName || user.displayName || '';
             document.getElementById('profileEmail').value = user.email || '';
+            // --- ADDED: Populate new fields ---
+            document.getElementById('profileRole').value = profile.role || 'Student'; // Display role (readonly)
+            document.getElementById('profileCollegeId').value = profile.collegeId || '';
+            document.getElementById('profileDeptId').value = profile.deptId || '';
+            document.getElementById('profileSectionId').value = profile.sectionId || '';
+            // --- END ADDED ---
+        } else {
+             console.warn("Cannot populate profile edit form: user or profile data missing.");
+             // Optionally disable the form or show a message
         }
     });
+
     document.getElementById('cancelEditBtn')?.addEventListener('click', function() {
         document.getElementById('profileViewMode').style.display = 'block';
         document.getElementById('profileEditForm').style.display = 'none';
+        // Optionally reset form fields from profile data if needed
     });
+
     document.getElementById('profileEditForm')?.addEventListener('submit', function(e) {
         e.preventDefault();
         const newName = document.getElementById('profileName').value.trim();
-        const user = firebase.auth().currentUser;
-        if (user) {
+        // --- ADDED: Get new field values ---
+        const collegeId = document.getElementById('profileCollegeId').value.trim() || null; // Save null if empty
+        const deptId = document.getElementById('profileDeptId').value.trim() || null;     // Save null if empty
+        const sectionId = document.getElementById('profileSectionId').value.trim() || null; // Save null if empty
+        // --- END ADDED ---
+
+        const user = firebase.auth().currentUser; // Assuming firebase is globally available
+        if (user && typeof firebase !== 'undefined' && firebase.firestore) { // Check dependencies
             const submitBtn = this.querySelector('button[type="submit"]');
             const originalText = submitBtn.innerHTML;
             submitBtn.disabled = true;
             submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Saving...';
+
+            // --- MODIFIED Firestore Update ---
+            const updateData = {
+                displayName: newName,
+                collegeId: collegeId,
+                deptId: deptId,
+                sectionId: sectionId,
+                updatedAt: new Date().toISOString() // Use Firestore server timestamp if preferred: firebase.firestore.FieldValue.serverTimestamp()
+                // Note: Do not update 'role' here, it's set on creation
+            };
+
+            // Update Firebase Auth profile (only supports displayName and photoURL)
             user.updateProfile({ displayName: newName })
                 .then(() => {
-                    if (firebase.firestore) {
-                        return firebase.firestore().collection('users').doc(user.uid).update({
-                            displayName: newName,
-                            updatedAt: new Date().toISOString()
-                        });
-                    }
+                    // Update Firestore document
+                    return firebase.firestore().collection('users').doc(user.uid).update(updateData);
                 })
                 .then(() => {
                     document.getElementById('profileViewMode').style.display = 'block';
                     document.getElementById('profileEditForm').style.display = 'none';
+
+                    // Update UI elements in View Mode
                     document.querySelectorAll('.user-display-name').forEach(el => { el.textContent = newName; });
+                    document.querySelector('.user-college-id').textContent = collegeId || 'Not Set';
+                    document.querySelector('.user-dept-id').textContent = deptId || 'Not Set';
+                    document.querySelector('.user-section-id').textContent = sectionId || 'Not Set';
+
+                    // Also update the global authState if it's used elsewhere immediately
+                     if(window.irisAuth && window.irisAuth.getUserProfile()) { // Check if auth module and profile exist
+                       const currentProfile = window.irisAuth.getUserProfile();
+                       currentProfile.displayName = newName;
+                       currentProfile.collegeId = collegeId;
+                       currentProfile.deptId = deptId;
+                       currentProfile.sectionId = sectionId;
+                       // Note: This updates the local copy. Refreshing might be safer.
+                     }
+
                     showMessage('Profile updated successfully!', 'success');
                 })
                 .catch(error => {
@@ -147,220 +190,238 @@ function initProfilePage() {
                     submitBtn.disabled = false;
                     submitBtn.innerHTML = originalText;
                 });
+        } else {
+            showMessage('Could not save profile. User not signed in or database unavailable.', 'danger');
         }
     });
 
-    // --- Change Password Logic (Modified Check) ---
+    // --- Change Password Logic (Check if password provider exists) ---
     document.getElementById('changePasswordBtn')?.addEventListener('click', function() {
         const user = firebase.auth().currentUser;
-        // Check if user exists and has a password provider linked
         const hasPasswordProvider = user?.providerData.some(p => p.providerId === 'password');
-
         if (hasPasswordProvider) {
-             // Only show change password modal if password is set
-             const modal = new bootstrap.Modal(document.getElementById('change-password-modal'));
-             modal.show();
+            const modal = new bootstrap.Modal(document.getElementById('change-password-modal'));
+            modal.show();
         } else {
             showMessage('You need to set a password first before changing it. Click "Enable Email/Password Sign-in".', 'info');
-            // Optionally, you could directly trigger the 'add password' modal here if desired:
-            // showAddPasswordModal();
         }
     });
+
     document.getElementById('change-password-form')?.addEventListener('submit', function(e) {
-        e.preventDefault();
-        const currentPassword = document.getElementById('current-password').value;
-        const newPassword = document.getElementById('new-password').value;
-        const confirmPassword = document.getElementById('confirm-new-password').value;
-        if (newPassword !== confirmPassword) {
-            showMessage('New passwords do not match', 'danger'); return;
-        }
-        if (newPassword.length < 6) {
-             showMessage('New password must be at least 6 characters.', 'warning'); return;
-        }
-        const user = firebase.auth().currentUser;
-        if (user) {
+       e.preventDefault();
+       const currentPassword = document.getElementById('current-password').value;
+       const newPassword = document.getElementById('new-password').value;
+       const confirmPassword = document.getElementById('confirm-new-password').value;
+       if (newPassword !== confirmPassword) { showMessage('New passwords do not match', 'danger'); return; }
+       if (newPassword.length < 6) { showMessage('New password must be at least 6 characters.', 'warning'); return; }
+
+       const user = firebase.auth().currentUser;
+       if (user) {
             const submitBtn = this.querySelector('button[type="submit"]');
             const originalText = submitBtn.innerHTML;
             submitBtn.disabled = true;
             submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Updating...';
             const credential = firebase.auth.EmailAuthProvider.credential(user.email, currentPassword);
+
             user.reauthenticateWithCredential(credential)
                 .then(() => user.updatePassword(newPassword))
                 .then(() => {
                     bootstrap.Modal.getInstance(document.getElementById('change-password-modal')).hide();
                     showMessage('Password updated successfully!', 'success');
-                    document.getElementById('change-password-form').reset(); // Clear form
+                    document.getElementById('change-password-form').reset();
                 })
                 .catch(error => {
                     console.error('Error updating password:', error);
-                    if (error.code === 'auth/wrong-password') {
-                        showMessage('Current password is incorrect', 'danger');
-                    } else if (error.code === 'auth/requires-recent-login') {
-                         showMessage('This operation requires a recent sign-in. Please sign out and sign back in, then try again.', 'warning');
-                    } else {
-                        showMessage(`Error updating password: ${error.message}`, 'danger');
-                    }
+                    let errorMsg = `Error updating password: ${error.message}`;
+                    if (error.code === 'auth/wrong-password') { errorMsg = 'Current password is incorrect'; }
+                    else if (error.code === 'auth/requires-recent-login') { errorMsg = 'This operation requires a recent sign-in. Please sign out and sign back in, then try again.'; }
+                    showMessage(errorMsg, error.code === 'auth/requires-recent-login' ? 'warning' : 'danger');
                 })
                 .finally(() => {
                     submitBtn.disabled = false;
                     submitBtn.innerHTML = originalText;
                 });
-        }
+       }
     });
 
-    // --- Add Password Logic (New) ---
+    // --- Add Password Logic ---
     const addPasswordBtn = document.getElementById('addPasswordBtn');
     if (addPasswordBtn) {
-        // Initial check is done in firebase-auth.js's updateUserProfileUI
-        addPasswordBtn.addEventListener('click', showAddPasswordModal); // Attach listener
+        addPasswordBtn.addEventListener('click', showAddPasswordModal); // Assuming showAddPasswordModal is defined
     }
 
-    // Listener for the new Add Password modal's form
     document.getElementById('add-password-form')?.addEventListener('submit', function(e) {
         e.preventDefault();
         const newPassword = document.getElementById('add-new-password').value;
         const confirmPassword = document.getElementById('add-confirm-new-password').value;
         const user = firebase.auth().currentUser;
 
-        if (!user || !user.email) {
-            showMessage('User not found or email missing.', 'danger'); return;
-        }
-        if (newPassword.length < 6) {
-             showMessage('Password must be at least 6 characters long.', 'warning'); return;
-        }
-        if (newPassword !== confirmPassword) {
-            showMessage('Passwords do not match.', 'danger'); return;
-        }
+        if (!user || !user.email) { showMessage('User not found or email missing.', 'danger'); return; }
+        if (newPassword.length < 6) { showMessage('Password must be at least 6 characters long.', 'warning'); return; }
+        if (newPassword !== confirmPassword) { showMessage('Passwords do not match.', 'danger'); return; }
 
-        // Show loading state
         const submitBtn = this.querySelector('button[type="submit"]');
         const originalText = submitBtn.innerHTML;
         submitBtn.disabled = true;
         submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Setting Password...';
 
-        // Create the Email/Password credential to link
         const credential = firebase.auth.EmailAuthProvider.credential(user.email, newPassword);
-
-        // Link the credential to the existing signed-in user
         user.linkWithCredential(credential)
             .then(() => {
                 showMessage('Password set successfully! You can now sign in using your email and this password.', 'success');
                 bootstrap.Modal.getInstance(document.getElementById('add-password-modal')).hide();
-
-                // Update button visibility: Hide "Add", Show "Change"
                 document.getElementById('addPasswordBtn').style.display = 'none';
                 document.getElementById('changePasswordBtn').style.display = 'block';
-
-                 // Clear the add password form
-                 document.getElementById('add-password-form').reset();
+                document.getElementById('add-password-form').reset();
             })
             .catch((error) => {
                 console.error('Error linking password credential:', error);
-                // Handle specific errors
-                if (error.code === 'auth/requires-recent-login') {
-                    showMessage('This operation requires a recent sign-in. Please sign out and sign back in, then try again.', 'warning');
-                    // Consider forcing sign out: irisAuth.signOut();
-                } else if (error.code === 'auth/credential-already-in-use' || error.code === 'auth/email-already-in-use') {
-                     showMessage('Error: This email address is already associated with another account using a password. Cannot link.', 'danger');
-                } else if (error.code === 'auth/provider-already-linked') {
-                     showMessage('Error: A password provider is already linked to this account.', 'warning');
-                     // Update UI just in case it was out of sync
-                     document.getElementById('addPasswordBtn').style.display = 'none';
-                     document.getElementById('changePasswordBtn').style.display = 'block';
-                     bootstrap.Modal.getInstance(document.getElementById('add-password-modal')).hide();
-                     document.getElementById('add-password-form').reset();
-                }
-                else {
-                     showMessage(`Failed to set password: ${error.message}`, 'danger');
-                }
+                let errorMsg = `Failed to set password: ${error.message}`;
+                 if (error.code === 'auth/requires-recent-login') { errorMsg = 'This operation requires a recent sign-in. Please sign out and sign back in, then try again.'; }
+                 else if (error.code === 'auth/credential-already-in-use' || error.code === 'auth/email-already-in-use') { errorMsg = 'Error: This email address is already associated with another account using a password. Cannot link.'; }
+                 else if (error.code === 'auth/provider-already-linked') {
+                      errorMsg = 'Error: A password provider is already linked to this account.';
+                      document.getElementById('addPasswordBtn').style.display = 'none';
+                      document.getElementById('changePasswordBtn').style.display = 'block';
+                      bootstrap.Modal.getInstance(document.getElementById('add-password-modal'))?.hide();
+                      document.getElementById('add-password-form').reset();
+                 }
+                showMessage(errorMsg, 'danger');
             })
             .finally(() => {
-                // Restore button state
                 submitBtn.disabled = false;
                 submitBtn.innerHTML = originalText;
             });
     });
 
-    // --- Delete Account Logic (Existing) ---
+    // --- Delete Account Logic ---
     document.getElementById('deleteAccountBtn')?.addEventListener('click', function() {
         const modal = new bootstrap.Modal(document.getElementById('delete-account-modal'));
         modal.show();
     });
+
     document.getElementById('delete-confirmation')?.addEventListener('input', function() {
         const deleteBtn = document.getElementById('confirm-delete-btn');
-        deleteBtn.disabled = this.value !== 'DELETE';
+        const passwordInput = document.getElementById('delete-password');
+        deleteBtn.disabled = (this.value !== 'DELETE' || !passwordInput.value); // Also disable if password is empty
     });
+    // Add listener for password input as well
+    document.getElementById('delete-password')?.addEventListener('input', function() {
+        const deleteBtn = document.getElementById('confirm-delete-btn');
+        const confirmationInput = document.getElementById('delete-confirmation');
+        deleteBtn.disabled = (this.value === '' || confirmationInput.value !== 'DELETE');
+    });
+
+
     document.getElementById('delete-account-form')?.addEventListener('submit', function(e) {
          e.preventDefault();
          const password = document.getElementById('delete-password').value;
          const confirmation = document.getElementById('delete-confirmation').value;
-         if (confirmation !== 'DELETE') { /* ... */ return; }
+         if (confirmation !== 'DELETE') { showMessage('Please type DELETE to confirm.', 'warning'); return; }
+         if (!password) { showMessage('Please enter your password to confirm deletion.', 'warning'); return; }
+
          const user = firebase.auth().currentUser;
-         if (user) {
+         if (user && typeof firebase !== 'undefined' && firebase.firestore) { // Check dependencies
              const submitBtn = this.querySelector('button[type="submit"]');
              const originalText = submitBtn.innerHTML;
              submitBtn.disabled = true;
              submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Deleting...';
-             const credential = firebase.auth.EmailAuthProvider.credential(user.email, password);
-             user.reauthenticateWithCredential(credential)
+
+             // Check if password provider is linked, otherwise reauth might fail or not be needed
+             const hasPasswordProvider = user.providerData.some(p => p.providerId === 'password');
+
+             let reauthPromise = Promise.resolve(); // Assume reauth not needed unless password provider exists
+
+             if(hasPasswordProvider) {
+                 const credential = firebase.auth.EmailAuthProvider.credential(user.email, password);
+                 reauthPromise = user.reauthenticateWithCredential(credential);
+             }
+
+             reauthPromise
                  .then(() => {
-                     // Firestore cleanup (existing logic)
-                     if (firebase.firestore) {
-                         const batch = firebase.firestore().batch();
-                         batch.delete(firebase.firestore().collection('users').doc(user.uid));
-                         return firebase.firestore().collection('sessions').where('userId', '==', user.uid).get()
-                             .then(snapshot => { snapshot.forEach(doc => batch.delete(doc.ref)); return firebase.firestore().collection('interviews').where('userId', '==', user.uid).get(); })
-                             .then(snapshot => { snapshot.forEach(doc => batch.delete(doc.ref)); return batch.commit(); });
-                     }
+                     // Firestore cleanup
+                     const db = firebase.firestore();
+                     const batch = db.batch();
+                     batch.delete(db.collection('users').doc(user.uid));
+                     // Add deletion logic for sessions and interviews if needed
+                     // return batch.commit(); // Example: commit batch after adding deletions
+                     return Promise.all([ // Example: Query and delete related collections
+                        db.collection('sessions').where('userId', '==', user.uid).get().then(snap => snap.forEach(doc => batch.delete(doc.ref))),
+                        db.collection('interviews').where('userId', '==', user.uid).get().then(snap => snap.forEach(doc => batch.delete(doc.ref))),
+                     ]).then(() => batch.commit());
+
                  })
                  .then(() => user.delete()) // Delete Firebase Auth user
                  .then(() => {
-                     bootstrap.Modal.getInstance(document.getElementById('delete-account-modal')).hide();
+                     bootstrap.Modal.getInstance(document.getElementById('delete-account-modal'))?.hide();
                      showMessage('Your account has been deleted successfully', 'success');
-                     // Auth state listener will handle UI changes
+                     // Auth state listener will handle UI changes (sign out)
                  })
-                 .catch(error => { /* ... (existing error handling) ... */ })
-                 .finally(() => { /* ... (restore button) ... */ });
+                 .catch(error => {
+                    console.error('Error deleting account:', error);
+                    let errorMsg = `Error deleting account: ${error.message}`;
+                    if (error.code === 'auth/wrong-password') { errorMsg = 'Incorrect password.'; }
+                    else if (error.code === 'auth/requires-recent-login') { errorMsg = 'This operation requires a recent sign-in. Please sign out and sign back in, then try again.'; }
+                    showMessage(errorMsg, error.code === 'auth/requires-recent-login' ? 'warning' : 'danger');
+                  })
+                 .finally(() => {
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = 'Delete My Account'; // Restore original text
+                    document.getElementById('delete-password').value = ''; // Clear password field
+                    document.getElementById('delete-confirmation').value = '';
+                    document.getElementById('confirm-delete-btn').disabled = true; // Re-disable button
+                 });
+         } else {
+             showMessage('Could not delete account. User not signed in or database unavailable.', 'danger');
          }
     });
 
-    // --- Placeholder Logic (Existing) ---
+    // --- Placeholder/Other Logic ---
     document.getElementById('upgradePlanBtn')?.addEventListener('click', function() {
-        showPaymentModal(); // Placeholder function
-    });
-    document.getElementById('downloadDataBtn')?.addEventListener('click', function() {
-        downloadUserData(); // Client-side download function
+        // Call showUpgradeModal or relevant payment function
+        if (typeof showUpgradeModal === 'function') {
+             showUpgradeModal(irisAuth?.getUserProfile()?.plan === 'free' ? 'resumeAnalyses' : 'mockInterviews');
+        } else {
+            console.warn("showUpgradeModal function not found.");
+            alert("Upgrade functionality not available.");
+        }
     });
 
-    // --- Helper function to show the Add Password Modal ---
-    // Defined within initProfilePage scope or globally if preferred
+    document.getElementById('downloadDataBtn')?.addEventListener('click', function() {
+        if (typeof downloadUserData === 'function') {
+            downloadUserData(); // Assuming downloadUserData is defined globally or imported
+        } else {
+            console.warn("downloadUserData function not found.");
+            alert("Data download functionality not available.");
+        }
+    });
+
+    // Helper function to show the Add Password Modal
+    // (Ensure this is defined within scope or globally as needed)
     function showAddPasswordModal() {
         const user = firebase.auth().currentUser;
         if (!user || !user.email) {
             showMessage('Cannot set password. User not logged in or email is missing.', 'warning');
             return;
         }
-         // Double-check if password provider exists before showing
         const hasPasswordProvider = user.providerData.some(p => p.providerId === 'password');
         if(hasPasswordProvider) {
              showMessage('Password is already set for this account.', 'info');
-             // Ensure button visibility is correct
              document.getElementById('addPasswordBtn').style.display = 'none';
              document.getElementById('changePasswordBtn').style.display = 'block';
-             return; // Don't show the modal
+             return;
         }
-
-        document.getElementById('add-password-email').textContent = user.email; // Show email in modal
-        // Clear form fields before showing
+        document.getElementById('add-password-email').textContent = user.email;
         document.getElementById('add-password-form').reset();
         const modal = new bootstrap.Modal(document.getElementById('add-password-modal'));
         modal.show();
     }
 
-    updateUsageDisplay();
+    // Call updateUsageDisplay initially if profile data might already be loaded
+    // updateUsageDisplay(); // Maybe call this after profile is confirmed loaded
 
-    // --- Add upgrade button listener in profile page ---
-    document.getElementById('upgradePlanBtn')?.addEventListener('click', showPaymentModal);
+    // Listener for Upgrade Plan button (also handled above)
+    // document.getElementById('upgradePlanBtn')?.addEventListener('click', showPaymentModal);
 
 } // End of initProfilePage function definition
 
