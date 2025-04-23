@@ -98,7 +98,6 @@ function initializeIRISApp() {
     }
 }
 
-// Replace this entire function in app.js
 function initProfilePage() {
     // --- Profile Edit Logic ---
     document.getElementById('editProfileBtn')?.addEventListener('click', function() {
@@ -109,34 +108,63 @@ function initProfilePage() {
         if (user) {
             document.getElementById('profileName').value = user.displayName || profile?.displayName || '';
             document.getElementById('profileEmail').value = user.email || '';
+            document.getElementById('profileRole').value = profile?.role || 'student';
+            document.getElementById('profileCollegeId').value = profile?.collegeId || '';
+            document.getElementById('profileDeptId').value = profile?.deptId || '';
+            document.getElementById('profileSectionId').value = profile?.sectionId || '';
         }
     });
+    
     document.getElementById('cancelEditBtn')?.addEventListener('click', function() {
         document.getElementById('profileViewMode').style.display = 'block';
         document.getElementById('profileEditForm').style.display = 'none';
     });
+    
     document.getElementById('profileEditForm')?.addEventListener('submit', function(e) {
         e.preventDefault();
         const newName = document.getElementById('profileName').value.trim();
+        const newCollegeId = document.getElementById('profileCollegeId').value.trim();
+        const newDeptId = document.getElementById('profileDeptId').value.trim();
+        const newSectionId = document.getElementById('profileSectionId').value.trim();
+        
         const user = firebase.auth().currentUser;
         if (user) {
             const submitBtn = this.querySelector('button[type="submit"]');
             const originalText = submitBtn.innerHTML;
             submitBtn.disabled = true;
             submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Saving...';
+            
+            // Update user profile in Firebase Auth
             user.updateProfile({ displayName: newName })
                 .then(() => {
                     if (firebase.firestore) {
+                        // Update user profile in Firestore
                         return firebase.firestore().collection('users').doc(user.uid).update({
                             displayName: newName,
+                            collegeId: newCollegeId || null,
+                            deptId: newDeptId || null,
+                            sectionId: newSectionId || null,
                             updatedAt: new Date().toISOString()
                         });
                     }
                 })
                 .then(() => {
+                    // Update local profile data
+                    if (authState && authState.userProfile) {
+                        authState.userProfile.displayName = newName;
+                        authState.userProfile.collegeId = newCollegeId || null;
+                        authState.userProfile.deptId = newDeptId || null;
+                        authState.userProfile.sectionId = newSectionId || null;
+                    }
+                    
+                    // Update UI
                     document.getElementById('profileViewMode').style.display = 'block';
                     document.getElementById('profileEditForm').style.display = 'none';
                     document.querySelectorAll('.user-display-name').forEach(el => { el.textContent = newName; });
+                    document.getElementById('userCollegeId').textContent = newCollegeId || 'Not specified';
+                    document.getElementById('userDeptId').textContent = newDeptId || 'Not specified';
+                    document.getElementById('userSectionId').textContent = newSectionId || 'Not specified';
+                    
                     showMessage('Profile updated successfully!', 'success');
                 })
                 .catch(error => {
@@ -150,6 +178,7 @@ function initProfilePage() {
         }
     });
 
+    // --- The rest of the function remains unchanged ---
     // --- Change Password Logic (Modified Check) ---
     document.getElementById('changePasswordBtn')?.addEventListener('click', function() {
         const user = firebase.auth().currentUser;
@@ -352,6 +381,8 @@ function initProfilePage() {
 
         document.getElementById('add-password-email').textContent = user.email; // Show email in modal
         // Clear form fields before showing
+        document.getElementById('add-password-email').textContent = user.email; // Show email in modal
+        // Clear form fields before showing
         document.getElementById('add-password-form').reset();
         const modal = new bootstrap.Modal(document.getElementById('add-password-modal'));
         modal.show();
@@ -396,6 +427,10 @@ function downloadUserData() {
         .then(doc => {
             if (doc.exists) {
                 userData.profile = doc.data();
+                // Remove sensitive information if needed
+                if (userData.profile.hasOwnProperty('password')) {
+                    delete userData.profile.password;
+                }
             }
             
             // Get user sessions

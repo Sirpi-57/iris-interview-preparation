@@ -140,6 +140,10 @@ function loadUserProfile(user) {
                   plan: 'free', // Default plan
                   planPurchasedAt: new Date().toISOString(), // When free plan "started"
                   planExpiresAt: null, // No expiration for free plan
+                  role: 'student', // Default role for all new users
+                  collegeId: null, // New field
+                  deptId: null, // New field
+                  sectionId: null, // New field
                   usage: {
                       resumeAnalyses: { used: 0, limit: getPackageLimit('resumeAnalyses', 'free') },
                       mockInterviews: { used: 0, limit: getPackageLimit('mockInterviews', 'free') }
@@ -326,19 +330,39 @@ function updateUserProfileUI(user) {
   const userDisplayElements = document.querySelectorAll('.user-display-name');
   const userEmailElements = document.querySelectorAll('.user-email');
   const userAvatarElements = document.querySelectorAll('.user-avatar');
+  const userRoleElements = document.querySelectorAll('.user-role');
 
   const displayName = user.displayName || authState.userProfile?.displayName || user.email.split('@')[0];
   const email = user.email;
   const photoURL = user.photoURL || 'https://i.stack.imgur.com/34AD2.jpg'; // Default avatar
+  const role = authState.userProfile?.role || 'student';
 
   userDisplayElements.forEach(el => el.textContent = displayName);
   userEmailElements.forEach(el => el.textContent = email);
+  userRoleElements.forEach(el => el.textContent = role);
   userAvatarElements.forEach(el => {
       if (el.tagName === 'IMG') {
           el.src = photoURL;
           el.alt = displayName;
       }
   });
+
+  // Update additional profile fields
+  const collegeIdElement = document.getElementById('userCollegeId');
+  const deptIdElement = document.getElementById('userDeptId');
+  const sectionIdElement = document.getElementById('userSectionId');
+  
+  if (collegeIdElement && authState.userProfile) {
+      collegeIdElement.textContent = authState.userProfile.collegeId || 'Not specified';
+  }
+  
+  if (deptIdElement && authState.userProfile) {
+      deptIdElement.textContent = authState.userProfile.deptId || 'Not specified';
+  }
+  
+  if (sectionIdElement && authState.userProfile) {
+      sectionIdElement.textContent = authState.userProfile.sectionId || 'Not specified';
+  }
 
   // Update plan info if available
   const planElements = document.querySelectorAll('.user-plan');
@@ -417,7 +441,6 @@ function updateUserProfileUI(user) {
   }
 }
 
-// Replace this entire function in firebase-auth.js
 function clearUserProfileUI() {
   // Clear user-related UI elements
   const userDisplayElements = document.querySelectorAll('.user-display-name');
@@ -425,9 +448,11 @@ function clearUserProfileUI() {
   const userAvatarElements = document.querySelectorAll('.user-avatar');
   const planElements = document.querySelectorAll('.user-plan');
   const userPlanBadgeElements = document.querySelectorAll('.user-plan-badge');
+  const userRoleElements = document.querySelectorAll('.user-role');
 
   userDisplayElements.forEach(el => el.textContent = '...'); // Use placeholder
   userEmailElements.forEach(el => el.textContent = '...'); // Use placeholder
+  userRoleElements.forEach(el => el.textContent = '...'); // Use placeholder
   userAvatarElements.forEach(el => {
       if (el.tagName === 'IMG') {
           el.src = 'https://i.stack.imgur.com/34AD2.jpg'; // Default placeholder
@@ -436,6 +461,15 @@ function clearUserProfileUI() {
   });
   planElements.forEach(el => el.textContent = '');
   userPlanBadgeElements.forEach(el => el.textContent = ''); // Clear sidebar badge
+
+  // Clear additional profile fields
+  const collegeIdElement = document.getElementById('userCollegeId');
+  const deptIdElement = document.getElementById('userDeptId');
+  const sectionIdElement = document.getElementById('userSectionId');
+  
+  if (collegeIdElement) collegeIdElement.textContent = 'Not specified';
+  if (deptIdElement) deptIdElement.textContent = 'Not specified';
+  if (sectionIdElement) sectionIdElement.textContent = 'Not specified';
 
   // Reset Password Buttons visibility
   const addPasswordBtn = document.getElementById('addPasswordBtn');
@@ -521,8 +555,34 @@ function signUpWithEmailPassword(email, password, displayName) {
         return userCredential.user.updateProfile({
           displayName: displayName
         }).then(() => {
-          hideAuthModal();
-          return userCredential.user;
+          // Add additional user data to Firestore if needed
+          if (firebase.firestore) {
+            // This might be redundant as loadUserProfile will create the doc,
+            // but we can ensure all fields are set immediately
+            const db = firebase.firestore();
+            return db.collection('users').doc(userCredential.user.uid).set({
+              uid: userCredential.user.uid,
+              email: email,
+              displayName: displayName,
+              role: 'student',
+              collegeId: null,
+              deptId: null,
+              sectionId: null,
+              createdAt: new Date().toISOString(),
+              plan: 'free',
+              planPurchasedAt: new Date().toISOString(),
+              usage: {
+                resumeAnalyses: { used: 0, limit: getPackageLimit('resumeAnalyses', 'free') },
+                mockInterviews: { used: 0, limit: getPackageLimit('mockInterviews', 'free') }
+              }
+            }, { merge: true }).then(() => {
+              hideAuthModal();
+              return userCredential.user;
+            });
+          } else {
+            hideAuthModal();
+            return userCredential.user;
+          }
         });
       } else {
         hideAuthModal();

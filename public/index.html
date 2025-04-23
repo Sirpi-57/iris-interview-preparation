@@ -575,8 +575,20 @@
                                                 <div class="col-md-9 user-email">Loading...</div>
                                             </div>
                                             <div class="row mb-3">
-                                                <div class="col-md-3 fw-bold">Account Created:</div>
-                                                <div class="col-md-9" id="accountCreatedDate">Loading...</div>
+                                                <div class="col-md-3 fw-bold">Role:</div>
+                                                <div class="col-md-9 user-role">Student</div>
+                                            </div>
+                                            <div class="row mb-3">
+                                                <div class="col-md-3 fw-bold">College ID:</div>
+                                                <div class="col-md-9" id="userCollegeId">Not specified</div>
+                                            </div>
+                                            <div class="row mb-3">
+                                                <div class="col-md-3 fw-bold">Department ID:</div>
+                                                <div class="col-md-9" id="userDeptId">Not specified</div>
+                                            </div>
+                                            <div class="row mb-3">
+                                                <div class="col-md-3 fw-bold">Section ID:</div>
+                                                <div class="col-md-9" id="userSectionId">Not specified</div>
                                             </div>
                                         </div>
                                         
@@ -590,6 +602,22 @@
                                                 <label for="profileEmail" class="form-label">Email (readonly)</label>
                                                 <input type="email" class="form-control" id="profileEmail" readonly>
                                             </div>
+                                            <div class="mb-3">
+                                                <label for="profileRole" class="form-label">Role (readonly)</label>
+                                                <input type="text" class="form-control" id="profileRole" value="Student" readonly>
+                                            </div>
+                                            <div class="mb-3">
+                                                <label for="profileCollegeId" class="form-label">College ID (Optional)</label>
+                                                <input type="text" class="form-control" id="profileCollegeId">
+                                            </div>
+                                            <div class="mb-3">
+                                                <label for="profileDeptId" class="form-label">Department ID (Optional)</label>
+                                                <input type="text" class="form-control" id="profileDeptId">
+                                            </div>
+                                            <div class="mb-3">
+                                                <label for="profileSectionId" class="form-label">Section ID (Optional)</label>
+                                                <input type="text" class="form-control" id="profileSectionId">
+                                            </div>
                                             <div class="d-flex justify-content-end">
                                                 <button type="button" class="btn btn-secondary me-2" id="cancelEditBtn">Cancel</button>
                                                 <button type="submit" class="btn btn-primary">Save Changes</button>
@@ -598,6 +626,7 @@
                                     </div>
                                 </div>
                                 
+                                <!-- Rest of the cards remain the same -->
                                 <div class="card mb-4">
                                     <div class="card-header">
                                         <h3 class="mb-0">Security</h3>
@@ -608,7 +637,7 @@
                                                 <i class="fas fa-lock me-2"></i> Change Password
                                             </button>
                                             <button class="btn btn-outline-secondary" id="addPasswordBtn" style="display: none;">
-                                                 <i class="fas fa-key me-2"></i> Enable Email/Password Sign-in
+                                                <i class="fas fa-key me-2"></i> Enable Email/Password Sign-in
                                             </button>
                                             <button class="btn btn-outline-secondary" id="twoFactorBtn">
                                                 <i class="fas fa-shield-alt me-2"></i> Enable Two-Factor Authentication
