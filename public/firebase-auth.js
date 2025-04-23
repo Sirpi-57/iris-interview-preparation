@@ -434,7 +434,7 @@ function updateUserProfileUI(user) {
   }
 }
 
-// Replace this entire function in firebase-auth.js
+// Replace the existing clearUserProfileUI function in firebase-auth.js
 function clearUserProfileUI() {
   // Clear user-related UI elements
   const userDisplayElements = document.querySelectorAll('.user-display-name');
@@ -465,9 +465,13 @@ function clearUserProfileUI() {
 
   // Clear usage display
   document.getElementById('resumeAnalysesCount')?.textContent = '-/-';
-  document.querySelector('#resumeAnalysesCount + .progress .progress-bar')?.style.setProperty('width', '0%');
+  // --- CORRECTED LINES ---
+  const resumeProgressBar = document.querySelector('#resumeAnalysesCount + .progress .progress-bar');
+  if (resumeProgressBar) resumeProgressBar.style.width = '0%'; // Direct assignment
   document.getElementById('mockInterviewsCount')?.textContent = '-/-';
-  document.querySelector('#mockInterviewsCount + .progress .progress-bar')?.style.setProperty('width', '0%');
+  const interviewProgressBar = document.querySelector('#mockInterviewsCount + .progress .progress-bar');
+  if (interviewProgressBar) interviewProgressBar.style.width = '0%'; // Direct assignment
+  // --- END CORRECTION ---
 }
 
 // View switching logic
