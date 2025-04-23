@@ -507,147 +507,53 @@ function signInWithEmailPassword(email, password) {
 }
 
 function signUpWithEmailPassword(email, password, displayName) {
-  // Basic client-side validation (optional, but good practice)
-  if (!email || !password || !displayName) {
-      showErrorMessage('Please provide name, email, and password.');
-      return Promise.reject(new Error('Missing signup fields'));
+  if (!firebase.auth) {
+    showErrorMessage('Authentication service not available');
+    return Promise.reject(new Error('Authentication service not available'));
   }
-   if (password.length < 6) {
-       showErrorMessage('Password must be at least 6 characters long.');
-       return Promise.reject(new Error('Password too short'));
-   }
-  // Check terms checkbox state (using existing ID from index.html)
-   const termsCheckbox = document.getElementById('terms-checkbox');
-   if (termsCheckbox && !termsCheckbox.checked) {
-      showErrorMessage('You must agree to the Terms of Service and Privacy Policy.');
-      return Promise.reject(new Error('Terms not accepted'));
-   }
-
-
-  console.log(`Attempting student signup via backend for: ${email}`);
-  // Add loading state to the signup button in the modal
-  const signupButton = document.querySelector('#signup-form button[type="submit"]');
-  if(signupButton) {
-      signupButton.disabled = true;
-      signupButton.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Creating Account...';
-  }
-
-  // --- Call your backend endpoint ---
-  // Make sure API_BASE_URL is defined (it should be in app.js [cite: 442])
-  const API_BASE_URL = 'https://iris-ai-backend.onrender.com'; // Or your actual backend URL
-
-  return fetch(`${API_BASE_URL}/create_student_account`, { // Use the new backend route
-      method: 'POST',
-      headers: {
-          'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-          email: email,
-          password: password,
+  
+  return firebase.auth().createUserWithEmailAndPassword(email, password)
+    .then(userCredential => {
+      console.log('User signed up successfully');
+      
+      // Set display name if provided
+      if (displayName) {
+        return userCredential.user.updateProfile({
           displayName: displayName
-      }),
-  })
-  .then(response => {
-      if (!response.ok) {
-          // Attempt to parse error message from backend response body
-          return response.json().then(errData => {
-               throw new Error(errData.error || `Signup failed (${response.status})`);
-          }).catch(() => {
-               // Fallback if response body isn't JSON or parsing fails
-               throw new Error(`Signup failed (${response.status} ${response.statusText})`);
-          });
+        }).then(() => {
+          hideAuthModal();
+          return userCredential.user;
+        });
+      } else {
+        hideAuthModal();
+        return userCredential.user;
       }
-      return response.json(); // Expect { success: true, uid: ..., role: 'student' }
-  })
-  .then(data => {
-      console.log('Student account created via backend:', data);
-      // Backend now handles claim setting and Firestore profile creation.
-      // Auth state listener will automatically pick up the new user.
-      hideAuthModal(); // Close the modal on success
-      showMessage('Account created successfully! Please wait...', 'success'); // Inform user
-      // No need to manually sign in here, onAuthStateChanged will handle it.
-      return data; // Return backend response if needed elsewhere
-  })
-  .catch(error => {
-      console.error('Backend signup error:', error);
+    })
+    .catch(error => {
+      console.error('Sign up error:', error);
       showErrorMessage(`Sign up failed: ${error.message}`);
-      // Re-enable signup button on error
-       if(signupButton) {
-           signupButton.disabled = false;
-           signupButton.innerHTML = 'Create Account';
-       }
-      throw error; // Re-throw the error for potential further handling
-  });
+      throw error;
+    });
 }
 
-// Replace the existing function in firebase-auth.js
 function signInWithGoogle() {
   if (!firebase.auth) {
-      showErrorMessage('Authentication service not available');
-      return Promise.reject(new Error('Authentication service not available'));
+    showErrorMessage('Authentication service not available');
+    return Promise.reject(new Error('Authentication service not available'));
   }
-
+  
   const provider = new firebase.auth.GoogleAuthProvider();
   return firebase.auth().signInWithPopup(provider)
-      .then(async (result) => { // Add 'async' here
-          const user = result.user;
-          const isNewUser = result.additionalUserInfo?.isNewUser; // Check if it's a new user
-
-          console.log('Google sign in successful for:', user.email);
-          console.log('Is new user?', isNewUser);
-
-          if (isNewUser) {
-              console.log("New user detected via Google Sign-In. Completing backend setup...");
-              // --- Call backend to finalize setup for NEW Google users ---
-              try {
-                   // Make sure API_BASE_URL is defined
-                  const API_BASE_URL = 'https://iris-ai-backend.onrender.com'; // Or your actual backend URL
-                  const token = await user.getIdToken(); // Get token to authenticate backend call
-
-                  const setupResponse = await fetch(`${API_BASE_URL}/complete_google_signup`, {
-                      method: 'POST',
-                      headers: {
-                          'Content-Type': 'application/json',
-                          'Authorization': `Bearer ${token}` // Authenticate the request
-                      },
-                      // Send minimal necessary info if backend uses token to get UID
-                      body: JSON.stringify({ email: user.email, displayName: user.displayName })
-                  });
-
-                  if (!setupResponse.ok) {
-                      const errData = await setupResponse.json().catch(() => ({}));
-                      // Log error but proceed; auth state listener might still work partially
-                      console.error("Backend setup failed for new Google user:", errData.error || `HTTP ${setupResponse.status}`);
-                       showErrorMessage(`Account created, but setup failed: ${errData.error || 'Please contact support.'}`);
-                      // Don't throw here, let the login proceed, but log the error
-                  } else {
-                       const setupData = await setupResponse.json();
-                       console.log("Backend setup complete for new Google user:", setupData);
-                  }
-              } catch (backendError) {
-                   console.error("Error calling backend setup for new Google user:", backendError);
-                   showErrorMessage(`Account created, but setup failed: ${backendError.message}`);
-                   // Proceed with login despite backend setup error
-              }
-              // --- End backend call ---
-          } else {
-              // Existing user signed in via Google
-              console.log("Existing user signed in via Google.");
-              // No need to call backend setup, handleAuthStateChanged will load profile/claims
-          }
-
-          hideAuthModal(); // Hide modal regardless of new/existing user
-          // The onAuthStateChanged listener will handle showing the correct view
-          return user; // Return the user object
-      })
-      .catch(error => {
-          console.error('Google sign in error:', error);
-          // Handle specific errors like 'auth/popup-closed-by-user' gracefully
-          if (error.code !== 'auth/popup-closed-by-user') {
-               showErrorMessage(`Google sign in failed: ${error.message}`);
-          }
-          throw error; // Re-throw
-      });
+    .then(result => {
+      console.log('Google sign in successful');
+      hideAuthModal();
+      return result.user;
+    })
+    .catch(error => {
+      console.error('Google sign in error:', error);
+      showErrorMessage(`Google sign in failed: ${error.message}`);
+      throw error;
+    });
 }
 
 function signOut() {
