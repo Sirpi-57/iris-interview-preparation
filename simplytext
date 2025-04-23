@@ -1,3 +1,5 @@
+index.html:
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -266,11 +268,11 @@
                 <div class="container py-5">
                     <h1 class="text-center mb-5">Choose Your Preparation Pack</h1>
                     <p class="text-center text-muted mb-5">One-time purchases designed for students. Get interview-ready without recurring subscriptions.</p>
-            
+
                     <div class="row justify-content-center">
-            
+
                         <div class="col-lg-3 col-md-6 mb-4 d-flex">
-                            <div class="card pricing-card w-100">
+                            <div class="card pricing-card w-100" data-plan="free" data-resume-limit="2" data-interview-limit="0">
                                 <div class="card-header">
                                     <h3 class="my-0 font-weight-normal">Free</h3>
                                 </div>
@@ -284,13 +286,13 @@
                                         <li class="text-muted"><i class="fas fa-times me-2"></i> Basic Feedback Only</li>
                                         <li class="text-muted"><i class="fas fa-times me-2"></i> No Suggested Answers</li>
                                     </ul>
-                                    <button type="button" class="btn btn-lg btn-block btn-outline-primary w-100 mt-auto" data-auth="signup">Sign Up Free</button>
+                                    <button type="button" class="btn btn-lg btn-block btn-outline-primary w-100 mt-auto plan-select-btn" data-plan="free" data-auth="signup">Sign Up Free</button>
                                 </div>
                             </div>
                         </div>
-            
+
                         <div class="col-lg-3 col-md-6 mb-4 d-flex">
-                            <div class="card pricing-card w-100">
+                            <div class="card pricing-card w-100" data-plan="starter" data-resume-limit="5" data-interview-limit="1">
                                 <div class="card-header">
                                     <h3 class="my-0 font-weight-normal">Starter Pack</h3>
                                 </div>
@@ -304,13 +306,13 @@
                                         <li><i class="fas fa-check text-success me-2"></i> Dynamic Timeline Generator</li>
                                         <li class="text-muted"><i class="fas fa-times me-2"></i> Suggested Answers Library</li>
                                     </ul>
-                                    <button type="button" class="btn btn-lg btn-block btn-primary w-100 mt-auto" data-auth="signup">Get Started</button>
+                                    <button type="button" class="btn btn-lg btn-block btn-primary w-100 mt-auto plan-select-btn" data-plan="starter">Get Started</button>
                                 </div>
                             </div>
                         </div>
-            
+
                         <div class="col-lg-3 col-md-6 mb-4 d-flex">
-                            <div class="card pricing-card highlight-card w-100">
+                            <div class="card pricing-card highlight-card w-100" data-plan="standard" data-resume-limit="10" data-interview-limit="3">
                                 <div class="card-header">
                                     <h3 class="my-0 font-weight-normal">Standard Pack</h3>
                                     <span class="badge bg-warning text-dark position-absolute top-0 start-50 translate-middle mt-2">Popular</span>
@@ -325,13 +327,13 @@
                                         <li><i class="fas fa-check text-success me-2"></i> Dynamic Timeline Generator</li>
                                         <li><i class="fas fa-check text-success me-2"></i> Suggested Answers Library</li>
                                     </ul>
-                                    <button type="button" class="btn btn-lg btn-block btn-primary w-100 mt-auto" data-auth="signup">Choose Standard</button>
+                                    <button type="button" class="btn btn-lg btn-block btn-primary w-100 mt-auto plan-select-btn" data-plan="standard">Choose Standard</button>
                                 </div>
                             </div>
                         </div>
-            
+
                         <div class="col-lg-3 col-md-6 mb-4 d-flex">
-                            <div class="card pricing-card w-100">
+                            <div class="card pricing-card w-100" data-plan="pro" data-resume-limit="10" data-interview-limit="5">
                                 <div class="card-header">
                                     <h3 class="my-0 font-weight-normal">Pro Pack</h3>
                                 </div>
@@ -345,24 +347,24 @@
                                         <li><i class="fas fa-check text-success me-2"></i> Dynamic Timeline Generator</li>
                                         <li><i class="fas fa-check text-success me-2"></i> Suggested Answers Library</li>
                                     </ul>
-                                    <button type="button" class="btn btn-lg btn-block btn-primary w-100 mt-auto" data-auth="signup">Go Pro</button>
+                                    <button type="button" class="btn btn-lg btn-block btn-primary w-100 mt-auto plan-select-btn" data-plan="pro">Go Pro</button>
                                 </div>
                             </div>
                         </div>
-            
+
                     </div>
-            
+
                     <div class="text-center mt-4 text-muted">
                         <p><small>Need just a bit more? Individual Mock Interviews (₹79) and Resume Analyses (₹9) available after signup.</small></p> 
                     </div>
-            
+
                     <div class="mt-5 pt-5 border-top text-center">
                         <h2>For Colleges & Institutions</h2>
                         <p class="lead">Partner with IRIS to provide comprehensive placement preparation for your students.</p>
                         <p>Offer includes bulk access to the Pro Pack features (10 Resume Analyses, 5 Mock Interviews per student) at special institutional pricing (Starting at ₹799 per student for 300+).</p>
                         <button type="button" class="btn btn-lg btn-outline-primary" onclick="window.location.href='mailto:info@irisapp.co?subject=Institutional Partnership Inquiry'">Contact Us for Bulk Pricing</button>
                     </div>
-            
+
                 </div>
             </div>
         </div>
@@ -644,14 +646,17 @@
                                         <div class="subscription-details">
                                             <div class="current-plan mb-3">
                                                 <h4>Current Plan</h4>
-                                                <div class="d-flex align-items-center">
+                                                <div class="d-flex align-items-center mb-2">
                                                     <span class="badge rounded-pill bg-primary me-2 p-2 user-plan">Free</span>
                                                     <span class="text-muted" id="planExpiryDate"></span>
                                                 </div>
+                                                <p class="plan-description" id="planDescription">
+                                                    Your free plan includes 2 resume analyses and 0 mock interviews.
+                                                </p>
                                             </div>
                                             
                                             <div class="usage-section mb-3">
-                                                <h5>Usage This Month</h5>
+                                                <h5>Usage</h5>
                                                 <div class="mb-3">
                                                     <div class="d-flex justify-content-between mb-1">
                                                         <span>Resume Analyses</span>
@@ -664,7 +669,7 @@
                                                 <div class="mb-3">
                                                     <div class="d-flex justify-content-between mb-1">
                                                         <span>Mock Interviews</span>
-                                                        <span id="mockInterviewsCount">0/4</span>
+                                                        <span id="mockInterviewsCount">0/0</span>
                                                     </div>
                                                     <div class="progress" style="height: 8px;">
                                                         <div class="progress-bar" role="progressbar" style="width: 0%"></div>
@@ -673,10 +678,10 @@
                                             </div>
                                             
                                             <div class="plan-upgrade">
-                                                <h5>Upgrade to Premium</h5>
+                                                <h5>Upgrade Your Plan</h5>
                                                 <ul class="list-unstyled mb-3">
-                                                    <li><i class="fas fa-check text-success me-2"></i> Unlimited resume analyses</li>
-                                                    <li><i class="fas fa-check text-success me-2"></i> Unlimited mock interviews</li>
+                                                    <li><i class="fas fa-check text-success me-2"></i> More resume analyses</li>
+                                                    <li><i class="fas fa-check text-success me-2"></i> Unlock mock interviews</li>
                                                     <li><i class="fas fa-check text-success me-2"></i> Advanced analytics</li>
                                                     <li><i class="fas fa-check text-success me-2"></i> Suggested answers for all questions</li>
                                                 </ul>
@@ -1379,6 +1384,77 @@
         </div>
     </div>
 
+    <!-- Add this at the end of body, before the scripts -->
+    <div class="modal fade" id="limitReachedModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-warning">
+                    <h5 class="modal-title"><i class="fas fa-exclamation-triangle me-2"></i> Limit Reached</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p id="limitReachedMessage">You've reached the limit for this feature on your current plan.</p>
+                    <div class="alert alert-info">
+                        <strong>Upgrade your plan to continue using this feature.</strong>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    <button type="button" class="btn btn-primary" id="limitReachedUpgradeBtn">Upgrade Now</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add a payment processing spinner modal -->
+    <div class="modal fade" id="paymentProcessingModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="fas fa-cog fa-spin me-2"></i> Processing Payment</h5>
+                </div>
+                <div class="modal-body text-center">
+                    <div class="spinner-border text-primary mb-3" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <p id="paymentProcessingMessage">Processing your payment...</p>
+                    <div class="progress mt-3">
+                        <div id="payment-progress-bar" class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 0%"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add a payment success modal -->
+    <div class="modal fade" id="paymentSuccessModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-success text-white">
+                    <h5 class="modal-title"><i class="fas fa-check-circle me-2"></i> Payment Successful</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body text-center">
+                    <div class="checkmark-circle">
+                        <i class="fas fa-check"></i>
+                    </div>
+                    <h4 class="mt-4">Thank You!</h4>
+                    <p id="paymentSuccessMessage">Your plan has been upgraded successfully.</p>
+                    <div class="alert alert-info">
+                        <strong>New limits:</strong>
+                        <ul class="mb-0 mt-2 text-start">
+                            <li>Resume Analyses: <span id="newResumeLimit">0</span></li>
+                            <li>Mock Interviews: <span id="newInterviewLimit">0</span></li>
+                        </ul>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-primary" data-bs-dismiss="modal">Continue</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Scripts -->
     <!-- Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
@@ -1399,6 +1475,7 @@
 </body>
 </html>
 
+app.js:
 
 // IRIS - Interview Readiness & Improvement System
 // Main JavaScript file (with Firebase authentication integration)
@@ -1468,39 +1545,35 @@ document.addEventListener('DOMContentLoaded', function() {
 
 // --- Authentication-related Functions ---
 
-// Replace this function in app.js
+// --- Updated initializeIRISApp function ---
 function initializeIRISApp() {
     console.log('Initializing IRIS app for authenticated user...');
 
     // Reset global state potentially tied to previous user/session
     state.sessionId = null;
     state.interviewId = null;
-    // Add any other state resets needed here
 
-    const userProfile = irisAuth?.getUserProfile(); // Get profile loaded by auth module
+    const userProfile = irisAuth?.getUserProfile();
 
-    // Check if user profile and Firestore DB object are available
-    // (Assuming 'db' is globally accessible if needed in checkAndLoadSessionStatus error handling)
      if (!userProfile) {
          console.warn("User profile not loaded yet, cannot check for last session.");
-         // This might happen on initial fast load. The profile should load shortly after.
-         // You could add a small delay/retry or rely on UI state being locked initially.
-         lockAllSections(); // Ensure sections start locked
-         navigateTo('upload'); // Default view
+         lockAllSections();
+         navigateTo('upload');
          return;
      }
+     
+     // Update usage display
+     updateUsageDisplay();
 
     const lastSessionId = userProfile.lastActiveSessionId;
 
     if (lastSessionId) {
         console.log(`Found last active session ID from user profile: ${lastSessionId}`);
-        // Check the status of this session
         checkAndLoadSessionStatus(lastSessionId);
     } else {
         console.log("No last active session found for this user. Starting fresh.");
-        // Ensure sections are locked if no session ID found
-        lockAllSections(); // Use helper to lock all dependent sections
-        navigateTo('upload'); // Start on upload page
+        lockAllSections();
+        navigateTo('upload');
     }
 }
 
@@ -1763,16 +1836,20 @@ function initProfilePage() {
         modal.show();
     }
 
+    updateUsageDisplay();
+
+    // --- Add upgrade button listener in profile page ---
+    document.getElementById('upgradePlanBtn')?.addEventListener('click', showPaymentModal);
+
 } // End of initProfilePage function definition
 
+// --- Replace showPaymentModal function ---
 function showPaymentModal() {
-    // Placeholder for Razorpay integration
-    alert('Payment processing will be implemented with Razorpay integration.');
-    // In the actual implementation, this would:
-    // 1. Create a Razorpay order on the backend
-    // 2. Show the Razorpay payment modal
-    // 3. Handle the payment success/failure
-    // 4. Update the user's subscription status
+    // Get the current plan
+    const currentPlan = irisAuth?.getUserProfile()?.plan || 'free';
+    
+    // Show the upgrade modal with appropriate features highlighted
+    showUpgradeModal(currentPlan === 'free' ? 'resumeAnalyses' : 'mockInterviews');
 }
 
 function downloadUserData() {
@@ -1916,26 +1993,34 @@ function initNavigation() {
 }
 
 function initButtons() {
-    // --- General Navigation ---
+    // --- General Navigation --- [Keep existing code]
     document.getElementById('getStartedBtn')?.addEventListener('click', () => navigateTo('upload'));
     document.getElementById('viewPrepPlanBtn')?.addEventListener('click', () => navigateTo('prep-plan'));
     document.getElementById('startInterviewBtn')?.addEventListener('click', () => {
-        navigateTo('mock-interview');
-        showPermissionsModal(); // Request permissions before starting
+        // Add feature check here
+        if (checkFeatureAccess('mockInterviews')) {
+            navigateTo('mock-interview');
+            showPermissionsModal();
+        }
     });
-     document.getElementById('startNewInterviewBtn')?.addEventListener('click', () => {
-        navigateTo('mock-interview');
-        showPermissionsModal();
+    document.getElementById('startNewInterviewBtn')?.addEventListener('click', () => {
+        // Add feature check here
+        if (checkFeatureAccess('mockInterviews')) {
+            navigateTo('mock-interview');
+            showPermissionsModal();
+        }
     });
-    document.getElementById('viewProgressBtn')?.addEventListener('click', () => navigateTo('history')); // History loading is handled in navigateTo/initNavigation
+    document.getElementById('viewProgressBtn')?.addEventListener('click', () => navigateTo('history'));
     document.getElementById('startAnotherInterviewBtn')?.addEventListener('click', () => {
-        navigateTo('mock-interview');
-        showPermissionsModal();
+        // Add feature check here
+        if (checkFeatureAccess('mockInterviews')) {
+            navigateTo('mock-interview');
+            showPermissionsModal();
+        }
     });
 
-
-    // --- Mock Interview Controls ---
-     document.getElementById('endInterviewBtn')?.addEventListener('click', endInterview); // End interview
+    // --- Mock Interview Controls --- [Keep existing code]
+    document.getElementById('endInterviewBtn')?.addEventListener('click', endInterview);
 
     const interviewTypeButtons = document.querySelectorAll('#interviewTypeSelector button');
     interviewTypeButtons.forEach(button => {
@@ -1955,14 +2040,17 @@ function initButtons() {
         if (event.key === 'Enter') sendTextReply();
     });
 
-     // Permissions Modal
+    // Permissions Modal
     document.getElementById('grantPermissionsBtn')?.addEventListener('click', setupMediaDevices);
 
     // Recording Buttons (hidden/repurposed for continuous mode)
     const voiceReplyBtn = document.getElementById('voiceReplyBtn');
     const stopRecordingBtn = document.getElementById('stopRecordingBtn');
-    if(voiceReplyBtn) voiceReplyBtn.style.display = 'none'; // Hide manual start
-    if(stopRecordingBtn) stopRecordingBtn.style.display = 'none'; // Hide manual stop
+    if(voiceReplyBtn) voiceReplyBtn.style.display = 'none';
+    if(stopRecordingBtn) stopRecordingBtn.style.display = 'none';
+    
+    // --- Add new event listener for Upgrade Plan button ---
+    document.getElementById('upgradePlanBtn')?.addEventListener('click', showPaymentModal);
 }
 
 function initForms() {
@@ -2047,17 +2135,19 @@ function checkForExistingSession() {
 // --- API Communication ---
 
 // Replace this entire function in app.js
+// --- Updated uploadResumeAndAnalyze function ---
 function uploadResumeAndAnalyze() {
-    // Check if user is authenticated
-    const user = firebase.auth().currentUser; // Get user first
-    if (!user) { // Check if user object exists
+    // Check feature access first
+    if (!checkFeatureAccess('resumeAnalyses')) {
+        return;
+    }
+
+    // Get user authentication data
+    const user = firebase.auth().currentUser;
+    if (!user) {
         showMessage('Please sign in to use this feature', 'warning');
-        // Ensure irisAuth and showSignInModal are available globally or passed correctly
         if (typeof irisAuth !== 'undefined' && typeof irisAuth.showSignInModal === 'function') {
             irisAuth.showSignInModal();
-        } else {
-            console.error("irisAuth or showSignInModal not available.");
-            // Fallback or alternative handling needed here
         }
         return;
     }
@@ -2079,88 +2169,120 @@ function uploadResumeAndAnalyze() {
 
     // Basic validation - Check if file exists in FormData
     const resumeFile = formData.get('resumeFile');
-    if (!resumeFile || typeof resumeFile === 'string' || resumeFile.size === 0) { // Check if it's a real file
-         showMessage("Please select a resume file.", 'warning');
-         return;
-     }
-     if (!formData.get('jobDescription')) {
+    if (!resumeFile || typeof resumeFile === 'string' || resumeFile.size === 0) {
+        showMessage("Please select a resume file.", 'warning');
+        return;
+    }
+    if (!formData.get('jobDescription')) {
         showMessage("Please provide a job description.", 'warning');
         return;
     }
 
-
-    // Add user ID to request (already have 'user' from check above)
+    // Add user ID to request
     formData.append('userId', user.uid);
-    console.log(`Appending userId: ${user.uid} to FormData`); // Debug log
+    console.log(`Appending userId: ${user.uid} to FormData`);
 
     // Reset and show progress bar
     progressContainer.style.display = 'block';
     progressBar.style.width = '10%';
-    progressBar.classList.remove('bg-success', 'bg-danger');
+    progressBar.classList.remove('bg-success', 'bg-danger', 'bg-warning'); // Reset colors
     progressMessage.textContent = 'Uploading files...';
 
     // Disable button during upload
     const analyzeBtn = document.getElementById('analyzeBtn');
-    if(analyzeBtn) analyzeBtn.disabled = true; analyzeBtn.textContent = 'Analyzing...';
-
+    if (analyzeBtn) analyzeBtn.disabled = true; analyzeBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Analyzing...'; // Add spinner
 
     fetch(`${API_BASE_URL}/analyze-resume`, {
         method: 'POST',
         body: formData
-        // Note: No 'Content-Type' header needed for FormData, browser sets it
     })
     .then(response => {
         if (!response.ok) {
-            // Attempt to read error message from backend JSON response
             return response.json().then(errData => {
-                 // Throw an error with the message from backend if available
-                 throw new Error(errData.error || `Analysis request failed (${response.status})`);
+                if (errData.limitReached) {
+                     showMessage(errData.error || 'Usage limit reached.', 'warning');
+                     showUpgradeModal('resumeAnalyses');
+                     throw new Error('Limit Reached');
+                }
+                throw new Error(errData.error || `Analysis request failed (${response.status})`);
             }).catch((jsonParseError) => {
-                 // If backend didn't send valid JSON error, throw generic HTTP error
-                 console.error("Could not parse error JSON from backend:", jsonParseError);
-                 throw new Error(`Analysis request failed (${response.status} ${response.statusText})`);
+                console.error("Could not parse error JSON from backend:", jsonParseError);
+                if (jsonParseError.message === 'Limit Reached') {
+                    throw jsonParseError;
+                }
+                throw new Error(`Analysis request failed (${response.status} ${response.statusText})`);
             });
         }
-        return response.json(); // Parse successful JSON response
+        return response.json();
     })
-    .then(data => {
-        console.log('Upload response:', data);
+    .then(data => { // 'data' contains { sessionId, status, message, usageInfo }
+        console.log('Upload response:', data); // Log includes usageInfo now
         if (!data.sessionId) {
             throw new Error("Backend did not return a valid session ID.");
         }
-        // Set session ID in the global state (used for polling)
-        state.sessionId = data.sessionId;
 
-        // ---> REMOVED localStorage.setItem('irisSessionId', data.sessionId); <---
-        console.log("Session ID stored in state, NOT localStorage.");
+        // Set session ID in the global state
+        state.sessionId = data.sessionId;
+        console.log("Session ID stored in state:", state.sessionId);
+
+        // *** FIX ISSUE 1: Update local usage state from backend response ***
+        if (data.usageInfo && typeof irisAuth !== 'undefined' && irisAuth.getUserProfile()?.usage?.resumeAnalyses) {
+            // Update local auth state directly
+            authState.userProfile.usage.resumeAnalyses.used = data.usageInfo.used;
+            authState.userProfile.usage.resumeAnalyses.limit = data.usageInfo.limit; // Ensure limit is also synced if it changes
+            console.log("Updated local 'resumeAnalyses' usage state from backend response:", authState.userProfile.usage.resumeAnalyses);
+        } else {
+             console.warn("Could not update local usage state: usageInfo missing in response or local profile structure invalid.");
+             // Consider reloading the profile as a fallback if needed: irisAuth.loadUserProfile(user);
+        }
+        // *** END FIX ISSUE 1 ***
+
+        // Update usage display with the potentially updated local state
+        updateUsageDisplay();
 
         progressMessage.textContent = 'Analyzing resume...';
-        pollAnalysisStatus(data.sessionId); // Start polling using the received session ID
+        pollAnalysisStatus(data.sessionId); // Start polling backend for analysis progress
+
+        // Note: analyzeBtn state is now handled within pollAnalysisStatus
     })
     .catch(error => {
-        console.error('Error uploading resume:', error);
-        if(progressMessage) progressMessage.textContent = `Error: ${error.message}`; // Display specific error
-        if(progressBar) progressBar.classList.add('bg-danger'); progressBar.style.width = '100%'; // Indicate error on progress bar
-        showMessage(`Error uploading resume: ${error.message}`, 'danger');
+        console.error('Error initiating resume analysis:', error); // Changed log message
 
-        // Re-enable button on error
-         if(analyzeBtn) analyzeBtn.disabled = false; analyzeBtn.textContent = 'Analyze Resume';
+        // Don't show generic error if it was a limit reached error
+        if (error.message !== 'Limit Reached') {
+             if(progressMessage) progressMessage.textContent = `Error: ${error.message}`;
+             if(progressBar) progressBar.classList.add('bg-danger'); progressBar.style.width = '100%';
+             showMessage(`Error starting analysis: ${error.message}`, 'danger');
+        } else {
+             if(progressMessage) progressMessage.textContent = `Limit reached. Please upgrade.`;
+             if(progressBar) progressBar.classList.add('bg-warning'); progressBar.style.width = '100%';
+        }
+
+        // *** FIX ISSUE 2 (Partial): Re-enable button on *initial* fetch error ***
+        if (analyzeBtn) {
+            analyzeBtn.disabled = false;
+            analyzeBtn.innerHTML = 'Analyze Resume'; // Reset text
+        }
     });
-     // Note: Button re-enabling on SUCCESS happens implicitly when polling finishes and navigates away,
-     // but you might want to explicitly re-enable it if the user stays on the upload page after success.
-}
+}                                    
 
 function pollAnalysisStatus(sessionId) {
     const progressContainer = document.getElementById('uploadProgress');
     const progressBar = progressContainer?.querySelector('.progress-bar');
     const progressMessage = document.getElementById('progressMessage');
+    const analyzeBtn = document.getElementById('analyzeBtn'); // Get button reference
 
-     if (!progressContainer || !progressBar || !progressMessage) return; // Exit if elements aren't there
+    if (!progressContainer || !progressBar || !progressMessage) return; // Exit if elements aren't there
 
     const checkStatus = () => {
         // If session changed or cleared, stop polling
         if (state.sessionId !== sessionId) {
             console.log("Session changed, stopping polling for", sessionId);
+            // *** FIX ISSUE 2: Ensure button is reset if polling stops unexpectedly ***
+            if (analyzeBtn) {
+                analyzeBtn.disabled = false;
+                analyzeBtn.innerHTML = 'Analyze Resume';
+            }
             return;
         }
 
@@ -2171,7 +2293,7 @@ function pollAnalysisStatus(sessionId) {
                  throw new Error('Session not found or expired. Please upload again.');
             }
             if (!response.ok) {
-                throw new Error(`Network response was not ok (${response.status})`);
+                 throw new Error(`Network response was not ok (${response.status})`);
             }
             return response.json();
         })
@@ -2190,20 +2312,35 @@ function pollAnalysisStatus(sessionId) {
 
                 loadAnalysisResults(sessionId);
                 loadPreparationPlan(sessionId);
+                checkAndUnlockHistorySections(sessionId); // Check history before unlocking
+
+                // *** FIX ISSUE 2: Reset button on completion ***
+                if (analyzeBtn) {
+                    analyzeBtn.disabled = false;
+                    analyzeBtn.innerHTML = 'Analyze Resume';
+                }
 
                 setTimeout(() => {
                     navigateTo('analysis');
-                    progressContainer.style.display = 'none';
+                    progressContainer.style.display = 'none'; // Hide progress bar
                 }, 1500);
 
             } else if (statusData.status === 'failed') {
-                progressMessage.textContent = `Error: ${statusData.errors?.[0] || 'Analysis failed'}`;
+                const errorMsg = statusData.errors?.[0] || 'Analysis failed';
+                progressMessage.textContent = `Error: ${errorMsg}`;
                 progressBar.classList.add('bg-danger');
-                showMessage(`Analysis failed: ${statusData.errors?.[0] || 'Unknown error'}`, 'danger');
+                showMessage(`Analysis failed: ${errorMsg}`, 'danger');
+
+                // *** FIX ISSUE 2: Reset button on failure ***
+                if (analyzeBtn) {
+                    analyzeBtn.disabled = false;
+                    analyzeBtn.innerHTML = 'Analyze Resume';
+                }
+
             } else { // Still processing
                 progressMessage.textContent = `Analyzing resume (${statusData.progress || 0}%)...`;
                 // Schedule next poll only if still processing
-                 setTimeout(checkStatus, 3000); // Poll slightly less frequently
+                setTimeout(checkStatus, 3000); // Poll slightly less frequently
             }
         })
         .catch(error => {
@@ -2211,8 +2348,17 @@ function pollAnalysisStatus(sessionId) {
             progressMessage.textContent = `Error: ${error.message}`;
             progressBar.classList.add('bg-danger');
             showMessage(`Error checking analysis status: ${error.message}`, 'danger');
+
+             // *** FIX ISSUE 2: Reset button on polling error ***
+             if (analyzeBtn) {
+                analyzeBtn.disabled = false;
+                analyzeBtn.innerHTML = 'Analyze Resume';
+            }
+
             if (error.message.includes('Session not found')) {
-                 // Reset relevant UI?
+                 // Reset relevant UI? Maybe lock sections again.
+                 lockAllSections();
+                 navigateTo('upload');
             }
         });
     };
@@ -3096,30 +3242,40 @@ function setupMediaRecorder(stream) {
 }
 
 
+// --- Updated startMockInterview function ---
 function startMockInterview() {
+    // Feature access checked before calling setupMediaDevices which calls this
+
     if (!state.sessionId) {
-        alert('No active session. Please analyze a resume first.');
+        alert('No active analysis session found. Please analyze a resume first.');
         navigateTo('upload');
         return;
     }
-     if (!state.mediaRecorder) {
-         alert('Audio recorder not initialized. Please grant microphone permissions.');
-         // Attempt to re-initialize? Or guide user.
-         showPermissionsModal();
-         return;
-     }
+
+    if (!state.mediaRecorder) {
+        alert('Audio recorder not initialized. Please grant microphone permissions.');
+        showPermissionsModal();
+        return;
+    }
 
     console.log(`Starting ${state.interviewType} interview for session: ${state.sessionId}`);
     state.isInterviewActive = true;
-    state.isAIResponding = false; // Ensure AI is not marked as responding initially
-    state.conversationHistory = []; // Clear previous history
+    state.isAIResponding = false;
+    state.conversationHistory = [];
 
     const conversationContainer = document.getElementById('conversationContainer');
-    if(conversationContainer) conversationContainer.innerHTML = ''; // Clear display
+    if (conversationContainer) conversationContainer.innerHTML = '';
 
-    // Add loading indicator?
     addMessageToConversation("system", `Starting ${state.interviewType} interview...`);
 
+    // Show loading/starting state
+    // Identify potential buttons that trigger this
+    const startBtn1 = document.getElementById('startInterviewBtn');
+    const startBtn2 = document.getElementById('startNewInterviewBtn');
+    const startBtn3 = document.getElementById('startAnotherInterviewBtn');
+    if(startBtn1) { startBtn1.disabled = true; startBtn1.textContent = 'Starting...'; }
+    if(startBtn2) { startBtn2.disabled = true; startBtn2.textContent = 'Starting...'; }
+    if(startBtn3) { startBtn3.disabled = true; startBtn3.textContent = 'Starting...'; }
 
     fetch(`${API_BASE_URL}/start-mock-interview`, {
         method: 'POST',
@@ -3130,29 +3286,78 @@ function startMockInterview() {
         })
     })
     .then(response => {
-        if (!response.ok) throw new Error(`Network response was not ok (${response.status})`);
+        if (!response.ok) {
+             return response.json().then(errData => {
+                if (errData.limitReached) {
+                     showMessage(errData.error || 'Usage limit reached.', 'warning');
+                     showUpgradeModal('mockInterviews');
+                     throw new Error('Limit Reached');
+                }
+                throw new Error(errData.error || `Failed to start interview (${response.status})`);
+            }).catch((jsonParseError) => {
+                console.error("Could not parse error JSON from backend:", jsonParseError);
+                 if (jsonParseError.message === 'Limit Reached') {
+                    throw jsonParseError;
+                }
+                throw new Error(`Failed to start interview (${response.status} ${response.statusText})`);
+            });
+        }
         return response.json();
     })
-    .then(data => {
+    .then(data => { // data contains { interviewId, sessionId, interviewType, greeting, usageInfo }
         console.log('Interview started response:', data);
         if (!data.interviewId || !data.greeting) {
-             throw new Error("Invalid response from start-mock-interview");
+            throw new Error("Invalid response from start-mock-interview");
         }
+
         state.interviewId = data.interviewId;
 
+        // *** FIX ISSUE 1: Update local usage state from backend response ***
+        if (data.usageInfo && typeof irisAuth !== 'undefined' && irisAuth.getUserProfile()?.usage?.mockInterviews) {
+            // Update local auth state directly
+            authState.userProfile.usage.mockInterviews.used = data.usageInfo.used;
+            authState.userProfile.usage.mockInterviews.limit = data.usageInfo.limit;
+            console.log("Updated local 'mockInterviews' usage state from backend response:", authState.userProfile.usage.mockInterviews);
+        } else {
+             console.warn("Could not update local interview usage state: usageInfo missing in response or local profile structure invalid.");
+        }
+         // *** END FIX ISSUE 1 ***
+
+        // Update usage display with the potentially updated local state
+        updateUsageDisplay();
+
         // Remove "Starting..." message
-        const systemMessages = conversationContainer.querySelectorAll('.message.system');
-        systemMessages.forEach(msg => msg.remove());
+        const systemMessages = conversationContainer?.querySelectorAll('.message.system');
+        systemMessages?.forEach(msg => msg.remove());
 
         // Display and speak greeting
         addMessageToConversation('interviewer', data.greeting);
-        generateAndPlayTTS(data.greeting); // This will trigger automatic listening on end
+        generateAndPlayTTS(data.greeting); // Triggers listening when done
+
+        // Reset button states (or maybe hide/change function)
+        if(startBtn1) { startBtn1.disabled = false; startBtn1.textContent = 'Start Interview'; }
+        if(startBtn2) { startBtn2.disabled = false; startBtn2.textContent = 'Start New Interview'; }
+        if(startBtn3) { startBtn3.disabled = false; startBtn3.textContent = 'Start Another Interview'; }
+        // Consider navigating to the interview screen here if not already done
+        // navigateTo('mock-interview');
+
+        return data;
     })
     .catch(error => {
         console.error('Error starting interview:', error);
-        alert(`Error starting interview: ${error.message}`);
-        state.isInterviewActive = false; // Reset state on error
-         addMessageToConversation("system", `Error starting interview: ${error.message}. Please try again.`);
+        state.isInterviewActive = false; // Reset state
+
+         if (error.message !== 'Limit Reached') {
+             alert(`Error starting interview: ${error.message}`);
+             addMessageToConversation("system", `Error starting interview: ${error.message}. Please try again.`);
+         } else {
+              addMessageToConversation("system", `Mock interview limit reached. Please upgrade your plan.`);
+         }
+
+        // Reset button states on error
+        if(startBtn1) { startBtn1.disabled = false; startBtn1.textContent = 'Start Interview'; }
+        if(startBtn2) { startBtn2.disabled = false; startBtn2.textContent = 'Start New Interview'; }
+        if(startBtn3) { startBtn3.disabled = false; startBtn3.textContent = 'Start Another Interview'; }
     });
 }
 
@@ -4509,6 +4714,310 @@ function checkAndUnlockHistorySections(sessionIdToCheck) {
           });
 }
 
+// --- Function to check feature access before performing actions ---
+function checkFeatureAccess(featureType) {
+    // Check if user is authenticated
+    const user = firebase.auth().currentUser;
+    if (!user) {
+        showMessage('Please sign in to use this feature', 'warning');
+        if (typeof irisAuth !== 'undefined' && typeof irisAuth.showSignInModal === 'function') {
+            irisAuth.showSignInModal();
+        }
+        return false;
+    }
+    
+    // Check if user can use this feature based on their plan
+    if (!irisAuth.canUseFeature(featureType)) {
+        const usageInfo = irisAuth.getUserProfile()?.usage?.[featureType] || { used: 0, limit: 0 };
+        
+        // If they've hit their limit, show upgrade modal
+        if (usageInfo.used >= usageInfo.limit) {
+            showMessage(`You've reached your ${featureType === 'resumeAnalyses' ? 'resume analysis' : 'mock interview'} limit (${usageInfo.used}/${usageInfo.limit}). Please upgrade your plan to continue.`, 'warning');
+            showUpgradeModal(featureType);
+            return false;
+        }
+    }
+    
+    return true;
+}
+
+// --- New function to update usage display ---
+function updateUsageDisplay() {
+    const userProfile = irisAuth?.getUserProfile();
+    if (!userProfile || !userProfile.usage) return;
+    
+    // Update resume analyses counter
+    const resumeUsage = userProfile.usage.resumeAnalyses || { used: 0, limit: 0 };
+    const resumeCountElement = document.getElementById('resumeAnalysesCount');
+    const resumeProgressBar = document.querySelector('#resumeAnalysesCount + .progress .progress-bar');
+    
+    if (resumeCountElement) {
+        resumeCountElement.textContent = `${resumeUsage.used}/${resumeUsage.limit}`;
+    }
+    
+    if (resumeProgressBar) {
+        const percentUsed = resumeUsage.limit > 0 ? (resumeUsage.used / resumeUsage.limit) * 100 : 0;
+        resumeProgressBar.style.width = `${Math.min(100, percentUsed)}%`;
+        
+        // Add warning color if close to limit
+        if (percentUsed >= 85) {
+            resumeProgressBar.classList.add('bg-warning');
+        } else if (percentUsed >= 100) {
+            resumeProgressBar.classList.add('bg-danger');
+        } else {
+            resumeProgressBar.classList.remove('bg-warning', 'bg-danger');
+        }
+    }
+    
+    // Update mock interviews counter
+    const interviewUsage = userProfile.usage.mockInterviews || { used: 0, limit: 0 };
+    const interviewCountElement = document.getElementById('mockInterviewsCount');
+    const interviewProgressBar = document.querySelector('#mockInterviewsCount + .progress .progress-bar');
+    
+    if (interviewCountElement) {
+        interviewCountElement.textContent = `${interviewUsage.used}/${interviewUsage.limit}`;
+    }
+    
+    if (interviewProgressBar) {
+        const percentUsed = interviewUsage.limit > 0 ? (interviewUsage.used / interviewUsage.limit) * 100 : 0;
+        interviewProgressBar.style.width = `${Math.min(100, percentUsed)}%`;
+        
+        // Add warning color if close to limit
+        if (percentUsed >= 85) {
+            interviewProgressBar.classList.add('bg-warning');
+        } else if (percentUsed >= 100) {
+            interviewProgressBar.classList.add('bg-danger');
+        } else {
+            interviewProgressBar.classList.remove('bg-warning', 'bg-danger');
+        }
+    }
+    
+    // Update upgrade button visibility based on usage
+    const upgradePlanBtn = document.getElementById('upgradePlanBtn');
+    if (upgradePlanBtn) {
+        // Show more prominently if close to limits
+        if (resumeUsage.used >= resumeUsage.limit || interviewUsage.used >= interviewUsage.limit) {
+            upgradePlanBtn.classList.add('btn-danger');
+            upgradePlanBtn.classList.remove('btn-success');
+            upgradePlanBtn.innerHTML = '<i class="fas fa-crown me-2"></i> Upgrade Now - Limits Reached!';
+        } else if ((resumeUsage.limit > 0 && resumeUsage.used / resumeUsage.limit >= 0.7) || 
+                  (interviewUsage.limit > 0 && interviewUsage.used / interviewUsage.limit >= 0.7)) {
+            upgradePlanBtn.classList.add('btn-warning');
+            upgradePlanBtn.classList.remove('btn-success', 'btn-danger');
+            upgradePlanBtn.innerHTML = '<i class="fas fa-crown me-2"></i> Upgrade Soon - Limits Approaching';
+        } else {
+            upgradePlanBtn.classList.add('btn-success');
+            upgradePlanBtn.classList.remove('btn-warning', 'btn-danger');
+            upgradePlanBtn.innerHTML = '<i class="fas fa-crown me-2"></i> Upgrade Now';
+        }
+    }
+}
+
+// --- New function to show upgrade modal (continued) ---
+function showUpgradeModal(featureType) {
+    // Get current plan to determine what plans to highlight
+    const currentPlan = irisAuth?.getUserProfile()?.plan || 'free';
+    const modalContent = document.createElement('div');
+    
+    // Determine recommended plan based on feature and current plan
+    let recommendedPlan = 'standard'; // Default recommendation
+    
+    if (featureType === 'resumeAnalyses') {
+        if (currentPlan === 'free') {
+            recommendedPlan = 'starter'; // From free to starter for more resume analyses
+        } else if (currentPlan === 'starter') {
+            recommendedPlan = 'standard'; // From starter to standard for even more
+        }
+    } else if (featureType === 'mockInterviews') {
+        if (currentPlan === 'free' || currentPlan === 'starter') {
+            recommendedPlan = 'standard'; // From free/starter to standard for interviews
+        } else if (currentPlan === 'standard') {
+            recommendedPlan = 'pro'; // From standard to pro for more interviews
+        }
+    }
+    
+    // Dynamic heading based on feature
+    const heading = featureType === 'resumeAnalyses' 
+        ? 'Upgrade for More Resume Analyses'
+        : 'Upgrade for Mock Interviews';
+    
+    modalContent.innerHTML = `
+        <div class="modal fade" id="upgradeModal" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">${heading}</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="alert alert-info">
+                            <i class="fas fa-info-circle me-2"></i>
+                            <strong>You've reached your ${featureType === 'resumeAnalyses' ? 'resume analysis' : 'mock interview'} limit on your current plan (${currentPlan}).</strong>
+                            <p class="mb-0">Upgrade to continue your interview preparation journey.</p>
+                        </div>
+                        
+                        <div class="row mt-4">
+                            <!-- Starter Plan -->
+                            <div class="col-md-4 mb-4">
+                                <div class="card ${recommendedPlan === 'starter' ? 'border-primary' : ''}">
+                                    <div class="card-header">
+                                        <h3 class="my-0 font-weight-normal">Starter Pack</h3>
+                                        ${recommendedPlan === 'starter' ? '<span class="badge bg-primary position-absolute top-0 end-0 mt-2 me-2">Recommended</span>' : ''}
+                                    </div>
+                                    <div class="card-body">
+                                        <h2 class="card-title pricing-card-title text-center">₹299</h2>
+                                        <ul class="list-unstyled mt-3 mb-4">
+                                            <li><i class="fas fa-check text-success me-2"></i> <strong>5 Resume Analyses</strong></li>
+                                            <li><i class="fas fa-check text-success me-2"></i> <strong>1 Mock Interview</strong></li>
+                                            <li><i class="fas fa-check text-success me-2"></i> Detailed Prep Plan</li>
+                                            <li><i class="fas fa-check text-success me-2"></i> Detailed Performance Report</li>
+                                            <li><i class="fas fa-check text-success me-2"></i> Dynamic Timeline Generator</li>
+                                            <li class="text-muted"><i class="fas fa-times me-2"></i> Suggested Answers Library</li>
+                                        </ul>
+                                        <button type="button" class="btn btn-lg btn-block ${recommendedPlan === 'starter' ? 'btn-primary' : 'btn-outline-primary'} w-100 plan-select-btn" data-plan="starter">Select Starter</button>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Standard Plan -->
+                            <div class="col-md-4 mb-4">
+                                <div class="card ${recommendedPlan === 'standard' ? 'border-primary highlight-card' : ''}">
+                                    <div class="card-header">
+                                        <h3 class="my-0 font-weight-normal">Standard Pack</h3>
+                                        ${recommendedPlan === 'standard' ? '<span class="badge bg-primary position-absolute top-0 end-0 mt-2 me-2">Recommended</span>' : ''}
+                                    </div>
+                                    <div class="card-body">
+                                        <h2 class="card-title pricing-card-title text-center">₹499</h2>
+                                        <ul class="list-unstyled mt-3 mb-4">
+                                            <li><i class="fas fa-check text-success me-2"></i> <strong>10 Resume Analyses</strong></li>
+                                            <li><i class="fas fa-check text-success me-2"></i> <strong>3 Mock Interviews</strong></li>
+                                            <li><i class="fas fa-check text-success me-2"></i> Detailed Prep Plan</li>
+                                            <li><i class="fas fa-check text-success me-2"></i> Detailed Performance Reports</li>
+                                            <li><i class="fas fa-check text-success me-2"></i> Dynamic Timeline Generator</li>
+                                            <li><i class="fas fa-check text-success me-2"></i> Suggested Answers Library</li>
+                                        </ul>
+                                        <button type="button" class="btn btn-lg btn-block ${recommendedPlan === 'standard' ? 'btn-primary' : 'btn-outline-primary'} w-100 plan-select-btn" data-plan="standard">Choose Standard</button>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Pro Plan -->
+                            <div class="col-md-4 mb-4">
+                                <div class="card ${recommendedPlan === 'pro' ? 'border-primary' : ''}">
+                                    <div class="card-header">
+                                        <h3 class="my-0 font-weight-normal">Pro Pack</h3>
+                                        ${recommendedPlan === 'pro' ? '<span class="badge bg-primary position-absolute top-0 end-0 mt-2 me-2">Recommended</span>' : ''}
+                                    </div>
+                                    <div class="card-body">
+                                        <h2 class="card-title pricing-card-title text-center">₹899</h2>
+                                        <ul class="list-unstyled mt-3 mb-4">
+                                            <li><i class="fas fa-check text-success me-2"></i> <strong>10 Resume Analyses</strong></li>
+                                            <li><i class="fas fa-check text-success me-2"></i> <strong>5 Mock Interviews</strong></li>
+                                            <li><i class="fas fa-check text-success me-2"></i> Detailed Prep Plan</li>
+                                            <li><i class="fas fa-check text-success me-2"></i> Detailed Performance Reports</li>
+                                            <li><i class="fas fa-check text-success me-2"></i> Dynamic Timeline Generator</li>
+                                            <li><i class="fas fa-check text-success me-2"></i> Suggested Answers Library</li>
+                                        </ul>
+                                        <button type="button" class="btn btn-lg btn-block ${recommendedPlan === 'pro' ? 'btn-primary' : 'btn-outline-primary'} w-100 plan-select-btn" data-plan="pro">Go Pro</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    // Append modal to body
+    document.body.appendChild(modalContent);
+    
+    // Initialize Bootstrap modal
+    const upgradeModal = new bootstrap.Modal(document.getElementById('upgradeModal'));
+    upgradeModal.show();
+    
+    // Add event listeners to plan select buttons
+    document.querySelectorAll('.plan-select-btn').forEach(button => {
+        button.addEventListener('click', function() {
+            const planName = this.getAttribute('data-plan');
+            selectPlan(planName, upgradeModal);
+        });
+    });
+    
+    // Clean up when modal is hidden
+    document.getElementById('upgradeModal').addEventListener('hidden.bs.modal', function() {
+        document.body.removeChild(modalContent);
+    });
+}
+
+// --- Function to handle plan selection ---
+function selectPlan(planName, modalInstance) {
+    console.log(`Selected plan: ${planName}`);
+    
+    // Create payment processing modal (temporary, will be replaced with Razorpay integration)
+    const processingModalContent = document.createElement('div');
+    processingModalContent.innerHTML = `
+        <div class="modal fade" id="paymentProcessingModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Processing Payment</h5>
+                    </div>
+                    <div class="modal-body text-center">
+                        <div class="spinner-border text-primary mb-3" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                        <p>Processing your upgrade to the ${planName.charAt(0).toUpperCase() + planName.slice(1)} plan...</p>
+                        <div class="progress mt-3">
+                            <div id="payment-progress-bar" class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 0%"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    // Hide the upgrade modal
+    if (modalInstance) {
+        modalInstance.hide();
+    }
+    
+    // Append and show processing modal
+    document.body.appendChild(processingModalContent);
+    const processingModal = new bootstrap.Modal(document.getElementById('paymentProcessingModal'));
+    processingModal.show();
+    
+    // Simulate payment processing (for testing)
+    const progressBar = document.getElementById('payment-progress-bar');
+    let progress = 0;
+    
+    const progressInterval = setInterval(() => {
+        progress += 10;
+        progressBar.style.width = `${progress}%`;
+        
+        if (progress >= 100) {
+            clearInterval(progressInterval);
+            setTimeout(() => {
+                // Simulate successful payment
+                processingModal.hide();
+                
+                // Update the user's plan
+                irisAuth.updateUserPlan(planName)
+                    .then(() => {
+                        showMessage(`Successfully upgraded to ${planName.charAt(0).toUpperCase() + planName.slice(1)} plan!`, 'success');
+                        updateUsageDisplay();
+                        document.body.removeChild(processingModalContent);
+                    })
+                    .catch(error => {
+                        showMessage(`Error upgrading plan: ${error.message}`, 'danger');
+                        document.body.removeChild(processingModalContent);
+                    });
+            }, 1000);
+        }
+    }, 300);
+}
+
+
 // NEW Helper function in app.js to lock sections dependent on analysis
 function lockAllSections() {
    lockSection('analysis');
@@ -4517,6 +5026,8 @@ function lockAllSections() {
    lockSection('performance');
    lockSection('history');
 }
+
+firebase-auth.js:
 
 // IRIS - Firebase Authentication Module
 
@@ -4615,53 +5126,232 @@ function handleAuthStateChanged(user) {
 
 
 function loadUserProfile(user) {
-    // Only load if we have a valid user and Firestore is available
-    if (!user || typeof firebase === 'undefined' || !firebase.firestore) {
-        console.warn("Cannot load profile: User null or Firebase/Firestore not available.");
-        authState.userProfile = null; // Ensure profile is null
-        return Promise.resolve(); // Return resolved promise so .finally() runs
-    }
+  // Only load if we have a valid user and Firestore is available
+  if (!user || typeof firebase === 'undefined' || !firebase.firestore) {
+      console.warn("Cannot load profile: User null or Firebase/Firestore not available.");
+      authState.userProfile = null; // Ensure profile is null
+      return Promise.resolve(); // Return resolved promise so .finally() runs
+  }
 
-    const db = firebase.firestore();
-    console.log(`Attempting to load profile for user: ${user.uid}`); // Add log
+  const db = firebase.firestore();
+  console.log(`Attempting to load profile for user: ${user.uid}`); // Add log
 
-    // Return the promise chain
-    return db.collection('users').doc(user.uid).get()
-        .then(doc => {
-            if (doc.exists) {
-                authState.userProfile = doc.data();
-                console.log('User profile loaded successfully:', authState.userProfile);
-            } else {
-                console.log('No user profile found in Firestore, attempting to create one');
-                const newProfile = {
-                    uid: user.uid,
-                    email: user.email,
-                    displayName: user.displayName || user.email.split('@')[0],
-                    photoURL: user.photoURL || null, // Store null if no photoURL
-                    createdAt: new Date().toISOString(),
-                    plan: 'free', // Default plan
-                    // lastActiveSessionId: null // Initialize explicitly if needed
-                };
-                // Attempt to save the new profile (this might fail if rules deny create)
-                return db.collection('users').doc(user.uid).set(newProfile)
-                    .then(() => {
-                        authState.userProfile = newProfile;
-                        console.log("New user profile created successfully:", authState.userProfile);
-                    })
-                    .catch(createError => {
-                        console.error(`Error creating user profile (check Firestore rules for 'create'):`, createError);
-                        authState.userProfile = null; // Ensure profile is null if creation fails
-                    });
-            }
-        })
-        .catch(error => {
-            console.error('Error loading user profile (check Firestore rules for \'read\'):', error);
-            authState.userProfile = null; // Ensure profile is null on error
-            // Don't re-throw here, let .finally() handle the next step
-        });
+  // Return the promise chain
+  return db.collection('users').doc(user.uid).get()
+      .then(doc => {
+          if (doc.exists) {
+              authState.userProfile = doc.data();
+              console.log('User profile loaded successfully:', authState.userProfile);
+              
+              // Ensure usage stats exist for existing profiles
+              if (!authState.userProfile.usage) {
+                  const usageUpdate = { 
+                      usage: {
+                          resumeAnalyses: { used: 0, limit: getPackageLimit('resumeAnalyses', authState.userProfile.plan || 'free') },
+                          mockInterviews: { used: 0, limit: getPackageLimit('mockInterviews', authState.userProfile.plan || 'free') }
+                      }
+                  };
+                  return db.collection('users').doc(user.uid).update(usageUpdate)
+                      .then(() => {
+                          authState.userProfile = {...authState.userProfile, ...usageUpdate};
+                          console.log("Added usage stats to existing profile:", authState.userProfile);
+                      })
+                      .catch(updateError => {
+                          console.error(`Error adding usage stats to profile:`, updateError);
+                      });
+              }
+          } else {
+              console.log('No user profile found in Firestore, attempting to create one');
+              const newProfile = {
+                  uid: user.uid,
+                  email: user.email,
+                  displayName: user.displayName || user.email.split('@')[0],
+                  photoURL: user.photoURL || null, // Store null if no photoURL
+                  createdAt: new Date().toISOString(),
+                  plan: 'free', // Default plan
+                  planPurchasedAt: new Date().toISOString(), // When free plan "started"
+                  planExpiresAt: null, // No expiration for free plan
+                  usage: {
+                      resumeAnalyses: { used: 0, limit: getPackageLimit('resumeAnalyses', 'free') },
+                      mockInterviews: { used: 0, limit: getPackageLimit('mockInterviews', 'free') }
+                  },
+                  // lastActiveSessionId: null // Initialize explicitly if needed
+              };
+              // Attempt to save the new profile (this might fail if rules deny create)
+              return db.collection('users').doc(user.uid).set(newProfile)
+                  .then(() => {
+                      authState.userProfile = newProfile;
+                      console.log("New user profile created successfully:", authState.userProfile);
+                  })
+                  .catch(createError => {
+                      console.error(`Error creating user profile (check Firestore rules for 'create'):`, createError);
+                      authState.userProfile = null; // Ensure profile is null if creation fails
+                  });
+          }
+      })
+      .catch(error => {
+          console.error('Error loading user profile (check Firestore rules for \'read\'):', error);
+          authState.userProfile = null; // Ensure profile is null on error
+          // Don't re-throw here, let .finally() handle the next step
+      });
 }
 
-// Replace this entire function in firebase-auth.js
+function getPackageLimit(feature, packageName) {
+  const limits = {
+      free: {
+          resumeAnalyses: 2,
+          mockInterviews: 0
+      },
+      starter: {
+          resumeAnalyses: 5,
+          mockInterviews: 1
+      },
+      standard: {
+          resumeAnalyses: 10,
+          mockInterviews: 3
+      },
+      pro: {
+          resumeAnalyses: 10,
+          mockInterviews: 5
+      }
+  };
+  
+  // Default to free package limits if package not found
+  if (!packageName || !limits[packageName]) {
+      console.warn(`Unknown package: ${packageName}, defaulting to free`);
+      packageName = 'free';
+  }
+  
+  // Return the limit for the specified feature, or 0 if feature not found
+  return limits[packageName][feature] || 0;
+}
+
+// --- New function to update user profile with plan change ---
+function updateUserPlan(planName, expiresAt = null) {
+  const user = firebase.auth().currentUser;
+  if (!user || !firebase.firestore) {
+      console.error("Cannot update plan: user not logged in or Firestore not available");
+      return Promise.reject(new Error("Authentication or database error"));
+  }
+  
+  const db = firebase.firestore();
+  
+  // Calculate new usage limits based on the plan
+  const resumeLimit = getPackageLimit('resumeAnalyses', planName);
+  const interviewLimit = getPackageLimit('mockInterviews', planName);
+  
+  // Keep track of current usage
+  let currentResumeUsage = 0;
+  let currentInterviewUsage = 0;
+  
+  if (authState.userProfile && authState.userProfile.usage) {
+      currentResumeUsage = authState.userProfile.usage.resumeAnalyses.used || 0;
+      currentInterviewUsage = authState.userProfile.usage.mockInterviews.used || 0;
+  }
+  
+  // Update profile with new plan and limits
+  const planUpdate = {
+      plan: planName,
+      planPurchasedAt: new Date().toISOString(),
+      planExpiresAt: expiresAt, // null for free/no expiration
+      'usage.resumeAnalyses.limit': resumeLimit,
+      'usage.resumeAnalyses.used': currentResumeUsage,
+      'usage.mockInterviews.limit': interviewLimit, 
+      'usage.mockInterviews.used': currentInterviewUsage
+  };
+  
+  return db.collection('users').doc(user.uid).update(planUpdate)
+      .then(() => {
+          // Update local state
+          if (authState.userProfile) {
+              authState.userProfile.plan = planName;
+              authState.userProfile.planPurchasedAt = planUpdate.planPurchasedAt;
+              authState.userProfile.planExpiresAt = expiresAt;
+              
+              // Ensure usage object exists
+              if (!authState.userProfile.usage) {
+                  authState.userProfile.usage = {};
+              }
+              
+              // Update usage limits
+              if (!authState.userProfile.usage.resumeAnalyses) {
+                  authState.userProfile.usage.resumeAnalyses = { used: currentResumeUsage, limit: resumeLimit };
+              } else {
+                  authState.userProfile.usage.resumeAnalyses.limit = resumeLimit;
+              }
+              
+              if (!authState.userProfile.usage.mockInterviews) {
+                  authState.userProfile.usage.mockInterviews = { used: currentInterviewUsage, limit: interviewLimit };
+              } else {
+                  authState.userProfile.usage.mockInterviews.limit = interviewLimit;
+              }
+          }
+          
+          // Update UI elements
+          updateUserProfileUI(user);
+          return { success: true, plan: planName };
+      })
+      .catch(error => {
+          console.error("Error updating user plan:", error);
+          return Promise.reject(error);
+      });
+}
+
+// --- New function to increment usage counter ---
+function incrementUsageCounter(featureType) {
+  const user = firebase.auth().currentUser;
+  if (!user || !firebase.firestore) {
+      console.error("Cannot increment usage: user not logged in or Firestore not available");
+      return Promise.reject(new Error("Authentication or database error"));
+  }
+  
+  // Validate feature type
+  if (!['resumeAnalyses', 'mockInterviews'].includes(featureType)) {
+      return Promise.reject(new Error(`Invalid feature type: ${featureType}`));
+  }
+  
+  const db = firebase.firestore();
+  
+  // Increment usage counter with atomic operation
+  const updateField = `usage.${featureType}.used`;
+  
+  return db.collection('users').doc(user.uid).update({
+      [updateField]: firebase.firestore.FieldValue.increment(1)
+  })
+  .then(() => {
+      // Update local state
+      if (authState.userProfile && authState.userProfile.usage && authState.userProfile.usage[featureType]) {
+          authState.userProfile.usage[featureType].used += 1;
+          
+          // Return updated usage info
+          return {
+              success: true,
+              feature: featureType,
+              used: authState.userProfile.usage[featureType].used,
+              limit: authState.userProfile.usage[featureType].limit,
+              canUseMore: authState.userProfile.usage[featureType].used < authState.userProfile.usage[featureType].limit
+          };
+      }
+      
+      return { success: true, feature: featureType };
+  })
+  .catch(error => {
+      console.error(`Error incrementing ${featureType} usage:`, error);
+      return Promise.reject(error);
+  });
+}
+
+// --- New function to check if user can use a feature ---
+function canUseFeature(featureType) {
+  // If no profile loaded or no usage stats, default to false
+  if (!authState.userProfile || !authState.userProfile.usage || !authState.userProfile.usage[featureType]) {
+      return false;
+  }
+  
+  const usage = authState.userProfile.usage[featureType];
+  return usage.used < usage.limit;
+}
+
 function updateUserProfileUI(user) {
   // Update UI elements showing user info
   const userDisplayElements = document.querySelectorAll('.user-display-name');
@@ -4683,12 +5373,61 @@ function updateUserProfileUI(user) {
 
   // Update plan info if available
   const planElements = document.querySelectorAll('.user-plan');
-  const userPlanBadgeElements = document.querySelectorAll('.user-plan-badge'); // Added selector for sidebar badge
+  const userPlanBadgeElements = document.querySelectorAll('.user-plan-badge');
   if (authState.userProfile && (planElements.length > 0 || userPlanBadgeElements.length > 0)) {
       const planName = authState.userProfile.plan || 'free';
       const formattedPlanName = planName.charAt(0).toUpperCase() + planName.slice(1);
       planElements.forEach(el => el.textContent = formattedPlanName);
-      userPlanBadgeElements.forEach(el => el.textContent = formattedPlanName); // Update sidebar badge too
+      userPlanBadgeElements.forEach(el => el.textContent = formattedPlanName);
+  }
+
+  // Update usage counters
+  if (authState.userProfile && authState.userProfile.usage) {
+      // Resume analyses usage
+      const resumeUsage = authState.userProfile.usage.resumeAnalyses || { used: 0, limit: 0 };
+      const resumeCountElement = document.getElementById('resumeAnalysesCount');
+      const resumeProgressBar = document.querySelector('#resumeAnalysesCount + .progress .progress-bar');
+      
+      if (resumeCountElement) {
+          resumeCountElement.textContent = `${resumeUsage.used}/${resumeUsage.limit}`;
+      }
+      
+      if (resumeProgressBar) {
+          const percentUsed = resumeUsage.limit > 0 ? (resumeUsage.used / resumeUsage.limit) * 100 : 0;
+          resumeProgressBar.style.width = `${Math.min(100, percentUsed)}%`;
+          
+          // Add warning color if close to limit
+          if (percentUsed >= 85) {
+              resumeProgressBar.classList.add('bg-warning');
+          } else if (percentUsed >= 100) {
+              resumeProgressBar.classList.add('bg-danger');
+          } else {
+              resumeProgressBar.classList.remove('bg-warning', 'bg-danger');
+          }
+      }
+      
+      // Mock interviews usage
+      const interviewUsage = authState.userProfile.usage.mockInterviews || { used: 0, limit: 0 };
+      const interviewCountElement = document.getElementById('mockInterviewsCount');
+      const interviewProgressBar = document.querySelector('#mockInterviewsCount + .progress .progress-bar');
+      
+      if (interviewCountElement) {
+          interviewCountElement.textContent = `${interviewUsage.used}/${interviewUsage.limit}`;
+      }
+      
+      if (interviewProgressBar) {
+          const percentUsed = interviewUsage.limit > 0 ? (interviewUsage.used / interviewUsage.limit) * 100 : 0;
+          interviewProgressBar.style.width = `${Math.min(100, percentUsed)}%`;
+          
+          // Add warning color if close to limit
+          if (percentUsed >= 85) {
+              interviewProgressBar.classList.add('bg-warning');
+          } else if (percentUsed >= 100) {
+              interviewProgressBar.classList.add('bg-danger');
+          } else {
+              interviewProgressBar.classList.remove('bg-warning', 'bg-danger');
+          }
+      }
   }
 
   // Show/Hide Password Buttons based on providers
@@ -4702,9 +5441,6 @@ function updateUserProfileUI(user) {
       addPasswordBtn.style.display = hasPasswordProvider ? 'none' : 'block';
       // Show "Change Password" if a password provider DOES exist
       changePasswordBtn.style.display = hasPasswordProvider ? 'block' : 'none';
-
-      console.log("User providers:", user.providerData.map(p => p.providerId)); // For debugging
-      console.log("Password provider exists:", hasPasswordProvider); // For debugging
   } else {
       // Ensure buttons are hidden if user/elements aren't ready
       if(addPasswordBtn) addPasswordBtn.style.display = 'none';
@@ -4979,9 +5715,15 @@ window.irisAuth = {
   getCurrentUser: () => authState.user,
   getUserProfile: () => authState.userProfile,
   showSignInModal: () => showAuthModal('signin'),
-  showSignUpModal: () => showAuthModal('signup')
+  showSignUpModal: () => showAuthModal('signup'),
+  // Add new functions to the exported object
+  canUseFeature,
+  incrementUsageCounter,
+  updateUserPlan,
+  getPackageLimit
 };
 
+backend.py:
 
 # -*- coding: utf-8 -*-
 import os
@@ -5797,6 +6539,189 @@ def get_duration(start_time_str, end_time_str):
     except Exception: return "N/A"
 
 
+def get_user_usage(user_id):
+    """Retrieves user profile including usage data from Firestore. Ensures default structure exists."""
+    if not db or not user_id:
+        return None
+
+    try:
+        user_ref = db.collection('users').document(user_id)
+        user_doc = user_ref.get()
+
+        if user_doc.exists:
+            user_data = user_doc.to_dict()
+            needs_update = False
+
+            # Ensure 'plan' exists, default to 'free'
+            if 'plan' not in user_data:
+                user_data['plan'] = 'free'
+                # Note: We might not want to update the plan here,
+                # just use 'free' for limit calculation.
+                # Let's assume plan exists or is handled during user creation.
+
+            current_plan = user_data.get('plan', 'free')
+
+            # Ensure 'usage' map exists
+            if 'usage' not in user_data:
+                user_data['usage'] = {}
+                needs_update = True
+
+            # Ensure 'resumeAnalyses' structure exists
+            if 'resumeAnalyses' not in user_data['usage']:
+                user_data['usage']['resumeAnalyses'] = {'used': 0, 'limit': get_package_limit(current_plan, 'resumeAnalyses')}
+                needs_update = True
+            elif 'used' not in user_data['usage']['resumeAnalyses'] or 'limit' not in user_data['usage']['resumeAnalyses']:
+                # If partially missing, reset it based on current plan
+                user_data['usage']['resumeAnalyses'] = {
+                    'used': user_data['usage']['resumeAnalyses'].get('used', 0), # Keep existing used count if possible
+                    'limit': get_package_limit(current_plan, 'resumeAnalyses')
+                }
+                needs_update = True
+
+            # Ensure 'mockInterviews' structure exists
+            if 'mockInterviews' not in user_data['usage']:
+                 user_data['usage']['mockInterviews'] = {'used': 0, 'limit': get_package_limit(current_plan, 'mockInterviews')}
+                 needs_update = True
+            elif 'used' not in user_data['usage']['mockInterviews'] or 'limit' not in user_data['usage']['mockInterviews']:
+                 user_data['usage']['mockInterviews'] = {
+                     'used': user_data['usage']['mockInterviews'].get('used', 0),
+                     'limit': get_package_limit(current_plan, 'mockInterviews')
+                 }
+                 needs_update = True
+
+            # If the structure needed fixing, update the document in Firestore
+            if needs_update:
+                print(f"[{user_id}] Initializing/Fixing usage structure in Firestore.")
+                try:
+                    user_ref.update({'usage': user_data['usage']})
+                except Exception as update_err:
+                     print(f"[{user_id}] WARNING: Failed to update usage structure: {update_err}")
+                     # Proceed with potentially stale data, or return None?
+                     # For now, proceed. The increment might still fail if update failed.
+
+            return user_data
+        else:
+            print(f"User {user_id} not found in Firestore")
+            # If user doc doesn't exist, should we create it? No, auth should handle that.
+            return None
+
+    except Exception as e:
+        print(f"Error retrieving user usage for {user_id}: {e}")
+        traceback.print_exc()
+        return None
+
+
+def get_package_limit(package_name, feature_type):
+    """Returns the limit for a specific feature based on package type."""
+    limits = {
+        'free': {
+            'resumeAnalyses': 2,
+            'mockInterviews': 0
+        },
+        'starter': {
+            'resumeAnalyses': 5,
+            'mockInterviews': 1
+        },
+        'standard': {
+            'resumeAnalyses': 10,
+            'mockInterviews': 3
+        },
+        'pro': {
+            'resumeAnalyses': 10,
+            'mockInterviews': 5
+        }
+    }
+    
+    # Default to free package if not found
+    if not package_name or package_name not in limits:
+        print(f"Warning: Unknown package '{package_name}', defaulting to free")
+        package_name = 'free'
+    
+    # Return the limit for the feature, or 0 if feature not found
+    return limits[package_name].get(feature_type, 0)
+
+
+def check_feature_access(user_id, feature_type):
+    """Checks if a user has access to a specific feature based on their plan."""
+    if not db or not user_id:
+        return {'allowed': False, 'error': 'Database or user ID not available'}
+    
+    try:
+        user_data = get_user_usage(user_id)
+        
+        if not user_data:
+            return {'allowed': False, 'error': 'User profile not found'}
+        
+        if 'usage' not in user_data or feature_type not in user_data['usage']:
+            return {'allowed': False, 'error': 'Usage data not found'}
+        
+        usage = user_data['usage'][feature_type]
+        currently_used = usage.get('used', 0)
+        limit = usage.get('limit', 0)
+        
+        # Check if user has used all their available resources
+        if currently_used >= limit:
+            return {
+                'allowed': False,
+                'error': f"Usage limit reached for {feature_type}",
+                'used': currently_used,
+                'limit': limit,
+                'plan': user_data.get('plan', 'free')
+            }
+        
+        return {
+            'allowed': True,
+            'used': currently_used,
+            'limit': limit,
+            'plan': user_data.get('plan', 'free')
+        }
+        
+    except Exception as e:
+        print(f"Error checking feature access for {user_id} ({feature_type}): {e}")
+        traceback.print_exc()
+        return {'allowed': False, 'error': f'Server error: {str(e)}'}
+
+
+def increment_usage_counter(user_id, feature_type):
+    """Increments usage counter for a specific feature."""
+    if not db or not user_id:
+        return {'success': False, 'error': 'Database or user ID not available'}
+    
+    try:
+        user_ref = db.collection('users').document(user_id)
+        
+        # Check if user exists
+        user_doc = user_ref.get()
+        if not user_doc.exists:
+            return {'success': False, 'error': 'User profile not found'}
+        
+        # Increment counter using atomic operation
+        update_field = f'usage.{feature_type}.used'
+        
+        # Perform the increment
+        user_ref.update({
+            update_field: firestore.Increment(1)
+        })
+        
+        # Get updated count
+        updated_user = user_ref.get().to_dict()
+        current_usage = updated_user.get('usage', {}).get(feature_type, {}).get('used', 0)
+        usage_limit = updated_user.get('usage', {}).get(feature_type, {}).get('limit', 0)
+        
+        return {
+            'success': True,
+            'used': current_usage,
+            'limit': usage_limit,
+            'remaining': max(0, usage_limit - current_usage)
+        }
+        
+    except Exception as e:
+        print(f"Error incrementing usage counter for {user_id} ({feature_type}): {e}")
+        traceback.print_exc()
+        return {'success': False, 'error': f'Server error: {str(e)}'}
+
+
+
 # === Flask Routes ===
 
 @app.route('/test', methods=['GET'])
@@ -5825,32 +6750,55 @@ def test_route():
 @app.route('/analyze-resume', methods=['POST'])
 def analyze_resume():
     """
-    Analyzes resume against JD, saves resume locally temporarily,
-    creates session in Firestore, starts background analysis,
-    AND updates user profile with lastActiveSessionId.
+    Analyzes resume against JD, enforces usage limits,
+    increments usage counter, creates session in Firestore, starts background analysis,
+    updates user profile with lastActiveSessionId, AND returns updated usage info.
     """
     session_id = None
     temp_session_dir = None
     temp_resume_path = None
-    user_id = None # Keep track of userId
+    user_id = None
+
     try:
         start_time = time.time()
 
         # --- Validate Request ---
-        if 'resumeFile' not in request.files: return jsonify({'error': 'No resume file'}), 400
+        if 'resumeFile' not in request.files:
+            return jsonify({'error': 'No resume file'}), 400
+
         resume_file = request.files['resumeFile']
         job_description = request.form.get('jobDescription')
-        user_id = request.form.get('userId') # <<< Get userId passed from frontend
+        user_id = request.form.get('userId')
 
-        if not job_description: return jsonify({'error': 'Job description required'}), 400
-        if not resume_file or not resume_file.filename: return jsonify({'error': 'Invalid resume file'}), 400
-        if not user_id: return jsonify({'error': 'User ID required for session tracking'}), 400 # Make userId mandatory
+        if not job_description:
+            return jsonify({'error': 'Job description required'}), 400
+
+        if not resume_file or not resume_file.filename:
+            return jsonify({'error': 'Invalid resume file'}), 400
+
+        if not user_id:
+            return jsonify({'error': 'User ID required for session tracking'}), 400
 
         resume_filename = secure_filename(resume_file.filename)
         if not (resume_file.content_type == 'application/pdf' or resume_filename.lower().endswith('.pdf')):
-             return jsonify({'error': 'Only PDF resumes supported'}), 400
-        if not db: return jsonify({'error': 'Database unavailable'}), 503
+            return jsonify({'error': 'Only PDF resumes supported'}), 400
+
+        if not db:
+            return jsonify({'error': 'Database unavailable'}), 503
         # --- End Validation ---
+
+        # --- Check usage limits ---
+        access_check = check_feature_access(user_id, 'resumeAnalyses')
+        if not access_check.get('allowed', False):
+            # Return specific error indicating limit reached
+            return jsonify({
+                'error': access_check.get('error', 'Usage limit reached'),
+                'limitReached': True, # Flag for frontend
+                'used': access_check.get('used', 0),
+                'limit': access_check.get('limit', 0),
+                'plan': access_check.get('plan', 'free')
+            }), 403  # Forbidden due to limits
+        # --- End usage limit check ---
 
         session_id = str(uuid.uuid4())
         print(f"[{session_id}] Received /analyze-resume request for file: {resume_filename} from user: {user_id}")
@@ -5868,39 +6816,59 @@ def analyze_resume():
             return jsonify({'error': f'Server file system error: {str(file_err)}'}), 500
         # === End File Handling ===
 
+        # --- Increment Usage Counter (BEFORE creating session, in case of errors) ---
+        # This function now returns {'success': True/False, 'used': N, 'limit': M, 'remaining': X}
+        increment_result = increment_usage_counter(user_id, 'resumeAnalyses')
+        if not increment_result.get('success', False):
+            error_msg = increment_result.get('error', 'Failed to update usage counter')
+            print(f"[{session_id}] ERROR: {error_msg}")
+            # Clean up temp file if usage increment fails
+            if temp_session_dir and os.path.exists(temp_session_dir):
+                try:
+                    shutil.rmtree(temp_session_dir)
+                except Exception as cleanup_err:
+                    print(f"[{session_id}] Error during cleanup after usage error: {cleanup_err}")
+            return jsonify({'error': error_msg}), 500
+        # --- End Usage Increment ---
+
         # --- Initialize session doc in Firestore ---
         session_ref = db.collection('sessions').document(session_id)
         initial_session_data = {
             'status': 'processing',
             'progress': 5,
-            'userId': user_id, # <<< Store the userId in the session doc
+            'userId': user_id,
             'resume_filename_temp': resume_filename,
             'job_description': job_description,
             'start_time': datetime.now().isoformat(),
             'results': {},
             'errors': [],
-            'last_updated': firestore.SERVER_TIMESTAMP
+            'last_updated': firestore.SERVER_TIMESTAMP,
+             # Add usage tracking to session for reference (using data from increment_result)
+            'usage_info': {
+                'feature': 'resumeAnalyses',
+                'used': increment_result.get('used', 0),
+                'limit': increment_result.get('limit', 0)
+            }
         }
         session_ref.set(initial_session_data)
         print(f"[{session_id}] Initial session created in Firestore for user {user_id}.")
         # --- End Firestore Init ---
 
-        # --- NEW: Update User Profile with lastActiveSessionId ---
+        # --- Update User Profile with lastActiveSessionId ---
         try:
             user_ref = db.collection('users').document(user_id)
             user_ref.update({
                 'lastActiveSessionId': session_id,
-                'lastSessionUpdate': firestore.SERVER_TIMESTAMP # Track when it was updated
+                'lastSessionUpdate': firestore.SERVER_TIMESTAMP
             })
             print(f"[{session_id}] Updated user {user_id} profile with lastActiveSessionId.")
         except Exception as profile_update_err:
-             # Log error but don't necessarily fail the whole request
-             print(f"[{session_id}] WARNING: Failed to update user {user_id} profile with last session ID: {profile_update_err}")
-        # --- END NEW ---
+            print(f"[{session_id}] WARNING: Failed to update user {user_id} profile with last session ID: {profile_update_err}")
+        # --- End User Profile Update ---
 
         # --- Define background task ---
         # (Keep the existing process_resume_background function definition as is)
-        def process_resume_background(current_session_id, resume_local_path, jd, associated_user_id): # Pass userId too
+        def process_resume_background(current_session_id, resume_local_path, jd, associated_user_id):
             session_status = 'failed'; error_list = []
             try:
                 # (Existing background processing logic...)
@@ -5911,19 +6879,13 @@ def analyze_resume():
                 update_session_data(current_session_id, {'progress': 30, 'status_detail': 'Parsing resume'})
                 parsed_resume = parse_resume_with_claude(resume_text)
                 if not parsed_resume or not parsed_resume.get("name"): raise ValueError("Failed to parse resume.")
-                # NOTE: Don't update session with full parsed data, results below contain it.
-                # update_session_data(current_session_id, {'parsed_resume_data': parsed_resume}) # Redundant?
                 update_session_data(current_session_id, {'progress': 50, 'status_detail': 'Matching resume/JD'})
                 match_results = match_resume_jd_with_gemini(parsed_resume, jd)
                 if match_results.get("error"): raise ValueError(f"JD matching failed: {match_results['error']}")
                 match_results['parsedResume'] = parsed_resume # Add parsed data here for context
-                # NOTE: Don't update session with full match data, results below contain it.
-                # update_session_data(current_session_id, {'match_results_data': match_results}) # Redundant?
                 update_session_data(current_session_id, {'progress': 80, 'status_detail': 'Generating prep plan'})
                 prep_plan = generate_interview_prep_plan(match_results)
                 if not prep_plan: raise ValueError("Failed to generate prep plan.")
-                # NOTE: Don't update session with full prep plan data, results below contain it.
-                # update_session_data(current_session_id, {'prep_plan_data': prep_plan}) # Redundant?
                 final_results = { 'parsed_resume': parsed_resume, 'match_results': match_results, 'prep_plan': prep_plan }
                 update_session_data(current_session_id, { 'results': final_results, 'status': 'completed', 'progress': 100, 'status_detail': 'Analysis complete', 'end_time': datetime.now().isoformat() })
                 session_status = 'completed'
@@ -5941,21 +6903,37 @@ def analyze_resume():
         # --- End background task definition ---
 
         # Start background thread
-        processing_thread = threading.Thread(target=process_resume_background, args=(session_id, temp_resume_path, job_description, user_id)) # Pass user_id
+        processing_thread = threading.Thread(target=process_resume_background, args=(session_id, temp_resume_path, job_description, user_id))
         processing_thread.daemon = True
         processing_thread.start()
 
         print(f"[{session_id}] /analyze-resume request completed in {time.time() - start_time:.2f}s (background running).")
-        return jsonify({'sessionId': session_id, 'status': 'processing', 'message': 'Resume analysis started'}), 202
+
+        # *** CORRECTED RETURN VALUE ***
+        # Return the latest usage info obtained from increment_result
+        return jsonify({
+            'sessionId': session_id,
+            'status': 'processing',
+            'message': 'Resume analysis started',
+            'usageInfo': { # Include updated usage info
+                'feature': 'resumeAnalyses',
+                'used': increment_result.get('used', 0),
+                'limit': increment_result.get('limit', 0),
+                'remaining': increment_result.get('remaining', 0)
+            }
+        }), 202 # Accepted
 
     except Exception as e:
-        print(f"Error in /analyze-resume route: {e}"); traceback.print_exc()
-        if session_id and db: update_session_data(session_id, {'status': 'failed', 'errors': firestore.ArrayUnion([f'Route level error: {str(e)}'])})
+        print(f"Error in /analyze-resume route: {e}")
+        traceback.print_exc()
+        if session_id and db:
+            update_session_data(session_id, {'status': 'failed', 'errors': firestore.ArrayUnion([f'Route level error: {str(e)}'])})
         if temp_resume_path and os.path.exists(os.path.dirname(temp_resume_path)):
-             try: shutil.rmtree(os.path.dirname(temp_resume_path))
-             except Exception as cleanup_err: print(f"Error cleaning up temp dir during route exception: {cleanup_err}")
+            try:
+                shutil.rmtree(os.path.dirname(temp_resume_path))
+            except Exception as cleanup_err:
+                print(f"Error cleaning up temp dir during route exception: {cleanup_err}")
         return jsonify({'error': f'Server error: {str(e)}'}), 500
-
 
 @app.route('/get-analysis-status/<session_id>', methods=['GET'])
 def get_analysis_status(session_id):
@@ -6081,9 +7059,13 @@ def rewrite_resume_section_route():
         return jsonify({'error': f'Server error: {str(e)}'}), 500
 
 
+# Replace this entire route function in backend.py
 @app.route('/start-mock-interview', methods=['POST'])
 def start_mock_interview():
-    """Initializes a new mock interview session in Firestore."""
+    """
+    Initializes a new mock interview session in Firestore, with usage limit checks,
+    increments counter, and returns updated usage info.
+    """
     try:
         data = request.get_json()
         if not data: return jsonify({'error': 'Invalid JSON payload'}), 400
@@ -6092,18 +7074,45 @@ def start_mock_interview():
         if not session_id: return jsonify({'error': 'Session ID required'}), 400
         if not db: return jsonify({'error': 'Database unavailable'}), 503
 
+        # --- Get session data to retrieve user ID ---
         session_data = get_session_data(session_id)
         if session_data is None: return jsonify({'error': 'Session not found or expired'}), 404
         if session_data.get('status') != 'completed': return jsonify({'error': 'Analysis not completed'}), 400
 
+        # Get user ID from session
+        user_id = session_data.get('userId')
+        if not user_id: return jsonify({'error': 'User ID not found in session'}), 400
+
+        # --- Check usage limits for mock interviews ---
+        access_check = check_feature_access(user_id, 'mockInterviews')
+        if not access_check.get('allowed', False):
+            # Return specific error indicating limit reached
+            return jsonify({
+                'error': access_check.get('error', 'Usage limit reached for mock interviews'),
+                'limitReached': True, # Flag for frontend
+                'used': access_check.get('used', 0),
+                'limit': access_check.get('limit', 0),
+                'plan': access_check.get('plan', 'free')
+            }), 403  # Forbidden due to limits
+
+        # --- Fetch data required for the interview ---
         resume_data = session_data.get('results', {}).get('parsed_resume')
         job_data = session_data.get('results', {}).get('match_results')
         if not resume_data or not job_data: return jsonify({'error': 'Required analysis data missing'}), 500
 
+        # --- Increment Usage Counter BEFORE creating interview ---
+        # This function now returns {'success': True/False, 'used': N, 'limit': M, 'remaining': X}
+        increment_result = increment_usage_counter(user_id, 'mockInterviews')
+        if not increment_result.get('success', False):
+            error_msg = increment_result.get('error', 'Failed to update usage counter')
+            print(f"[{session_id}] ERROR: {error_msg}")
+            return jsonify({'error': error_msg}), 500
+
+        # --- Create interview ID and generate system prompt ---
         interview_id = str(uuid.uuid4())
         system_prompt = create_mock_interviewer_prompt(resume_data, job_data, interview_type)
 
-        # Initial greeting generation
+        # --- Generate initial greeting ---
         initial_prompt = f"Start the '{interview_type}' interview with {resume_data.get('name', 'the candidate')}. Give a brief professional greeting and ask your first question."
         try:
             greeting = call_claude_api(
@@ -6114,36 +7123,49 @@ def start_mock_interview():
             print(f"[{session_id}] Error generating greeting for interview {interview_id}: {e}")
             greeting = f"Hello {resume_data.get('name', 'there')}. Welcome to your {interview_type} mock interview. Let's begin. Can you start by telling me a bit about yourself and your background?"
 
-        # Create interview document in Firestore
+        # --- Create interview document in Firestore ---
         interview_doc_ref = db.collection('interviews').document(interview_id)
         interview_data_to_save = {
-            'sessionId': session_id, # Link back to the analysis session
-            # 'userId': '...', # TODO: Add user ID when auth is implemented
+            'sessionId': session_id,
+            'userId': user_id,  # Store user ID directly in interview doc
             'interviewType': interview_type,
-            'system_prompt_summary': system_prompt[:1000] + "...", # Store summary, not full prompt maybe
-            # === CORRECTED LINE BELOW ===
-            'conversation': [{'role': 'assistant', 'content': greeting, 'timestamp': datetime.now().isoformat()}], # Use standard datetime string
-            # === END CORRECTION ===
+            'system_prompt_summary': system_prompt[:1000] + "...",
+            'conversation': [{'role': 'assistant', 'content': greeting, 'timestamp': datetime.now().isoformat()}],
             'status': 'active',
             'start_time': datetime.now().isoformat(),
-            'last_updated': firestore.SERVER_TIMESTAMP, # Top-level SERVER_TIMESTAMP is OK on set()
-            'resume_data_snapshot': resume_data, # Snapshot data used for this interview
+            'last_updated': firestore.SERVER_TIMESTAMP,
+            'resume_data_snapshot': resume_data,
             'job_data_snapshot': job_data,
-            'analysis_status': 'not_started', # Add initial analysis status
-            'analysis': None # Placeholder for analysis results
+            'analysis_status': 'not_started',
+            'analysis': None,
+            # Add usage tracking info to interview (using data from increment_result)
+            'usage_info': {
+                'feature': 'mockInterviews',
+                'used': increment_result.get('used', 0),
+                'limit': increment_result.get('limit', 0)
+            }
         }
-        interview_doc_ref.set(interview_data_to_save) # Now this should work
-        print(f"[{session_id}] Started interview {interview_id} of type {interview_type}.")
+        interview_doc_ref.set(interview_data_to_save)
+        print(f"[{session_id}] Started interview {interview_id} of type {interview_type} for user {user_id}.")
 
-        return jsonify({'interviewId': interview_id, 'sessionId': session_id, 'interviewType': interview_type, 'greeting': greeting})
+        # *** CORRECTED RETURN VALUE ***
+        # Return the latest usage info obtained from increment_result
+        return jsonify({
+            'interviewId': interview_id,
+            'sessionId': session_id,
+            'interviewType': interview_type,
+            'greeting': greeting,
+            'usageInfo': { # Include updated usage info
+                'feature': 'mockInterviews',
+                'used': increment_result.get('used', 0),
+                'limit': increment_result.get('limit', 0),
+                'remaining': increment_result.get('remaining', 0)
+            }
+        }) # OK (200)
 
-    # Add specific exception handling for Firestore errors if needed
     except Exception as e:
         print(f"Error in /start-mock-interview: {e}")
         traceback.print_exc()
-        # Check if it's the specific TypeError we saw
-        if isinstance(e, TypeError) and 'Cannot convert to a Firestore Value' in str(e):
-             return jsonify({'error': f'Server error preparing interview data: {str(e)}'}), 500
         return jsonify({'error': f'Server error starting interview: {str(e)}'}), 500
 
 
@@ -6444,6 +7466,126 @@ def get_progress_history(session_id):
         traceback.print_exc()
         return jsonify({'error': f'Server error retrieving progress: {str(e)}'}), 500
 
+@app.route('/check-feature-access', methods=['POST'])
+def check_feature_access_route():
+    """API endpoint to check if user can access a specific feature based on plan."""
+    try:
+        data = request.get_json()
+        if not data: return jsonify({'error': 'Invalid JSON payload'}), 400
+        
+        user_id = data.get('userId')
+        feature_type = data.get('feature')
+        
+        if not user_id: return jsonify({'error': 'User ID required'}), 400
+        if not feature_type: return jsonify({'error': 'Feature type required'}), 400
+        if not db: return jsonify({'error': 'Database unavailable'}), 503
+        
+        if feature_type not in ['resumeAnalyses', 'mockInterviews']:
+            return jsonify({'error': f'Invalid feature type: {feature_type}'}), 400
+            
+        # Check access
+        access_result = check_feature_access(user_id, feature_type)
+        
+        # Return the result directly
+        return jsonify(access_result)
+        
+    except Exception as e:
+        print(f"Error in /check-feature-access: {e}")
+        traceback.print_exc()
+        return jsonify({'error': f'Server error: {str(e)}', 'allowed': False}), 500
+
+
+@app.route('/update-user-plan', methods=['POST'])
+def update_user_plan():
+    """Updates a user's plan in Firestore."""
+    try:
+        data = request.get_json()
+        if not data: return jsonify({'error': 'Invalid JSON payload'}), 400
+        
+        user_id = data.get('userId')
+        plan_name = data.get('plan')
+        
+        if not user_id: return jsonify({'error': 'User ID required'}), 400
+        if not plan_name: return jsonify({'error': 'Plan name required'}), 400
+        if not db: return jsonify({'error': 'Database unavailable'}), 503
+        
+        # Validate plan name
+        valid_plans = ['free', 'starter', 'standard', 'pro']
+        if plan_name not in valid_plans:
+            return jsonify({'error': f'Invalid plan name: {plan_name}. Valid plans: {", ".join(valid_plans)}'}), 400
+            
+        # Get user profile to keep current usage 
+        user_data = get_user_usage(user_id)
+        if not user_data:
+            return jsonify({'error': f'User {user_id} not found'}), 404
+            
+        # Calculate new limits based on plan
+        resume_limit = get_package_limit(plan_name, 'resumeAnalyses')
+        interview_limit = get_package_limit(plan_name, 'mockInterviews')
+        
+        # Keep track of current usage (or default to 0)
+        current_resume_used = user_data.get('usage', {}).get('resumeAnalyses', {}).get('used', 0)
+        current_interview_used = user_data.get('usage', {}).get('mockInterviews', {}).get('used', 0)
+        
+        # Update user profile
+        user_ref = db.collection('users').document(user_id)
+        update_data = {
+            'plan': plan_name,
+            'planPurchasedAt': datetime.now().isoformat(),
+            'planExpiresAt': None,  # No expiration for now
+            'usage.resumeAnalyses.limit': resume_limit,
+            'usage.resumeAnalyses.used': current_resume_used,
+            'usage.mockInterviews.limit': interview_limit,
+            'usage.mockInterviews.used': current_interview_used,
+            'last_updated': firestore.SERVER_TIMESTAMP
+        }
+        
+        user_ref.update(update_data)
+        print(f"Updated user {user_id} to plan: {plan_name}")
+        
+        return jsonify({
+            'success': True,
+            'plan': plan_name,
+            'resumeLimit': resume_limit,
+            'interviewLimit': interview_limit,
+            'resumeUsed': current_resume_used,
+            'interviewUsed': current_interview_used
+        })
+        
+    except Exception as e:
+        print(f"Error in /update-user-plan: {e}")
+        traceback.print_exc()
+        return jsonify({'error': f'Server error: {str(e)}', 'success': False}), 500
+
+
+@app.route('/get-user-usage/<user_id>', methods=['GET'])
+def get_user_usage_route(user_id):
+    """Returns usage statistics for a user."""
+    try:
+        if not user_id: return jsonify({'error': 'User ID required'}), 400
+        if not db: return jsonify({'error': 'Database unavailable'}), 503
+        
+        user_data = get_user_usage(user_id)
+        if not user_data:
+            return jsonify({'error': f'User {user_id} not found'}), 404
+            
+        # Extract relevant information only
+        usage_data = {
+            'userId': user_id,
+            'plan': user_data.get('plan', 'free'),
+            'planPurchasedAt': user_data.get('planPurchasedAt'),
+            'planExpiresAt': user_data.get('planExpiresAt'),
+            'resumeAnalyses': user_data.get('usage', {}).get('resumeAnalyses', {'used': 0, 'limit': 0}),
+            'mockInterviews': user_data.get('usage', {}).get('mockInterviews', {'used': 0, 'limit': 0})
+        }
+        
+        return jsonify(usage_data)
+        
+    except Exception as e:
+        print(f"Error in /get-user-usage: {e}")
+        traceback.print_exc()
+        return jsonify({'error': f'Server error: {str(e)}'}), 500
+
 
 # --- Cleanup Function (Needs Review/Replacement with TTL) ---
 # Commenting out for now, as direct deletion based on time is inefficient
@@ -6478,1083 +7620,1258 @@ if __name__ == '__main__':
     # Use `flask run --port=5000` or `gunicorn backend:app` locally.
     # app.run(host='0.0.0.0', port=PORT, debug=False) # debug=False for production-like Gunicorn behavior
 
+styles.css:
 
+/* Main Styles for IRIS - Interview Readiness & Improvement System */
 
-    /* Main Styles for IRIS - Interview Readiness & Improvement System */
+:root {
+    --primary-color: #4a6fdc;
+    --secondary-color: #6c757d;
+    --accent-color: #53b3cb;
+    --success-color: #28a745;
+    --warning-color: #ffc107;
+    --danger-color: #dc3545;
+    --light-color: #f8f9fa;
+    --dark-color: #343a40;
+    --sidebar-width: 260px;
+    --gradient-start: #4a6fdc;
+    --gradient-end: #53b3cb;
+    --transition-speed: 0.3s;
+}
 
-    :root {
-        --primary-color: #4a6fdc;
-        --secondary-color: #6c757d;
-        --accent-color: #53b3cb;
-        --success-color: #28a745;
-        --warning-color: #ffc107;
-        --danger-color: #dc3545;
-        --light-color: #f8f9fa;
-        --dark-color: #343a40;
-        --sidebar-width: 260px;
-        --gradient-start: #4a6fdc;
-        --gradient-end: #53b3cb;
-        --transition-speed: 0.3s;
+/* Base Styles */
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background-color: #f5f7fa;
+    margin: 0;
+    padding: 0;
+    color: #333;
+}
+
+/* ===== Public View Styles ===== */
+#public-view {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+#public-navbar {
+    background: linear-gradient(to right, var(--gradient-start), var(--gradient-end));
+    padding: 1rem 0;
+}
+
+.iris-logo-sm {
+    font-size: 1.2rem;
+    color: white;
+}
+
+.public-tabs-container {
+    flex: 1;
+}
+
+.public-tab {
+    display: none;
+}
+
+.public-tab.active {
+    display: block;
+    animation: fadeIn 0.5s;
+}
+
+.public-footer {
+    background-color: #2a2f35;
+    color: white;
+    padding: 40px 0 20px;
+}
+
+.public-footer a {
+    color: rgba(255, 255, 255, 0.7);
+    text-decoration: none;
+    transition: color 0.3s;
+}
+
+.public-footer a:hover {
+    color: white;
+}
+
+.public-footer h5 {
+    color: white;
+    margin-bottom: 15px;
+    font-weight: 600;
+}
+
+.social-icons {
+    display: flex;
+    gap: 15px;
+}
+
+.social-icons a {
+    display: inline-flex;
+    justify-content: center;
+    align-items: center;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background-color: rgba(255, 255, 255, 0.1);
+    transition: background-color 0.3s;
+}
+
+.social-icons a:hover {
+    background-color: rgba(255, 255, 255, 0.2);
+}
+
+/* Pricing Cards */
+.pricing-card {
+    height: 100%;
+    transition: transform 0.3s, box-shadow 0.3s;
+}
+
+.pricing-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
+}
+
+.pricing-card .card-header {
+    background-color: #f8f9fa;
+    border-bottom: none;
+    text-align: center;
+    padding: 1.5rem 1rem;
+}
+
+.pricing-card-title {
+    margin: 1.5rem 0;
+    font-size: 2.5rem;
+    text-align: center;
+    font-weight: 600;
+}
+
+.highlight-card {
+    border-color: var(--primary-color);
+    box-shadow: 0 5px 15px rgba(74, 111, 220, 0.2);
+}
+
+.highlight-card .card-header {
+    background: linear-gradient(to right, var(--gradient-start), var(--gradient-end));
+    color: white;
+}
+
+/* Auth Modals */
+#auth-modal .modal-header {
+    background: linear-gradient(to right, var(--gradient-start), var(--gradient-end));
+    color: white;
+}
+
+.separator {
+    display: flex;
+    align-items: center;
+    text-align: center;
+    margin: 10px 0;
+}
+
+.separator::before,
+.separator::after {
+    content: '';
+    flex: 1;
+    border-bottom: 1px solid #ddd;
+}
+
+.separator span {
+    padding: 0 10px;
+    color: #6c757d;
+    font-size: 0.9rem;
+}
+
+/* ===== App View Styles ===== */
+.app-container {
+    display: flex;
+    min-height: 100vh;
+}
+
+/* Sidebar Styles */
+#sidebar {
+    width: var(--sidebar-width);
+    background: linear-gradient(to bottom, var(--gradient-start), var(--gradient-end));
+    color: white;
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    overflow-y: auto;
+    transition: all var(--transition-speed);
+    z-index: 1000;
+    box-shadow: 2px 0 10px rgba(0, 0, 0, 0.1);
+    display: flex;
+    flex-direction: column;
+}
+
+.sidebar-header {
+    padding: 20px;
+    text-align: center;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.sidebar-header h3 {
+    margin: 0;
+    font-size: 24px;
+    font-weight: 700;
+}
+
+.sidebar-header p {
+    font-size: 12px;
+    margin: 5px 0 0;
+    opacity: 0.8;
+}
+
+.nav-items {
+    list-style-type: none;
+    padding: 0;
+    margin: 20px 0;
+    flex-grow: 1;
+}
+
+.nav-item {
+    padding: 15px 20px;
+    cursor: pointer;
+    transition: background-color var(--transition-speed);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-left: 3px solid transparent;
+}
+
+.nav-item i {
+    margin-right: 10px;
+    width: 20px;
+    text-align: center;
+}
+
+.nav-item:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+}
+
+.nav-item.active {
+    background-color: rgba(255, 255, 255, 0.2);
+    border-left: 3px solid white;
+}
+
+.status-indicator {
+    font-size: 12px;
+    border-radius: 50%;
+    width: 22px;
+    height: 22px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.status-indicator.locked {
+    background-color: rgba(0, 0, 0, 0.3);
+}
+
+.status-indicator.unlocked {
+    background-color: var(--success-color);
+}
+
+/* User Info in Sidebar */
+.sidebar-user-info {
+    padding: 15px;
+    border-top: 1px solid rgba(255, 255, 255, 0.2);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.user-avatar-container {
+    position: relative;
+    margin-bottom: 10px;
+}
+
+.user-avatar {
+    width: 64px;
+    height: 64px;
+    object-fit: cover;
+    border: 2px solid white;
+}
+
+.user-plan-badge {
+    position: absolute;
+    bottom: -5px;
+    right: -5px;
+    background: var(--warning-color);
+    color: #333;
+    font-size: 10px;
+    font-weight: bold;
+    padding: 3px 8px;
+    border-radius: 10px;
+    text-transform: uppercase;
+}
+
+.user-details {
+    text-align: center;
+    margin-bottom: 10px;
+}
+
+.user-display-name {
+    display: block;
+    font-weight: bold;
+    font-size: 14px;
+}
+
+.user-email {
+    display: block;
+    opacity: 0.8;
+    font-size: 12px;
+}
+
+.sidebar-footer {
+    padding: 20px;
+    text-align: center;
+    font-size: 12px;
+    opacity: 0.7;
+    border-top: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+/* Main Content Area */
+#content {
+    flex: 1;
+    padding: 0;
+    overflow-x: hidden;
+    transition: all var(--transition-speed);
+}
+
+.content-section {
+    display: none;
+    padding: 30px 20px;
+    min-height: 100vh;
+}
+
+.content-section.active {
+    display: block;
+    animation: fadeIn 0.5s;
+}
+
+.section-description {
+    color: #6c757d;
+    margin-bottom: 30px;
+}
+
+h2 {
+    color: var(--dark-color);
+    margin-bottom: 20px;
+    position: relative;
+    display: inline-block;
+}
+
+h2:after {
+    content: '';
+    position: absolute;
+    width: 50%;
+    height: 3px;
+    background: linear-gradient(to right, var(--gradient-start), var(--gradient-end));
+    bottom: -10px;
+    left: 0;
+    border-radius: 3px;
+}
+
+/* User Profile Styles */
+.subscription-details h4,
+.subscription-details h5 {
+    margin-bottom: 15px;
+    font-weight: 600;
+}
+
+.subscription-details .badge {
+    font-size: 0.875rem;
+}
+
+.usage-section .progress {
+    height: 8px;
+    border-radius: 4px;
+    background-color: #eee;
+}
+
+.usage-section .progress-bar {
+    background: linear-gradient(to right, var(--gradient-start), var(--gradient-end));
+}
+
+.plan-upgrade {
+    border-top: 1px solid #eee;
+    padding-top: 20px;
+    margin-top: 20px;
+}
+
+.plan-upgrade ul li {
+    margin-bottom: 8px;
+}
+
+#profileViewMode .row {
+    padding: 10px 0;
+    border-bottom: 1px solid #f0f0f0;
+}
+
+#profileViewMode .row:last-child {
+    border-bottom: none;
+}
+
+/* Landing Page Styles */
+.hero-section {
+    padding: 60px 0;
+    text-align: center;
+}
+
+.logo-container {
+    margin-bottom: 30px;
+}
+
+.iris-logo {
+    font-size: 80px;
+    color: var(--primary-color);
+    background: linear-gradient(to right, var(--gradient-start), var(--gradient-end));
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.features-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 30px;
+    margin: 50px 0;
+}
+
+.feature-card {
+    background: white;
+    border-radius: 10px;
+    padding: 30px 20px;
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.05);
+    transition: transform 0.3s, box-shadow 0.3s;
+}
+
+.feature-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
+}
+
+.feature-card i {
+    font-size: 40px;
+    color: var(--primary-color);
+    margin-bottom: 20px;
+}
+
+.get-started-btn {
+    padding: 12px 30px;
+    font-size: 18px;
+    font-weight: 600;
+    background: linear-gradient(to right, var(--gradient-start), var(--gradient-end));
+    border: none;
+    transition: transform 0.3s, box-shadow 0.3s;
+}
+
+.get-started-btn:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 10px 20px rgba(74, 111, 220, 0.2);
+}
+
+/* Upload Page Styles */
+.progress-container {
+    margin-top: 30px;
+    padding: 20px;
+    border-radius: 10px;
+    background-color: white;
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.05);
+}
+
+.progress {
+    height: 10px;
+    margin: 15px 0;
+}
+
+/* Analysis Results Styles */
+.match-score-circle {
+    width: 150px;
+    height: 150px;
+    border-radius: 50%;
+    background: conic-gradient(var(--primary-color) 0% var(--percentage, 0%), #eee var(--percentage, 0%) 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 30px auto;
+    position: relative;
+}
+
+.match-score-circle::before {
+    content: '';
+    position: absolute;
+    width: 130px;
+    height: 130px;
+    border-radius: 50%;
+    background: white;
+}
+
+.match-score-circle span {
+    position: relative;
+    font-size: 36px;
+    font-weight: bold;
+    color: var(--primary-color);
+}
+
+.match-score-circle span:nth-child(2) {
+    font-size: 20px;
+    margin-left: 2px;
+}
+
+/* Prep Plan Styles */
+.focus-areas-list {
+    list-style-type: none;
+    padding: 0;
+}
+
+.focus-areas-list li {
+    padding: 15px;
+    margin-bottom: 10px;
+    background-color: #f8f9fa;
+    border-left: 4px solid var(--primary-color);
+    border-radius: 5px;
+}
+
+.timeline {
+    position: relative;
+    padding: 20px 0;
+}
+
+.timeline::before {
+    content: '';
+    position: absolute;
+    width: 4px;
+    background-color: #f1f1f1;
+    top: 0;
+    bottom: 0;
+    left: 20px;
+    margin-left: -2px;
+}
+
+.timeline-item {
+    padding: 10px 40px;
+    position: relative;
+    background-color: inherit;
+    width: 100%;
+    margin-bottom: 20px;
+}
+
+.timeline-item::before {
+    content: '';
+    position: absolute;
+    width: 20px;
+    height: 20px;
+    left: 15px;
+    background-color: white;
+    border: 4px solid var(--primary-color);
+    top: 15px;
+    border-radius: 50%;
+    z-index: 1;
+}
+
+.timeline-content {
+    padding: 15px;
+    background-color: white;
+    position: relative;
+    border-radius: 5px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+}
+
+.timeline-header {
+    font-weight: bold;
+    margin-bottom: 10px;
+    color: var(--primary-color);
+}
+
+/* Mock Interview Styles */
+.interview-type-selector {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 30px;
+}
+
+.interview-type-selector button {
+    margin: 0 10px;
+    padding: 10px 20px;
+    font-weight: 600;
+}
+
+.interview-container {
+    background-color: white;
+    border-radius: 10px;
+    padding: 30px;
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.05);
+}
+
+.video-card, .avatar-card {
+    height: 400px;
+    margin-bottom: 20px;
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.05);
+    border: none;
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+.video-container {
+    width: 100%;
+    height: 350px;
+    background-color: #292929;
+    position: relative;
+    overflow: hidden;
+}
+
+video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.video-controls {
+    position: absolute;
+    bottom: 20px;
+    right: 20px;
+    display: flex;
+    gap: 10px;
+}
+
+.avatar-container {
+    width: 100%;
+    height: 350px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    background-color: #f5f7fa;
+}
+
+.avatar-circle {
+    width: 150px;
+    height: 150px;
+    background: linear-gradient(to right, var(--gradient-start), var(--gradient-end));
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 10px 20px rgba(74, 111, 220, 0.2);
+    z-index: 2;
+}
+
+.avatar-circle i {
+    font-size: 80px;
+    color: white;
+}
+
+.avatar-pulse-rings {
+    position: absolute;
+    width: 150px;
+    height: 150px;
+}
+
+.pulse-ring {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    background-color: var(--primary-color);
+    opacity: 0;
+    transform: scale(1);
+    animation: pulse 2s infinite;
+}
+
+.pulse-ring:nth-child(2) {
+    animation-delay: 0.5s;
+}
+
+.pulse-ring:nth-child(3) {
+    animation-delay: 1s;
+}
+
+@keyframes pulse {
+    0% {
+        transform: scale(1);
+        opacity: 0.7;
     }
-    
-    /* Base Styles */
-    body {
-        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-        background-color: #f5f7fa;
-        margin: 0;
-        padding: 0;
-        color: #333;
+    100% {
+        transform: scale(2);
+        opacity: 0;
     }
-    
-    /* ===== Public View Styles ===== */
-    #public-view {
-        min-height: 100vh;
-        display: flex;
-        flex-direction: column;
+}
+
+.audio-waves {
+    display: flex;
+    align-items: center;
+    height: 20px;
+    width: 30px;
+    margin-right: 10px;
+}
+
+.audio-waves span {
+    display: inline-block;
+    width: 4px;
+    height: 5px;
+    margin: 0 2px;
+    background-color: #ccc;
+    border-radius: 1px;
+    animation: none;
+}
+
+.audio-waves.active span {
+    animation: soundWave 1s infinite;
+}
+
+.audio-waves.active span:nth-child(1) {
+    animation-delay: 0.1s;
+    height: 10px;
+}
+
+.audio-waves.active span:nth-child(2) {
+    animation-delay: 0.2s;
+    height: 15px;
+}
+
+.audio-waves.active span:nth-child(3) {
+    animation-delay: 0.3s;
+    height: 10px;
+}
+
+.audio-waves.active span:nth-child(4) {
+    animation-delay: 0.4s;
+    height: 5px;
+}
+
+@keyframes soundWave {
+    0%, 100% {
+        transform: scaleY(1);
     }
-    
-    #public-navbar {
-        background: linear-gradient(to right, var(--gradient-start), var(--gradient-end));
-        padding: 1rem 0;
+    50% {
+        transform: scaleY(1.5);
     }
-    
-    .iris-logo-sm {
-        font-size: 1.2rem;
-        color: white;
-    }
-    
-    .public-tabs-container {
-        flex: 1;
-    }
-    
-    .public-tab {
-        display: none;
-    }
-    
-    .public-tab.active {
-        display: block;
-        animation: fadeIn 0.5s;
-    }
-    
-    .public-footer {
-        background-color: #2a2f35;
-        color: white;
-        padding: 40px 0 20px;
-    }
-    
-    .public-footer a {
-        color: rgba(255, 255, 255, 0.7);
-        text-decoration: none;
-        transition: color 0.3s;
-    }
-    
-    .public-footer a:hover {
-        color: white;
-    }
-    
-    .public-footer h5 {
-        color: white;
-        margin-bottom: 15px;
-        font-weight: 600;
-    }
-    
-    .social-icons {
-        display: flex;
-        gap: 15px;
-    }
-    
-    .social-icons a {
-        display: inline-flex;
-        justify-content: center;
-        align-items: center;
-        width: 36px;
-        height: 36px;
-        border-radius: 50%;
-        background-color: rgba(255, 255, 255, 0.1);
-        transition: background-color 0.3s;
-    }
-    
-    .social-icons a:hover {
-        background-color: rgba(255, 255, 255, 0.2);
-    }
-    
-    /* Pricing Cards */
-    .pricing-card {
-        height: 100%;
-        transition: transform 0.3s, box-shadow 0.3s;
-    }
-    
-    .pricing-card:hover {
-        transform: translateY(-5px);
-        box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
-    }
-    
-    .pricing-card .card-header {
-        background-color: #f8f9fa;
-        border-bottom: none;
-        text-align: center;
-        padding: 1.5rem 1rem;
+}
+
+.candidate-speaking-indicator, .interviewer-speaking-indicator {
+    display: flex;
+    align-items: center;
+}
+
+.conversation-card {
+    border: none;
+    border-radius: 10px;
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.05);
+}
+
+.conversation-container {
+    height: 300px;
+    overflow-y: auto;
+    padding: 15px;
+    background-color: #f9f9f9;
+    border-radius: 10px;
+}
+
+.message {
+    padding: 12px 15px;
+    margin-bottom: 15px;
+    border-radius: 10px;
+    max-width: 80%;
+    position: relative;
+}
+
+.message.interviewer {
+    background-color: #ebf5fe;
+    color: #333;
+    margin-right: auto;
+    border-top-left-radius: 0;
+}
+
+.message.candidate {
+    background-color: var(--primary-color);
+    color: white;
+    margin-left: auto;
+    border-top-right-radius: 0;
+}
+
+.message.system {
+    background-color: #f0f0f0;
+    color: #666;
+    margin: 0 auto;
+    font-style: italic;
+    font-size: 0.9rem;
+    text-align: center;
+    border-radius: 5px;
+}
+
+.message .sender {
+    font-weight: bold;
+    margin-bottom: 5px;
+    font-size: 14px;
+}
+
+.recording-indicator {
+    display: none;
+    margin-top: 15px;
+    background-color: #fef8f8;
+    color: var(--danger-color);
+    padding: 10px;
+    border-radius: 5px;
+    text-align: center;
+}
+
+/* Performance Analysis Styles */
+.performance-score-circle {
+    width: 150px;
+    height: 150px;
+    border-radius: 50%;
+    background: conic-gradient(var(--primary-color) 0% var(--percentage, 0%), #eee var(--percentage, 0%) 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 30px auto;
+    position: relative;
+}
+
+.performance-score-circle::before {
+    content: '';
+    position: absolute;
+    width: 130px;
+    height: 130px;
+    border-radius: 50%;
+    background: white;
+}
+
+.performance-score-circle span {
+    position: relative;
+    font-size: 36px;
+    font-weight: bold;
+    color: var(--primary-color);
+}
+
+.performance-score-circle span:nth-child(2) {
+    font-size: 20px;
+    margin-left: 2px;
+}
+
+.score-card {
+    height: 100%;
+}
+
+.score-indicator {
+    text-align: center;
+    margin-bottom: 20px;
+}
+
+.score-value {
+    font-size: 32px;
+    font-weight: bold;
+    color: var(--primary-color);
+}
+
+.score-bar {
+    height: 8px;
+    background-color: #eee;
+    border-radius: 4px;
+    margin-top: 10px;
+    overflow: hidden;
+}
+
+.score-progress {
+    height: 100%;
+    background: linear-gradient(to right, var(--gradient-start), var(--gradient-end));
+    width: 0%;
+    transition: width 1.5s;
+}
+
+.score-details h5 {
+    font-size: 16px;
+    margin-bottom: 10px;
+}
+
+.score-details ul {
+    padding-left: 20px;
+    margin-bottom: 15px;
+}
+
+.score-details li {
+    margin-bottom: 5px;
+}
+
+.interview-transcript {
+    max-height: 400px;
+    overflow-y: auto;
+    padding: 15px;
+    background-color: #f9f9f9;
+    border-radius: 10px;
+}
+
+.transcript-message {
+    padding: 10px 15px;
+    margin-bottom: 10px;
+    border-left: 3px solid;
+}
+
+.transcript-message.interviewer {
+    border-left-color: var(--primary-color);
+    background-color: #f0f7ff;
+}
+
+.transcript-message.candidate {
+    border-left-color: var(--secondary-color);
+    background-color: #f8f9fa;
+}
+
+.transcript-speaker {
+    font-weight: bold;
+    margin-bottom: 5px;
+}
+
+/* Progress History Styles */
+.chart-container {
+    position: relative;
+    height: 300px;
+    margin-bottom: 20px;
+}
+
+.past-interviews-list {
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.past-interview-item {
+    padding: 15px;
+    margin-bottom: 10px;
+    background-color: #f8f9fa;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: background-color 0.3s;
+}
+
+.past-interview-item:hover {
+    background-color: #f0f0f0;
+}
+
+.past-interview-header {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 10px;
+}
+
+.past-interview-type {
+    background-color: #e9ecef;
+    padding: 2px 8px;
+    border-radius: 3px;
+    font-size: 12px;
+}
+
+.past-interview-score {
+    font-weight: bold;
+    color: var(--primary-color);
+}
+
+/* Animations */
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+/* Error Messages */
+#error-messages {
+    max-width: 400px;
+}
+
+/* Responsive Styles */
+@media (max-width: 992px) {
+    #sidebar {
+        width: 220px;
     }
     
     .pricing-card-title {
-        margin: 1.5rem 0;
-        font-size: 2.5rem;
-        text-align: center;
-        font-weight: 600;
+        font-size: 2rem;
     }
-    
-    .highlight-card {
-        border-color: var(--primary-color);
-        box-shadow: 0 5px 15px rgba(74, 111, 220, 0.2);
-    }
-    
-    .highlight-card .card-header {
-        background: linear-gradient(to right, var(--gradient-start), var(--gradient-end));
-        color: white;
-    }
-    
-    /* Auth Modals */
-    #auth-modal .modal-header {
-        background: linear-gradient(to right, var(--gradient-start), var(--gradient-end));
-        color: white;
-    }
-    
-    .separator {
-        display: flex;
-        align-items: center;
-        text-align: center;
-        margin: 10px 0;
-    }
-    
-    .separator::before,
-    .separator::after {
-        content: '';
-        flex: 1;
-        border-bottom: 1px solid #ddd;
-    }
-    
-    .separator span {
-        padding: 0 10px;
-        color: #6c757d;
-        font-size: 0.9rem;
-    }
-    
-    /* ===== App View Styles ===== */
+}
+
+@media (max-width: 768px) {
     .app-container {
-        display: flex;
-        min-height: 100vh;
-    }
-    
-    /* Sidebar Styles */
-    #sidebar {
-        width: var(--sidebar-width);
-        background: linear-gradient(to bottom, var(--gradient-start), var(--gradient-end));
-        color: white;
-        position: sticky;
-        top: 0;
-        height: 100vh;
-        overflow-y: auto;
-        transition: all var(--transition-speed);
-        z-index: 1000;
-        box-shadow: 2px 0 10px rgba(0, 0, 0, 0.1);
-        display: flex;
         flex-direction: column;
     }
     
-    .sidebar-header {
-        padding: 20px;
-        text-align: center;
-        border-bottom: 1px solid rgba(255, 255, 255, 0.2);
-    }
-    
-    .sidebar-header h3 {
-        margin: 0;
-        font-size: 24px;
-        font-weight: 700;
-    }
-    
-    .sidebar-header p {
-        font-size: 12px;
-        margin: 5px 0 0;
-        opacity: 0.8;
-    }
-    
-    .nav-items {
-        list-style-type: none;
-        padding: 0;
-        margin: 20px 0;
-        flex-grow: 1;
+    #sidebar {
+        width: 100%;
+        height: auto;
+        position: relative;
     }
     
     .nav-item {
-        padding: 15px 20px;
-        cursor: pointer;
-        transition: background-color var(--transition-speed);
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        border-left: 3px solid transparent;
+        padding: 10px 15px;
     }
     
-    .nav-item i {
-        margin-right: 10px;
-        width: 20px;
-        text-align: center;
+    .vi
+deo-card, .avatar-card {
+        height: 300px;
     }
     
-    .nav-item:hover {
-        background-color: rgba(255, 255, 255, 0.1);
+    .video-container, .avatar-container {
+        height: 250px;
     }
     
-    .nav-item.active {
-        background-color: rgba(255, 255, 255, 0.2);
-        border-left: 3px solid white;
+    .features-grid {
+        grid-template-columns: 1fr;
     }
     
-    .status-indicator {
-        font-size: 12px;
-        border-radius: 50%;
-        width: 22px;
-        height: 22px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-    }
-    
-    .status-indicator.locked {
-        background-color: rgba(0, 0, 0, 0.3);
-    }
-    
-    .status-indicator.unlocked {
-        background-color: var(--success-color);
-    }
-    
-    /* User Info in Sidebar */
     .sidebar-user-info {
-        padding: 15px;
-        border-top: 1px solid rgba(255, 255, 255, 0.2);
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-    }
-    
-    .user-avatar-container {
-        position: relative;
-        margin-bottom: 10px;
+        flex-direction: row;
+        justify-content: space-between;
     }
     
     .user-avatar {
-        width: 64px;
-        height: 64px;
-        object-fit: cover;
-        border: 2px solid white;
+        width: 40px;
+        height: 40px;
     }
     
     .user-plan-badge {
-        position: absolute;
-        bottom: -5px;
-        right: -5px;
-        background: var(--warning-color);
-        color: #333;
-        font-size: 10px;
-        font-weight: bold;
-        padding: 3px 8px;
-        border-radius: 10px;
-        text-transform: uppercase;
-    }
-    
-    .user-details {
-        text-align: center;
-        margin-bottom: 10px;
-    }
-    
-    .user-display-name {
-        display: block;
-        font-weight: bold;
-        font-size: 14px;
-    }
-    
-    .user-email {
-        display: block;
-        opacity: 0.8;
-        font-size: 12px;
-    }
-    
-    .sidebar-footer {
-        padding: 20px;
-        text-align: center;
-        font-size: 12px;
-        opacity: 0.7;
-        border-top: 1px solid rgba(255, 255, 255, 0.2);
-    }
-    
-    /* Main Content Area */
-    #content {
-        flex: 1;
-        padding: 0;
-        overflow-x: hidden;
-        transition: all var(--transition-speed);
-    }
-    
-    .content-section {
-        display: none;
-        padding: 30px 20px;
-        min-height: 100vh;
-    }
-    
-    .content-section.active {
-        display: block;
-        animation: fadeIn 0.5s;
-    }
-    
-    .section-description {
-        color: #6c757d;
-        margin-bottom: 30px;
-    }
-    
-    h2 {
-        color: var(--dark-color);
-        margin-bottom: 20px;
-        position: relative;
-        display: inline-block;
-    }
-    
-    h2:after {
-        content: '';
-        position: absolute;
-        width: 50%;
-        height: 3px;
-        background: linear-gradient(to right, var(--gradient-start), var(--gradient-end));
-        bottom: -10px;
-        left: 0;
-        border-radius: 3px;
-    }
-    
-    /* User Profile Styles */
-    .subscription-details h4,
-    .subscription-details h5 {
-        margin-bottom: 15px;
-        font-weight: 600;
-    }
-    
-    .subscription-details .badge {
-        font-size: 0.875rem;
-    }
-    
-    .usage-section .progress {
-        height: 8px;
-        border-radius: 4px;
-        background-color: #eee;
-    }
-    
-    .usage-section .progress-bar {
-        background: linear-gradient(to right, var(--gradient-start), var(--gradient-end));
-    }
-    
-    .plan-upgrade {
-        border-top: 1px solid #eee;
-        padding-top: 20px;
-        margin-top: 20px;
-    }
-    
-    .plan-upgrade ul li {
-        margin-bottom: 8px;
-    }
-    
-    #profileViewMode .row {
-        padding: 10px 0;
-        border-bottom: 1px solid #f0f0f0;
-    }
-    
-    #profileViewMode .row:last-child {
-        border-bottom: none;
-    }
-    
-    /* Landing Page Styles */
-    .hero-section {
-        padding: 60px 0;
-        text-align: center;
-    }
-    
-    .logo-container {
-        margin-bottom: 30px;
-    }
-    
-    .iris-logo {
-        font-size: 80px;
-        color: var(--primary-color);
-        background: linear-gradient(to right, var(--gradient-start), var(--gradient-end));
-        background-clip: text;
-        -webkit-text-fill-color: transparent;
-    }
-    
-    .features-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-        gap: 30px;
-        margin: 50px 0;
-    }
-    
-    .feature-card {
-        background: white;
-        border-radius: 10px;
-        padding: 30px 20px;
-        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.05);
-        transition: transform 0.3s, box-shadow 0.3s;
-    }
-    
-    .feature-card:hover {
-        transform: translateY(-5px);
-        box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
-    }
-    
-    .feature-card i {
-        font-size: 40px;
-        color: var(--primary-color);
-        margin-bottom: 20px;
-    }
-    
-    .get-started-btn {
-        padding: 12px 30px;
-        font-size: 18px;
-        font-weight: 600;
-        background: linear-gradient(to right, var(--gradient-start), var(--gradient-end));
-        border: none;
-        transition: transform 0.3s, box-shadow 0.3s;
-    }
-    
-    .get-started-btn:hover {
-        transform: translateY(-3px);
-        box-shadow: 0 10px 20px rgba(74, 111, 220, 0.2);
-    }
-    
-    /* Upload Page Styles */
-    .progress-container {
-        margin-top: 30px;
-        padding: 20px;
-        border-radius: 10px;
-        background-color: white;
-        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.05);
-    }
-    
-    .progress {
-        height: 10px;
-        margin: 15px 0;
-    }
-    
-    /* Analysis Results Styles */
-    .match-score-circle {
-        width: 150px;
-        height: 150px;
-        border-radius: 50%;
-        background: conic-gradient(var(--primary-color) 0% var(--percentage, 0%), #eee var(--percentage, 0%) 100%);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        margin: 30px auto;
-        position: relative;
-    }
-    
-    .match-score-circle::before {
-        content: '';
-        position: absolute;
-        width: 130px;
-        height: 130px;
-        border-radius: 50%;
-        background: white;
-    }
-    
-    .match-score-circle span {
-        position: relative;
-        font-size: 36px;
-        font-weight: bold;
-        color: var(--primary-color);
-    }
-    
-    .match-score-circle span:nth-child(2) {
-        font-size: 20px;
-        margin-left: 2px;
-    }
-    
-    /* Prep Plan Styles */
-    .focus-areas-list {
-        list-style-type: none;
-        padding: 0;
-    }
-    
-    .focus-areas-list li {
-        padding: 15px;
-        margin-bottom: 10px;
-        background-color: #f8f9fa;
-        border-left: 4px solid var(--primary-color);
-        border-radius: 5px;
-    }
-    
-    .timeline {
-        position: relative;
-        padding: 20px 0;
-    }
-    
-    .timeline::before {
-        content: '';
-        position: absolute;
-        width: 4px;
-        background-color: #f1f1f1;
-        top: 0;
-        bottom: 0;
-        left: 20px;
-        margin-left: -2px;
-    }
-    
-    .timeline-item {
-        padding: 10px 40px;
-        position: relative;
-        background-color: inherit;
-        width: 100%;
-        margin-bottom: 20px;
-    }
-    
-    .timeline-item::before {
-        content: '';
-        position: absolute;
-        width: 20px;
-        height: 20px;
-        left: 15px;
-        background-color: white;
-        border: 4px solid var(--primary-color);
-        top: 15px;
-        border-radius: 50%;
-        z-index: 1;
-    }
-    
-    .timeline-content {
-        padding: 15px;
-        background-color: white;
-        position: relative;
-        border-radius: 5px;
-        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
-    }
-    
-    .timeline-header {
-        font-weight: bold;
-        margin-bottom: 10px;
-        color: var(--primary-color);
-    }
-    
-    /* Mock Interview Styles */
-    .interview-type-selector {
-        display: flex;
-        justify-content: center;
-        margin-bottom: 30px;
-    }
-    
-    .interview-type-selector button {
-        margin: 0 10px;
-        padding: 10px 20px;
-        font-weight: 600;
-    }
-    
-    .interview-container {
-        background-color: white;
-        border-radius: 10px;
-        padding: 30px;
-        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.05);
-    }
-    
-    .video-card, .avatar-card {
-        height: 400px;
-        margin-bottom: 20px;
-        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.05);
-        border: none;
-        border-radius: 10px;
-        overflow: hidden;
-    }
-    
-    .video-container {
-        width: 100%;
-        height: 350px;
-        background-color: #292929;
-        position: relative;
-        overflow: hidden;
-    }
-    
-    video {
-        width: 100%;
-        height: 100%;
-        object-fit: cover;
-    }
-    
-    .video-controls {
-        position: absolute;
-        bottom: 20px;
-        right: 20px;
-        display: flex;
-        gap: 10px;
-    }
-    
-    .avatar-container {
-        width: 100%;
-        height: 350px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        position: relative;
-        background-color: #f5f7fa;
-    }
-    
-    .avatar-circle {
-        width: 150px;
-        height: 150px;
-        background: linear-gradient(to right, var(--gradient-start), var(--gradient-end));
-        border-radius: 50%;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        box-shadow: 0 10px 20px rgba(74, 111, 220, 0.2);
-        z-index: 2;
-    }
-    
-    .avatar-circle i {
-        font-size: 80px;
-        color: white;
-    }
-    
-    .avatar-pulse-rings {
-        position: absolute;
-        width: 150px;
-        height: 150px;
-    }
-    
-    .pulse-ring {
-        position: absolute;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        border-radius: 50%;
-        background-color: var(--primary-color);
-        opacity: 0;
-        transform: scale(1);
-        animation: pulse 2s infinite;
-    }
-    
-    .pulse-ring:nth-child(2) {
-        animation-delay: 0.5s;
-    }
-    
-    .pulse-ring:nth-child(3) {
-        animation-delay: 1s;
-    }
-    
-    @keyframes pulse {
-        0% {
-            transform: scale(1);
-            opacity: 0.7;
-        }
-        100% {
-            transform: scale(2);
-            opacity: 0;
-        }
-    }
-    
-    .audio-waves {
-        display: flex;
-        align-items: center;
-        height: 20px;
-        width: 30px;
-        margin-right: 10px;
-    }
-    
-    .audio-waves span {
-        display: inline-block;
-        width: 4px;
-        height: 5px;
-        margin: 0 2px;
-        background-color: #ccc;
-        border-radius: 1px;
-        animation: none;
-    }
-    
-    .audio-waves.active span {
-        animation: soundWave 1s infinite;
-    }
-    
-    .audio-waves.active span:nth-child(1) {
-        animation-delay: 0.1s;
-        height: 10px;
-    }
-    
-    .audio-waves.active span:nth-child(2) {
-        animation-delay: 0.2s;
-        height: 15px;
-    }
-    
-    .audio-waves.active span:nth-child(3) {
-        animation-delay: 0.3s;
-        height: 10px;
-    }
-    
-    .audio-waves.active span:nth-child(4) {
-        animation-delay: 0.4s;
-        height: 5px;
-    }
-    
-    @keyframes soundWave {
-        0%, 100% {
-            transform: scaleY(1);
-        }
-        50% {
-            transform: scaleY(1.5);
-        }
-    }
-    
-    .candidate-speaking-indicator, .interviewer-speaking-indicator {
-        display: flex;
-        align-items: center;
-    }
-    
-    .conversation-card {
-        border: none;
-        border-radius: 10px;
-        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.05);
-    }
-    
-    .conversation-container {
-        height: 300px;
-        overflow-y: auto;
-        padding: 15px;
-        background-color: #f9f9f9;
-        border-radius: 10px;
-    }
-    
-    .message {
-        padding: 12px 15px;
-        margin-bottom: 15px;
-        border-radius: 10px;
-        max-width: 80%;
-        position: relative;
-    }
-    
-    .message.interviewer {
-        background-color: #ebf5fe;
-        color: #333;
-        margin-right: auto;
-        border-top-left-radius: 0;
-    }
-    
-    .message.candidate {
-        background-color: var(--primary-color);
-        color: white;
-        margin-left: auto;
-        border-top-right-radius: 0;
-    }
-    
-    .message.system {
-        background-color: #f0f0f0;
-        color: #666;
-        margin: 0 auto;
-        font-style: italic;
-        font-size: 0.9rem;
-        text-align: center;
-        border-radius: 5px;
-    }
-    
-    .message .sender {
-        font-weight: bold;
-        margin-bottom: 5px;
-        font-size: 14px;
-    }
-    
-    .recording-indicator {
-        display: none;
-        margin-top: 15px;
-        background-color: #fef8f8;
-        color: var(--danger-color);
-        padding: 10px;
-        border-radius: 5px;
-        text-align: center;
-    }
-    
-    /* Performance Analysis Styles */
-    .performance-score-circle {
-        width: 150px;
-        height: 150px;
-        border-radius: 50%;
-        background: conic-gradient(var(--primary-color) 0% var(--percentage, 0%), #eee var(--percentage, 0%) 100%);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        margin: 30px auto;
-        position: relative;
-    }
-    
-    .performance-score-circle::before {
-        content: '';
-        position: absolute;
-        width: 130px;
-        height: 130px;
-        border-radius: 50%;
-        background: white;
-    }
-    
-    .performance-score-circle span {
-        position: relative;
-        font-size: 36px;
-        font-weight: bold;
-        color: var(--primary-color);
-    }
-    
-    .performance-score-circle span:nth-child(2) {
-        font-size: 20px;
-        margin-left: 2px;
-    }
-    
-    .score-card {
-        height: 100%;
-    }
-    
-    .score-indicator {
-        text-align: center;
-        margin-bottom: 20px;
-    }
-    
-    .score-value {
-        font-size: 32px;
-        font-weight: bold;
-        color: var(--primary-color);
-    }
-    
-    .score-bar {
-        height: 8px;
-        background-color: #eee;
-        border-radius: 4px;
-        margin-top: 10px;
-        overflow: hidden;
-    }
-    
-    .score-progress {
-        height: 100%;
-        background: linear-gradient(to right, var(--gradient-start), var(--gradient-end));
-        width: 0%;
-        transition: width 1.5s;
-    }
-    
-    .score-details h5 {
-        font-size: 16px;
-        margin-bottom: 10px;
-    }
-    
-    .score-details ul {
-        padding-left: 20px;
-        margin-bottom: 15px;
-    }
-    
-    .score-details li {
-        margin-bottom: 5px;
-    }
-    
-    .interview-transcript {
-        max-height: 400px;
-        overflow-y: auto;
-        padding: 15px;
-        background-color: #f9f9f9;
-        border-radius: 10px;
-    }
-    
-    .transcript-message {
-        padding: 10px 15px;
-        margin-bottom: 10px;
-        border-left: 3px solid;
-    }
-    
-    .transcript-message.interviewer {
-        border-left-color: var(--primary-color);
-        background-color: #f0f7ff;
-    }
-    
-    .transcript-message.candidate {
-        border-left-color: var(--secondary-color);
-        background-color: #f8f9fa;
-    }
-    
-    .transcript-speaker {
-        font-weight: bold;
-        margin-bottom: 5px;
-    }
-    
-    /* Progress History Styles */
-    .chart-container {
-        position: relative;
-        height: 300px;
-        margin-bottom: 20px;
-    }
-    
-    .past-interviews-list {
-        max-height: 300px;
-        overflow-y: auto;
-    }
-    
-    .past-interview-item {
-        padding: 15px;
-        margin-bottom: 10px;
-        background-color: #f8f9fa;
-        border-radius: 5px;
-        cursor: pointer;
-        transition: background-color 0.3s;
-    }
-    
-    .past-interview-item:hover {
-        background-color: #f0f0f0;
-    }
-    
-    .past-interview-header {
-        display: flex;
-        justify-content: space-between;
-        margin-bottom: 10px;
-    }
-    
-    .past-interview-type {
-        background-color: #e9ecef;
-        padding: 2px 8px;
-        border-radius: 3px;
-        font-size: 12px;
-    }
-    
-    .past-interview-score {
-        font-weight: bold;
-        color: var(--primary-color);
-    }
-    
-    /* Animations */
-    @keyframes fadeIn {
-        from { opacity: 0; }
-        to { opacity: 1; }
-    }
-    
-    /* Error Messages */
-    #error-messages {
-        max-width: 400px;
-    }
-    
-    /* Responsive Styles */
-    @media (max-width: 992px) {
-        #sidebar {
-            width: 220px;
-        }
-        
-        .pricing-card-title {
-            font-size: 2rem;
-        }
-    }
-    
-    @media (max-width: 768px) {
-        .app-container {
-            flex-direction: column;
-        }
-        
-        #sidebar {
-            width: 100%;
-            height: auto;
-            position: relative;
-        }
-        
-        .nav-item {
-            padding: 10px 15px;
-        }
-        
-        .vi
-    deo-card, .avatar-card {
-            height: 300px;
-        }
-        
-        .video-container, .avatar-container {
-            height: 250px;
-        }
-        
-        .features-grid {
-            grid-template-columns: 1fr;
-        }
-        
-        .sidebar-user-info {
-            flex-direction: row;
-            justify-content: space-between;
-        }
-        
-        .user-avatar {
-            width: 40px;
-            height: 40px;
-        }
-        
-        .user-plan-badge {
-            font-size: 8px;
-        }
-    }
-    
-    /* Utilities */
-    .text-center {
-        text-align: center;
-    }
-    
-    .mt-3 {
-        margin-top: 15px;
-    }
-    
-    .mt-4 {
-        margin-top: 20px;
-    }
-    
-    .mb-4 {
-        margin-bottom: 20px;
-    }
-    
-    .hero-section {
-        padding-bottom: 0; /* Reduce bottom padding if sections follow directly */
-    }
-    
-    .features-grid {
-        margin-bottom: 3rem; /* Add space below features grid */
-    }
-    
-    /* Style for the numbered steps */
-    .step-number {
-        display: inline-block;
-        width: 40px;
-        height: 40px;
-        line-height: 40px;
-        border-radius: 50%;
-        background-color: var(--primary-color);
-        color: white;
-        font-weight: bold;
-        font-size: 1.2rem;
-        text-align: center;
-        margin-bottom: 15px;
-    }
-    
-    /* Spacing between new sections */
-    #welcome-tab > .container.py-5,
-    #welcome-tab > .bg-light.py-5 {
-        margin-bottom: 3rem; /* Add space between content blocks */
-    }
-    
-    /* Ensure consistent icon colors if needed */
-    .text-primary {
-        color: var(--primary-color) !important;
-    }
-    .text-success {
-         color: var(--success-color) !important;
-    }
-    .text-danger {
-        color: var(--danger-color) !important;
-    }
-    
-    /* Add some padding to new text sections */
-    .container.py-5 h2 + p {
-        margin-top: 1rem;
-    }
-    .container.py-5 ul {
-        margin-top: 1.5rem;
-        padding-left: 1rem; /* Adjust bullet point indentation */
-    }
-    .container.py-5 ul li {
-        margin-bottom: 0.75rem;
-    }
+        font-size: 8px;
+    }
+}
+
+/* Utilities */
+.text-center {
+    text-align: center;
+}
+
+.mt-3 {
+    margin-top: 15px;
+}
+
+.mt-4 {
+    margin-top: 20px;
+}
+
+.mb-4 {
+    margin-bottom: 20px;
+}
+
+.hero-section {
+    padding-bottom: 0; /* Reduce bottom padding if sections follow directly */
+}
+
+.features-grid {
+    margin-bottom: 3rem; /* Add space below features grid */
+}
+
+/* Style for the numbered steps */
+.step-number {
+    display: inline-block;
+    width: 40px;
+    height: 40px;
+    line-height: 40px;
+    border-radius: 50%;
+    background-color: var(--primary-color);
+    color: white;
+    font-weight: bold;
+    font-size: 1.2rem;
+    text-align: center;
+    margin-bottom: 15px;
+}
+
+/* Spacing between new sections */
+#welcome-tab > .container.py-5,
+#welcome-tab > .bg-light.py-5 {
+    margin-bottom: 3rem; /* Add space between content blocks */
+}
+
+/* Ensure consistent icon colors if needed */
+.text-primary {
+    color: var(--primary-color) !important;
+}
+.text-success {
+     color: var(--success-color) !important;
+}
+.text-danger {
+    color: var(--danger-color) !important;
+}
+
+/* Add some padding to new text sections */
+.container.py-5 h2 + p {
+    margin-top: 1rem;
+}
+.container.py-5 ul {
+    margin-top: 1.5rem;
+    padding-left: 1rem; /* Adjust bullet point indentation */
+}
+.container.py-5 ul li {
+    margin-bottom: 0.75rem;
+}
+
+/* ==== CSS Updates for Package-Based Implementation ==== */
+
+/* Subscription Card Enhancements */
+.subscription-details {
+    position: relative;
+}
+
+.current-plan {
+    border-bottom: 1px solid #eee;
+    padding-bottom: 15px;
+    margin-bottom: 15px;
+}
+
+.plan-description {
+    color: #666;
+    font-size: 0.9rem;
+}
+
+.user-plan {
+    font-size: 0.875rem;
+    font-weight: 600;
+}
+
+.usage-section .progress {
+    height: 8px;
+    border-radius: 4px;
+    background-color: #eee;
+}
+
+.usage-section .progress-bar {
+    background: linear-gradient(to right, var(--gradient-start), var(--gradient-end));
+    transition: width 0.5s ease-in-out;
+}
+
+.usage-section .progress-bar.bg-warning {
+    background: linear-gradient(to right, #ffc107, #ffb838);
+}
+
+.usage-section .progress-bar.bg-danger {
+    background: linear-gradient(to right, #dc3545, #f56565);
+}
+
+/* Plan upgrade section */
+.plan-upgrade {
+    border-top: 1px solid #eee;
+    padding-top: 15px;
+    margin-top: 15px;
+}
+
+.plan-upgrade ul li {
+    margin-bottom: 8px;
+}
+
+.plan-upgrade .btn-success:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px rgba(40, 167, 69, 0.3);
+}
+
+.plan-upgrade .btn-danger:hover,
+.plan-upgrade .btn-warning:hover {
+    transform: translateY(-2px);
+}
+
+/* ==== Upgrade Modal Styling ==== */
+.modal-dialog.modal-lg {
+    max-width: 900px;
+}
+
+.modal .pricing-card {
+    transition: transform 0.3s, box-shadow 0.3s;
+}
+
+.modal .pricing-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
+}
+
+.modal .pricing-card.border-primary {
+    border-width: 2px !important;
+    box-shadow: 0 5px 15px rgba(74, 111, 220, 0.2);
+}
+
+.badge.position-absolute {
+    z-index: 2;
+}
+
+/* Payment Success Modal Styling */
+.checkmark-circle {
+    width: 100px;
+    height: 100px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: #28a745;
+    margin: 0 auto;
+    color: white;
+    font-size: 50px;
+    margin-top: 1rem;
+}
+
+/* ==== Feature Lock/Unlock Indicators ==== */
+.status-indicator.locked,
+.status-indicator.unlocked {
+    transition: all 0.3s ease;
+}
+
+.status-indicator.locked {
+    background-color: rgba(0, 0, 0, 0.3);
+    color: rgba(255, 255, 255, 0.7);
+}
+
+.status-indicator.unlocked {
+    background-color: var(--success-color);
+    animation: pulse-success 2s;
+}
+
+@keyframes pulse-success {
+    0% {
+        box-shadow: 0 0 0 0 rgba(40, 167, 69, 0.7);
+    }
+    70% {
+        box-shadow: 0 0 0 10px rgba(40, 167, 69, 0);
+    }
+    100% {
+        box-shadow: 0 0 0 0 rgba(40, 167, 69, 0);
+    }
+}
+
+/* Feature Card Modifications */
+.feature-card.locked {
+    opacity: 0.7;
+    position: relative;
+}
+
+.feature-card.locked::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.1);
+    z-index: 1;
+}
+
+.feature-card.locked .lock-icon {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    color: #dc3545;
+    font-size: 1.25rem;
+    z-index: 2;
+}
+
+/* Limit Modal */
+#limitReachedModal .modal-header.bg-warning {
+    color: #212529;
+}
+
+#limitReachedModal .btn-primary {
+    background: linear-gradient(to right, var(--gradient-start), var(--gradient-end));
+    border: none;
+}
+
+/* Payment Processing Modal */
+#paymentProcessingModal .progress {
+    height: 10px;
+    border-radius: 5px;
+}
+
+#paymentProcessingModal .progress-bar {
+    background: linear-gradient(to right, var(--gradient-start), var(--gradient-end));
+}
