@@ -12,8 +12,8 @@
     ],
     "rewrites": [
       {
-        "source": "/teachers/**",
-        "destination": "/teacher_dashboard/index.html"
+        "source": "/teachers/**", 
+        "destination": "/teacher_dashboard/index.html" 
       },
       {
         "source": "**",
