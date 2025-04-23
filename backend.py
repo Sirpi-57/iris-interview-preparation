@@ -21,7 +21,7 @@ import traceback
 
 # --- Add Firebase Imports ---
 import firebase_admin
-from firebase_admin import credentials, firestore, storage # storage client initialized but not used yet
+from firebase_admin import credentials, firestore, storage, auth # storage client initialized but not used yet
 # --- End Firebase Imports ---
 
 # Load environment variables (keep this)
@@ -1858,6 +1858,340 @@ def get_user_usage_route(user_id):
         print(f"Error in /get-user-usage: {e}")
         traceback.print_exc()
         return jsonify({'error': f'Server error: {str(e)}'}), 500
+
+# Environment variable for the teacher secret key
+TEACHER_SECRET_KEY = os.environ.get("TEACHER_SECRET_KEY")
+
+@app.route('/create_student_account', methods=['POST'])
+def create_student_account():
+    """Handles student signup, creates Auth user, sets 'student' claim, and creates Firestore doc."""
+    if not db: return jsonify({'error': 'Database unavailable'}), 503
+
+    try:
+        data = request.get_json()
+        if not data: return jsonify({'error': 'Invalid JSON payload'}), 400
+
+        email = data.get('email')
+        password = data.get('password')
+        display_name = data.get('displayName')
+
+        if not email or not password:
+            return jsonify({'error': 'Email and password required'}), 400
+        if len(password) < 6:
+             return jsonify({'error': 'Password must be at least 6 characters'}), 400
+
+        print(f"Attempting to create STUDENT account for: {email}")
+
+        try:
+            # Create user in Firebase Authentication
+            user_record = auth.create_user(
+                email=email,
+                password=password,
+                display_name=display_name or email.split('@')[0] # Default display name
+            )
+            print(f"Successfully created Auth user for {email} with UID: {user_record.uid}")
+
+            # Set custom claim for 'student' role
+            auth.set_custom_user_claims(user_record.uid, {'role': 'student'})
+            print(f"Successfully set 'student' role claim for UID: {user_record.uid}")
+
+            # Create user profile in Firestore
+            user_ref = db.collection('users').document(user_record.uid)
+            user_profile_data = {
+                'uid': user_record.uid,
+                'email': user_record.email,
+                'displayName': user_record.display_name,
+                'role': 'student', # Store role in Firestore too for easy querying
+                'createdAt': firestore.SERVER_TIMESTAMP,
+                'last_updated': firestore.SERVER_TIMESTAMP,
+                'plan': 'free', # Default plan
+                'planPurchasedAt': firestore.SERVER_TIMESTAMP,
+                'planExpiresAt': None,
+                'usage': { # Initialize usage structure
+                    'resumeAnalyses': {'used': 0, 'limit': get_package_limit('free', 'resumeAnalyses')},
+                    'mockInterviews': {'used': 0, 'limit': get_package_limit('free', 'mockInterviews')}
+                },
+                # Initialize optional fields
+                'collegeId': None,
+                'deptId': None,
+                'sectionId': None,
+            }
+            user_ref.set(user_profile_data)
+            print(f"Successfully created Firestore profile for student UID: {user_record.uid}")
+
+            return jsonify({'success': True, 'uid': user_record.uid, 'role': 'student'}), 201 # Created
+
+        except auth.EmailAlreadyExistsError:
+            print(f"Student signup failed: Email {email} already exists.")
+            return jsonify({'error': 'Email address already in use'}), 409 # Conflict
+        except Exception as e:
+            print(f"Error during student account creation for {email}: {e}")
+            traceback.print_exc()
+            # Clean up partial creation if possible (e.g., delete Auth user if Firestore failed)
+            # This requires careful error handling based on where the failure occurred
+            try:
+                # If user was created in Auth but Firestore failed, maybe delete Auth user?
+                if 'user_record' in locals() and user_record:
+                    print(f"Attempting cleanup: Deleting Auth user {user_record.uid} due to subsequent error.")
+                    auth.delete_user(user_record.uid)
+            except Exception as cleanup_error:
+                 print(f"Error during cleanup for failed student signup {email}: {cleanup_error}")
+
+            return jsonify({'error': f'Server error creating student account: {str(e)}'}), 500
+
+    except Exception as e:
+        print(f"Error in /create_student_account route: {e}")
+        traceback.print_exc()
+        return jsonify({'error': f'Server error: {str(e)}'}), 500
+
+
+@app.route('/create_teacher_account', methods=['POST'])
+def create_teacher_account():
+    """Handles TEACHER signup, validates secret key, creates Auth user, sets 'teacher' claim, and creates Firestore doc."""
+    if not db: return jsonify({'error': 'Database unavailable'}), 503
+    if not TEACHER_SECRET_KEY: # Check if the env var is set
+        print("CRITICAL: TEACHER_SECRET_KEY environment variable is not set.")
+        return jsonify({'error': 'Server configuration error: Teacher signup disabled'}), 500
+
+    try:
+        data = request.get_json()
+        if not data: return jsonify({'error': 'Invalid JSON payload'}), 400
+
+        email = data.get('email')
+        password = data.get('password')
+        display_name = data.get('displayName')
+        submitted_key = data.get('secretKey') # Key from the form
+
+        if not email or not password:
+            return jsonify({'error': 'Email and password required'}), 400
+        if len(password) < 6:
+             return jsonify({'error': 'Password must be at least 6 characters'}), 400
+        if not submitted_key:
+            return jsonify({'error': 'Secret key required for teacher registration'}), 400
+
+        # *** Secure Server-Side Key Validation ***
+        if submitted_key != TEACHER_SECRET_KEY:
+            print(f"Teacher signup attempt failed for {email}: Invalid secret key.")
+            return jsonify({'error': 'Invalid secret key'}), 403 # Forbidden
+
+        print(f"Attempting to create TEACHER account for: {email} (Secret key validated)")
+
+        try:
+            # Create user in Firebase Authentication
+            user_record = auth.create_user(
+                email=email,
+                password=password,
+                display_name=display_name or email.split('@')[0]
+            )
+            print(f"Successfully created Auth user for {email} with UID: {user_record.uid}")
+
+            # Set custom claim for 'teacher' role
+            auth.set_custom_user_claims(user_record.uid, {'role': 'teacher'})
+            print(f"Successfully set 'teacher' role claim for UID: {user_record.uid}")
+
+            # Create teacher profile in Firestore
+            user_ref = db.collection('users').document(user_record.uid)
+            user_profile_data = {
+                'uid': user_record.uid,
+                'email': user_record.email,
+                'displayName': user_record.display_name,
+                'role': 'teacher', # Store role in Firestore
+                'createdAt': firestore.SERVER_TIMESTAMP,
+                'last_updated': firestore.SERVER_TIMESTAMP,
+                # Teachers might not have plans/usage in the same way, or might have default
+                'plan': 'teacher_default', # Or None, depending on your model
+                'usage': {}, # Or specific teacher usage if needed
+                # Initialize assignment fields as null/empty
+                'assignedCollegeId': None,
+                'assignedDeptId': None,
+                'assignedSectionId': None,
+            }
+            user_ref.set(user_profile_data)
+            print(f"Successfully created Firestore profile for teacher UID: {user_record.uid}")
+
+            return jsonify({'success': True, 'uid': user_record.uid, 'role': 'teacher'}), 201 # Created
+
+        except auth.EmailAlreadyExistsError:
+            print(f"Teacher signup failed: Email {email} already exists.")
+            return jsonify({'error': 'Email address already in use'}), 409 # Conflict
+        except Exception as e:
+            print(f"Error during teacher account creation for {email}: {e}")
+            traceback.print_exc()
+             # Attempt cleanup if partial creation occurred
+            try:
+                if 'user_record' in locals() and user_record:
+                    print(f"Attempting cleanup: Deleting Auth user {user_record.uid} due to subsequent error.")
+                    auth.delete_user(user_record.uid)
+            except Exception as cleanup_error:
+                 print(f"Error during cleanup for failed teacher signup {email}: {cleanup_error}")
+            return jsonify({'error': f'Server error creating teacher account: {str(e)}'}), 500
+
+    except Exception as e:
+        print(f"Error in /create_teacher_account route: {e}")
+        traceback.print_exc()
+        return jsonify({'error': f'Server error: {str(e)}'}), 500
+
+
+@app.route('/update_assignment_details', methods=['POST'])
+def update_assignment_details():
+    """Updates assignment details (college, dept, section) for a user (teacher or student)."""
+    if not db: return jsonify({'error': 'Database unavailable'}), 503
+
+    # --- Get User ID from Firebase Auth Token ---
+    # This requires the request to have an 'Authorization: Bearer <ID_TOKEN>' header
+    # Your frontend needs to send this token with the request.
+    try:
+        id_token = request.headers.get('Authorization', '').split('Bearer ')[1]
+        if not id_token:
+             return jsonify({'error': 'Authorization token missing'}), 401
+        decoded_token = auth.verify_id_token(id_token)
+        user_id = decoded_token['uid']
+        user_role = decoded_token.get('role', 'unknown') # Get role from token claims
+        print(f"Request received for /update_assignment_details from UID: {user_id}, Role: {user_role}")
+    except Exception as auth_err:
+         print(f"Authentication error verifying token: {auth_err}")
+         return jsonify({'error': 'Invalid or expired authentication token'}), 401
+    # --- End Auth Check ---
+
+    try:
+        data = request.get_json()
+        if not data: return jsonify({'error': 'Invalid JSON payload'}), 400
+
+        # Fields expected from the request
+        college_id = data.get('collegeId')
+        dept_id = data.get('deptId')
+        section_id = data.get('sectionId')
+
+        # Determine Firestore field names based on role
+        if user_role == 'teacher':
+            update_payload = {
+                'assignedCollegeId': college_id,
+                'assignedDeptId': dept_id,
+                'assignedSectionId': section_id,
+                'last_updated': firestore.SERVER_TIMESTAMP
+            }
+        elif user_role == 'student':
+             # Students update their optional fields
+             update_payload = {
+                 'collegeId': college_id, # Use student field names
+                 'deptId': dept_id,
+                 'sectionId': section_id,
+                 'last_updated': firestore.SERVER_TIMESTAMP
+             }
+        else:
+            return jsonify({'error': 'User role not recognized or missing from token claims'}), 403
+
+        # Basic validation (can add more specific checks)
+        # Allow null/empty strings to clear the fields if needed
+        if not isinstance(college_id, (str, type(None))) or \
+           not isinstance(dept_id, (str, type(None))) or \
+           not isinstance(section_id, (str, type(None))):
+             return jsonify({'error': 'Invalid data type for assignment details'}), 400
+
+        user_ref = db.collection('users').document(user_id)
+
+        # Check if user exists before updating
+        user_doc = user_ref.get()
+        if not user_doc.exists:
+             print(f"User {user_id} not found in Firestore for update.")
+             return jsonify({'error': 'User profile not found'}), 404
+
+        # Perform the update
+        user_ref.update(update_payload)
+        print(f"Successfully updated assignment details for user {user_id} (Role: {user_role})")
+
+        return jsonify({'success': True, 'message': 'Assignment details updated successfully'})
+
+    except Exception as e:
+        print(f"Error in /update_assignment_details route for user {user_id}: {e}")
+        traceback.print_exc()
+        return jsonify({'error': f'Server error updating details: {str(e)}'}), 500
+
+
+@app.route('/complete_google_signup', methods=['POST'])
+def complete_google_signup():
+    """Finalizes setup for a NEW user signed in via Google (sets claim, creates profile)."""
+    if not db: return jsonify({'error': 'Database unavailable'}), 503
+
+    # --- Verify Authentication from Token ---
+    try:
+        id_token = request.headers.get('Authorization', '').split('Bearer ')[1]
+        if not id_token: return jsonify({'error': 'Authorization token missing'}), 401
+        decoded_token = auth.verify_id_token(id_token)
+        user_id = decoded_token['uid']
+        user_email = decoded_token.get('email') # Email from token
+        # Get display name from token (might not always be present) or request body
+        user_display_name = decoded_token.get('name')
+        if not user_display_name:
+             try: # Fallback to request body if needed
+                  request_data = request.get_json()
+                  user_display_name = request_data.get('displayName')
+             except:
+                  pass # Ignore if request body isn't JSON
+        user_display_name = user_display_name or (user_email.split('@')[0] if user_email else 'User')
+
+        print(f"Completing Google signup setup for UID: {user_id}, Email: {user_email}")
+    except Exception as auth_err:
+        print(f"Authentication error verifying token for Google signup completion: {auth_err}")
+        return jsonify({'error': 'Invalid or expired authentication token'}), 401
+    # --- End Auth Check ---
+
+    try:
+        # --- Check if Firestore profile ALREADY exists (should ideally not happen for 'onCreate') ---
+        user_ref = db.collection('users').document(user_id)
+        user_doc = user_ref.get()
+        if user_doc.exists:
+            print(f"Firestore profile already exists for Google user {user_id}. Skipping profile creation, ensuring claim.")
+            # Ensure role claim is set even if profile exists (idempotency)
+            try:
+                # Get existing claims first to avoid overwriting others
+                existing_user = auth.get_user(user_id)
+                current_claims = existing_user.custom_claims or {}
+                if current_claims.get('role') != 'student':
+                     current_claims['role'] = 'student'
+                     auth.set_custom_user_claims(user_id, current_claims)
+                     print(f"Set missing/incorrect 'student' role claim for existing Google user {user_id}.")
+            except Exception as claim_err:
+                print(f"Error ensuring claim for existing Google user {user_id}: {claim_err}")
+                # Don't fail the whole request if claim setting fails here
+
+            return jsonify({'success': True, 'message': 'Profile already exists, claim checked/set.'})
+        # --- End Check ---
+
+
+        # Set custom claim for 'student' role
+        auth.set_custom_user_claims(user_id, {'role': 'student'})
+        print(f"Successfully set 'student' role claim for new Google user UID: {user_id}")
+
+        # Create user profile in Firestore (similar to student signup)
+        user_profile_data = {
+            'uid': user_id,
+            'email': user_email,
+            'displayName': user_display_name,
+            'role': 'student',
+            'createdAt': firestore.SERVER_TIMESTAMP,
+            'last_updated': firestore.SERVER_TIMESTAMP,
+            'plan': 'free',
+            'planPurchasedAt': firestore.SERVER_TIMESTAMP,
+            'planExpiresAt': None,
+            'usage': {
+                'resumeAnalyses': {'used': 0, 'limit': get_package_limit('free', 'resumeAnalyses')},
+                'mockInterviews': {'used': 0, 'limit': get_package_limit('free', 'mockInterviews')}
+            },
+            'collegeId': None,
+            'deptId': None,
+            'sectionId': None,
+        }
+        user_ref.set(user_profile_data)
+        print(f"Successfully created Firestore profile for new Google user UID: {user_id}")
+
+        return jsonify({'success': True, 'uid': user_id, 'role': 'student'}), 201 # Created
+
+    except Exception as e:
+        print(f"Error during Google signup completion for {user_id}: {e}")
+        traceback.print_exc()
+        # Don't delete the Auth user here as it was created by Google Sign-In
+        return jsonify({'error': f'Server error completing Google signup: {str(e)}'}), 500
 
 
 # --- Cleanup Function (Needs Review/Replacement with TTL) ---
