@@ -93,8 +93,9 @@ function handleAuthStateChanged(user) {
     }
 }
 
+
 function loadUserProfile(user) {
-  // Only load if we have a valid user and Firebase/Firestore is available
+  // Only load if we have a valid user and Firestore is available
   if (!user || typeof firebase === 'undefined' || !firebase.firestore) {
       console.warn("Cannot load profile: User null or Firebase/Firestore not available.");
       authState.userProfile = null; // Ensure profile is null
@@ -110,14 +111,13 @@ function loadUserProfile(user) {
           if (doc.exists) {
               authState.userProfile = doc.data();
               console.log('User profile loaded successfully:', authState.userProfile);
-
+              
               // Ensure usage stats exist for existing profiles
               if (!authState.userProfile.usage) {
-                  const current_plan = authState.userProfile.plan || 'free'; // Get current plan or default
-                  const usageUpdate = {
+                  const usageUpdate = { 
                       usage: {
-                          resumeAnalyses: { used: 0, limit: getPackageLimit('resumeAnalyses', current_plan) },
-                          mockInterviews: { used: 0, limit: getPackageLimit('mockInterviews', current_plan) }
+                          resumeAnalyses: { used: 0, limit: getPackageLimit('resumeAnalyses', authState.userProfile.plan || 'free') },
+                          mockInterviews: { used: 0, limit: getPackageLimit('mockInterviews', authState.userProfile.plan || 'free') }
                       }
                   };
                   return db.collection('users').doc(user.uid).update(usageUpdate)
@@ -127,7 +127,6 @@ function loadUserProfile(user) {
                       })
                       .catch(updateError => {
                           console.error(`Error adding usage stats to profile:`, updateError);
-                          // Continue even if updating usage stats fails for existing users
                       });
               }
           } else {
@@ -136,17 +135,11 @@ function loadUserProfile(user) {
                   uid: user.uid,
                   email: user.email,
                   displayName: user.displayName || user.email.split('@')[0],
-                  photoURL: user.photoURL || null,
+                  photoURL: user.photoURL || null, // Store null if no photoURL
                   createdAt: new Date().toISOString(),
                   plan: 'free', // Default plan
                   planPurchasedAt: new Date().toISOString(), // When free plan "started"
                   planExpiresAt: null, // No expiration for free plan
-                  // --- ADDED FIELDS ---
-                  role: 'student', // Default role
-                  collegeId: null, // Optional field
-                  deptId: null,    // Optional field
-                  sectionId: null, // Optional field
-                  // --- END ADDED FIELDS ---
                   usage: {
                       resumeAnalyses: { used: 0, limit: getPackageLimit('resumeAnalyses', 'free') },
                       mockInterviews: { used: 0, limit: getPackageLimit('mockInterviews', 'free') }
@@ -357,84 +350,74 @@ function updateUserProfileUI(user) {
       userPlanBadgeElements.forEach(el => el.textContent = formattedPlanName);
   }
 
-  // Update role and optional IDs
-  const roleElement = document.querySelector('.user-role');
-  const collegeIdElement = document.querySelector('.user-college-id');
-  const deptIdElement = document.querySelector('.user-dept-id');
-  const sectionIdElement = document.querySelector('.user-section-id');
-
-  if (authState.userProfile) {
-      if (roleElement) roleElement.textContent = authState.userProfile.role || 'Student'; // Default to Student
-      if (collegeIdElement) collegeIdElement.textContent = authState.userProfile.collegeId || 'Not Set';
-      if (deptIdElement) deptIdElement.textContent = authState.userProfile.deptId || 'Not Set';
-      if (sectionIdElement) sectionIdElement.textContent = authState.userProfile.sectionId || 'Not Set';
-
-      // Update usage counters (moved inside profile check)
-      if (authState.userProfile.usage) {
-          // Resume analyses usage
-          const resumeUsage = authState.userProfile.usage.resumeAnalyses || { used: 0, limit: 0 };
-          const resumeCountElement = document.getElementById('resumeAnalysesCount');
-          const resumeProgressBar = document.querySelector('#resumeAnalysesCount + .progress .progress-bar');
-          if (resumeCountElement) {
-              resumeCountElement.textContent = `${resumeUsage.used}/${resumeUsage.limit}`;
-          }
-          if (resumeProgressBar) {
-              const percentUsed = resumeUsage.limit > 0 ? (resumeUsage.used / resumeUsage.limit) * 100 : 0;
-              resumeProgressBar.style.width = `${Math.min(100, percentUsed)}%`;
+  // Update usage counters
+  if (authState.userProfile && authState.userProfile.usage) {
+      // Resume analyses usage
+      const resumeUsage = authState.userProfile.usage.resumeAnalyses || { used: 0, limit: 0 };
+      const resumeCountElement = document.getElementById('resumeAnalysesCount');
+      const resumeProgressBar = document.querySelector('#resumeAnalysesCount + .progress .progress-bar');
+      
+      if (resumeCountElement) {
+          resumeCountElement.textContent = `${resumeUsage.used}/${resumeUsage.limit}`;
+      }
+      
+      if (resumeProgressBar) {
+          const percentUsed = resumeUsage.limit > 0 ? (resumeUsage.used / resumeUsage.limit) * 100 : 0;
+          resumeProgressBar.style.width = `${Math.min(100, percentUsed)}%`;
+          
+          // Add warning color if close to limit
+          if (percentUsed >= 85) {
+              resumeProgressBar.classList.add('bg-warning');
+          } else if (percentUsed >= 100) {
+              resumeProgressBar.classList.add('bg-danger');
+          } else {
               resumeProgressBar.classList.remove('bg-warning', 'bg-danger');
-              if (percentUsed >= 100) {
-                  resumeProgressBar.classList.add('bg-danger');
-              } else if (percentUsed >= 85) {
-                  resumeProgressBar.classList.add('bg-warning');
-              }
-          }
-
-          // Mock interviews usage
-          const interviewUsage = authState.userProfile.usage.mockInterviews || { used: 0, limit: 0 };
-          const interviewCountElement = document.getElementById('mockInterviewsCount');
-          const interviewProgressBar = document.querySelector('#mockInterviewsCount + .progress .progress-bar');
-          if (interviewCountElement) {
-              interviewCountElement.textContent = `${interviewUsage.used}/${interviewUsage.limit}`;
-          }
-          if (interviewProgressBar) {
-              const percentUsed = interviewUsage.limit > 0 ? (interviewUsage.used / interviewUsage.limit) * 100 : 0;
-              interviewProgressBar.style.width = `${Math.min(100, percentUsed)}%`;
-              interviewProgressBar.classList.remove('bg-warning', 'bg-danger');
-              if (percentUsed >= 100) {
-                  interviewProgressBar.classList.add('bg-danger');
-              } else if (percentUsed >= 85) {
-                  interviewProgressBar.classList.add('bg-warning');
-              }
           }
       }
-  } else {
-      // Clear role/IDs if no profile
-      if (roleElement) roleElement.textContent = '...';
-      if (collegeIdElement) collegeIdElement.textContent = '...';
-      if (deptIdElement) deptIdElement.textContent = '...';
-      if (sectionIdElement) sectionIdElement.textContent = '...';
-      // Clear usage too
-      document.getElementById('resumeAnalysesCount')?.textContent = '-/-';
-      document.querySelector('#resumeAnalysesCount + .progress .progress-bar')?.style.setProperty('width', '0%');
-      document.getElementById('mockInterviewsCount')?.textContent = '-/-';
-      document.querySelector('#mockInterviewsCount + .progress .progress-bar')?.style.setProperty('width', '0%');
+      
+      // Mock interviews usage
+      const interviewUsage = authState.userProfile.usage.mockInterviews || { used: 0, limit: 0 };
+      const interviewCountElement = document.getElementById('mockInterviewsCount');
+      const interviewProgressBar = document.querySelector('#mockInterviewsCount + .progress .progress-bar');
+      
+      if (interviewCountElement) {
+          interviewCountElement.textContent = `${interviewUsage.used}/${interviewUsage.limit}`;
+      }
+      
+      if (interviewProgressBar) {
+          const percentUsed = interviewUsage.limit > 0 ? (interviewUsage.used / interviewUsage.limit) * 100 : 0;
+          interviewProgressBar.style.width = `${Math.min(100, percentUsed)}%`;
+          
+          // Add warning color if close to limit
+          if (percentUsed >= 85) {
+              interviewProgressBar.classList.add('bg-warning');
+          } else if (percentUsed >= 100) {
+              interviewProgressBar.classList.add('bg-danger');
+          } else {
+              interviewProgressBar.classList.remove('bg-warning', 'bg-danger');
+          }
+      }
   }
-
 
   // Show/Hide Password Buttons based on providers
   const addPasswordBtn = document.getElementById('addPasswordBtn');
   const changePasswordBtn = document.getElementById('changePasswordBtn');
   if (user && addPasswordBtn && changePasswordBtn) {
+      // Check if 'password' is listed in the providerData array
       const hasPasswordProvider = user.providerData.some(provider => provider.providerId === 'password');
+
+      // Show "Add Password" if NO password provider exists
       addPasswordBtn.style.display = hasPasswordProvider ? 'none' : 'block';
+      // Show "Change Password" if a password provider DOES exist
       changePasswordBtn.style.display = hasPasswordProvider ? 'block' : 'none';
   } else {
+      // Ensure buttons are hidden if user/elements aren't ready
       if(addPasswordBtn) addPasswordBtn.style.display = 'none';
       if(changePasswordBtn) changePasswordBtn.style.display = 'none';
   }
 }
 
-// Replace the existing clearUserProfileUI function in firebase-auth.js
+// Replace this entire function in firebase-auth.js
 function clearUserProfileUI() {
   // Clear user-related UI elements
   const userDisplayElements = document.querySelectorAll('.user-display-name');
@@ -454,24 +437,11 @@ function clearUserProfileUI() {
   planElements.forEach(el => el.textContent = '');
   userPlanBadgeElements.forEach(el => el.textContent = ''); // Clear sidebar badge
 
-  // Clear new fields
-  document.querySelectorAll('.user-role, .user-college-id, .user-dept-id, .user-section-id').forEach(el => el.textContent = '...');
-
   // Reset Password Buttons visibility
   const addPasswordBtn = document.getElementById('addPasswordBtn');
   const changePasswordBtn = document.getElementById('changePasswordBtn');
   if(addPasswordBtn) addPasswordBtn.style.display = 'none'; // Hide when logged out
   if(changePasswordBtn) changePasswordBtn.style.display = 'none'; // Hide when logged out
-
-  // Clear usage display
-  document.getElementById('resumeAnalysesCount')?.textContent = '-/-';
-  // --- CORRECTED LINES ---
-  const resumeProgressBar = document.querySelector('#resumeAnalysesCount + .progress .progress-bar');
-  if (resumeProgressBar) resumeProgressBar.style.width = '0%'; // Direct assignment
-  document.getElementById('mockInterviewsCount')?.textContent = '-/-';
-  const interviewProgressBar = document.querySelector('#mockInterviewsCount + .progress .progress-bar');
-  if (interviewProgressBar) interviewProgressBar.style.width = '0%'; // Direct assignment
-  // --- END CORRECTION ---
 }
 
 // View switching logic

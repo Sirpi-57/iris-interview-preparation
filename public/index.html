@@ -552,8 +552,9 @@
                     <div class="container">
                         <h2>My Profile</h2>
                         <p class="section-description">Manage your account information and subscription</p>
-                
+                        
                         <div class="row">
+                            <!-- Profile Details -->
                             <div class="col-md-8">
                                 <div class="card mb-4">
                                     <div class="card-header d-flex justify-content-between align-items-center">
@@ -563,6 +564,7 @@
                                         </button>
                                     </div>
                                     <div class="card-body">
+                                        <!-- View Mode -->
                                         <div id="profileViewMode">
                                             <div class="row mb-3">
                                                 <div class="col-md-3 fw-bold">Name:</div>
@@ -573,22 +575,12 @@
                                                 <div class="col-md-9 user-email">Loading...</div>
                                             </div>
                                             <div class="row mb-3">
-                                                <div class="col-md-3 fw-bold">Role:</div>
-                                                <div class="col-md-9 user-role">Student</div> </div>
-                                            <div class="row mb-3">
-                                                <div class="col-md-3 fw-bold">College ID:</div>
-                                                <div class="col-md-9 user-college-id">Not Set</div>
-                                            </div>
-                                            <div class="row mb-3">
-                                                <div class="col-md-3 fw-bold">Department ID:</div>
-                                                <div class="col-md-9 user-dept-id">Not Set</div>
-                                            </div>
-                                            <div class="row mb-3">
-                                                <div class="col-md-3 fw-bold">Section ID:</div>
-                                                <div class="col-md-9 user-section-id">Not Set</div>
+                                                <div class="col-md-3 fw-bold">Account Created:</div>
+                                                <div class="col-md-9" id="accountCreatedDate">Loading...</div>
                                             </div>
                                         </div>
-                
+                                        
+                                        <!-- Edit Mode (initially hidden) -->
                                         <form id="profileEditForm" style="display: none;">
                                             <div class="mb-3">
                                                 <label for="profileName" class="form-label">Name</label>
@@ -598,23 +590,6 @@
                                                 <label for="profileEmail" class="form-label">Email (readonly)</label>
                                                 <input type="email" class="form-control" id="profileEmail" readonly>
                                             </div>
-                                            <div class="mb-3">
-                                                <label for="profileRole" class="form-label">Role</label>
-                                                <input type="text" class="form-control" id="profileRole" value="Student" readonly>
-                                                <div class="form-text">Role is automatically assigned.</div>
-                                            </div>
-                                            <div class="mb-3">
-                                                <label for="profileCollegeId" class="form-label">College ID (Optional)</label>
-                                                <input type="text" class="form-control" id="profileCollegeId">
-                                            </div>
-                                            <div class="mb-3">
-                                                <label for="profileDeptId" class="form-label">Department ID (Optional)</label>
-                                                <input type="text" class="form-control" id="profileDeptId">
-                                            </div>
-                                            <div class="mb-3">
-                                                <label for="profileSectionId" class="form-label">Section ID (Optional)</label>
-                                                <input type="text" class="form-control" id="profileSectionId">
-                                            </div>
                                             <div class="d-flex justify-content-end">
                                                 <button type="button" class="btn btn-secondary me-2" id="cancelEditBtn">Cancel</button>
                                                 <button type="submit" class="btn btn-primary">Save Changes</button>
@@ -622,7 +597,7 @@
                                         </form>
                                     </div>
                                 </div>
-                
+                                
                                 <div class="card mb-4">
                                     <div class="card-header">
                                         <h3 class="mb-0">Security</h3>
@@ -633,7 +608,7 @@
                                                 <i class="fas fa-lock me-2"></i> Change Password
                                             </button>
                                             <button class="btn btn-outline-secondary" id="addPasswordBtn" style="display: none;">
-                                                <i class="fas fa-key me-2"></i> Enable Email/Password Sign-in
+                                                 <i class="fas fa-key me-2"></i> Enable Email/Password Sign-in
                                             </button>
                                             <button class="btn btn-outline-secondary" id="twoFactorBtn">
                                                 <i class="fas fa-shield-alt me-2"></i> Enable Two-Factor Authentication
@@ -641,7 +616,7 @@
                                         </div>
                                     </div>
                                 </div>
-                
+                                
                                 <div class="card mb-4">
                                     <div class="card-header">
                                         <h3 class="mb-0">Data & Privacy</h3>
@@ -658,7 +633,8 @@
                                     </div>
                                 </div>
                             </div>
-                
+                            
+                            <!-- Subscription Details -->
                             <div class="col-md-4">
                                 <div class="card mb-4">
                                     <div class="card-header bg-primary text-white">
@@ -676,7 +652,7 @@
                                                     Your free plan includes 2 resume analyses and 0 mock interviews.
                                                 </p>
                                             </div>
-                
+                                            
                                             <div class="usage-section mb-3">
                                                 <h5>Usage</h5>
                                                 <div class="mb-3">
@@ -698,7 +674,7 @@
                                                     </div>
                                                 </div>
                                             </div>
-                
+                                            
                                             <div class="plan-upgrade">
                                                 <h5>Upgrade Your Plan</h5>
                                                 <ul class="list-unstyled mb-3">
@@ -714,7 +690,7 @@
                                         </div>
                                     </div>
                                 </div>
-                
+                                
                                 <div class="card mb-4">
                                     <div class="card-header">
                                         <h3 class="mb-0">Need Help?</h3>
