@@ -1,5 +1,6 @@
 {
   "hosting": {
+    "site": "iris-ai-prod",
     "public": "public",
     "ignore": [
       "firebase.json",
