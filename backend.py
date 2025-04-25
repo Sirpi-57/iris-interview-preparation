@@ -1557,7 +1557,7 @@ def interview_response():
         system_prompt = create_mock_interviewer_prompt(resume_data, job_data, interview_type) # Regenerate prompt
 
         # Get current time for context
-        current_time_str = datetime.datetime.now().strftime("%I:%M %p") # e.g., "01:15 PM"
+        current_time_str = datetime.now().strftime("%I:%M %p")
 
         # Generate interviewer's next response with LOWER temperature and time context
         interviewer_response = "[IRIS encountered an issue generating a response. Please try again.]" # Default fallback
