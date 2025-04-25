@@ -597,34 +597,83 @@ Strictly follow JSON format. No extra text or markdown.
         traceback.print_exc()
         return {"timeline": [], "error": f"Failed to generate timeline: {str(e)}"}
 
-def create_mock_interviewer_prompt(resume_data, job_data, interview_type="general"):
-    """Creates the system prompt for the AI interviewer."""
+# MODIFIED function in backend.py
+def create_mock_interviewer_prompt(resume_data, job_data):
+    """Creates the system prompt for the AI interviewer (MODIFIED with detailed flow and constraints)."""
     job_title = job_data.get("jobRequirements", {}).get("jobTitle", "the position")
     required_skills = job_data.get("jobRequirements", {}).get("requiredSkills", [])
     experience_level = job_data.get("jobRequirements", {}).get("experienceLevel", "")
     candidate_name = resume_data.get("name", "the candidate")
     current_position = resume_data.get("currentPosition", "their background")
     years_experience = resume_data.get("yearsOfExperience", "")
-    skills = resume_data.get("technicalSkills", [])
-    skills_str = ", ".join(required_skills) if required_skills else "as specified"
-    candidate_skills_str = ", ".join(skills) if skills else "listed skills"
-    experience_str = f" with {years_experience} of experience" if years_experience else ""
+    candidate_skills = resume_data.get("technicalSkills", [])
+    skill_gaps = job_data.get("skillGaps", []) # Get skill gaps from match results
+    is_experienced = bool(years_experience and years_experience not in ["0", "fresher", "<1", "less than 1"]) # Simple check for experience
 
+    # Format data for prompt
+    skills_str = ", ".join(required_skills) if required_skills else "as specified in the job description"
+    candidate_skills_str = ", ".join(candidate_skills) if candidate_skills else "no specific skills listed on resume"
+    skill_gaps_str = ", ".join([gap.get('missingSkill', 'N/A') for gap in skill_gaps]) if skill_gaps else "None identified"
+    experience_str = f" with {years_experience} of experience" if years_experience else " who seems to be relatively new or a fresher"
+
+    # Note: Current time needs to be injected into the *API call* context,
+    # but we instruct the AI to consider it here.
+    # Example: current_time_str = datetime.now().strftime("%H:%M %p %Z")
     system_prompt = f"""
-You are an AI Interviewer conducting a structured mock interview. You are interviewing {candidate_name} ({current_position}{experience_str}) for a {job_title} role requiring {experience_level} experience and skills in {skills_str}. Candidate mentioned skills: {candidate_skills_str}. The interview type is '{interview_type}'.
+You are IRIS, an AI Interviewer from the Interview Readiness & Improvement System. Your goal is to conduct a realistic and structured mock interview.
+You are interviewing {candidate_name} ({current_position}{experience_str}) for a {job_title} role requiring {experience_level} experience and skills in {skills_str}.
+Candidate mentioned skills: {candidate_skills_str}.
+Identified potential skill gaps from resume/JD match: {skill_gaps_str}.
+Assume the current time context (e.g., morning/afternoon/evening) is provided to you separately if needed for greetings.
 
-**Persona:** Professional, engaging, PATIENT (wait for responses, don't interrupt), adaptive (ask relevant follow-ups), objective, concise.
+**Your Persona:**
+- **Name:** IRIS
+- **Role:** Professional, engaging, and objective interviewer.
+- **Behavior:** Be PATIENT, wait for the candidate to finish speaking. Ask ONE question at a time. Only ask a second clarifying question in the same message if absolutely necessary. Do NOT answer technical questions yourself; your role is to ask and evaluate. Be concise.
 
-**Mandatory Structure:** Follow these stages, adapting questions based on the '{interview_type}' focus:
-1.  **Intro & Rapport (1-2 Qs):** Greet, state purpose ({job_title} mock), ask "Tell me about yourself" or similar.
-2.  **Experience/Foundation:** If technical/general, ask about general experience/core skills. If behavioral, ask about past roles/teams.
-3.  **Technical Deep Dive (Focus for 'technical'/'general'):** Ask specific technical questions on {skills_str}, increasing complexity. Present scenarios. Validate resume skills ({candidate_skills_str}). Ask for logic/approach for coding Qs (no live coding). Minimize/skip if purely 'behavioral'.
-4.  **Project Discussion (All types):** Ask about 1-2 significant projects: contributions, challenges, tech, outcomes. Relate to {job_title}.
-5.  **Behavioral/Situational (Focus for 'behavioral', include in 'general'):** Use STAR prompts ("Tell me about a time..."). Assess teamwork, problem-solving, pressure handling relevant to {job_title}/{experience_level}. Include standards like strengths/weaknesses (with examples), career goals.
-6.  **Candidate Questions & Logistics (Brief):** Ask if candidate has Qs (give generic answers about mock process). Maybe one simple logistical Q if relevant (no salary).
-7.  **Closing (Final Response):** Signal end. Thank candidate. Brief, neutral closing ("Thank you for sharing..."). State that a detailed analysis report will be available after. End professionally ("That concludes our mock interview...").
+**Mandatory Interview Flow:**
 
-**Constraints:** Adhere to flow. BE PATIENT. Be concise. Ask questions, don't answer. Stay in character. No detailed feedback during the interview.
+1.  **Introduction:**
+    * Greet the candidate appropriately for the time of day (e.g., "Good morning/afternoon/evening, {candidate_name}").
+    * Introduce yourself: "I am IRIS, your AI interviewer for this session."
+    * State the purpose: "Today, we'll be conducting a mock interview for the {job_title} role to help you practice."
+    * Ask an opening question: "To start, could you please tell me a bit about yourself and your background?"
+
+2.  **Experience / Projects:**
+    * **(If Experienced: {is_experienced}):** Ask 1-2 questions about their previous roles, responsibilities, and key achievements relevant to the {job_title}. Then, transition to asking about 1-2 significant projects they've worked on (contributions, challenges, tech used, outcomes).
+    * **(If Inexperienced/Fresher: {not is_experienced}):** Focus primarily on their academic projects, internships, or personal projects. Ask about 1-2 significant projects in detail (motivation, role, tech stack, challenges faced, learnings, outcomes).
+
+3.  **Technical - Fundamentals:**
+    * Based on the context gathered (experience/projects) and the required skills ({skills_str}), ask 2-3 fundamental questions related to core concepts of the required skills.
+
+4.  **Technical - Deep Dive & Resume Validation:**
+    * Ask 2-3 more specific technical questions related to the required skills ({skills_str}), potentially increasing complexity or presenting small scenarios.
+    * Validate skills mentioned on their resume ({candidate_skills_str}) by asking a question related to one or two of those skills.
+    * Ask 1-2 questions based *directly* on technical requirements mentioned *in the Job Description*. Frame them to confirm their practical ability (e.g., "The JD mentions experience with X, can you describe a situation where you applied it?").
+
+5.  **Skill Gap Exploration:**
+    * Based on the identified skill gaps ({skill_gaps_str}), politely ask 1-2 questions related to those areas. Frame it neutrally, e.g., "This role involves some work with [Gap Skill]. Could you share your experience or understanding of it?" Assess their response strategy (honesty, willingness to learn, related skills).
+
+6.  **Behavioral Assessment:**
+    * Ask 2-3 behavioral questions using the STAR method format (e.g., "Tell me about a time you faced a challenging technical problem and how you solved it," "Describe a situation where you had to collaborate with a difficult team member," "How do you handle tight deadlines or pressure?").
+    * Ask standard questions like "What do you consider your greatest professional strength?" and "What's an area you're working to improve?" (Ensure they provide examples).
+    * Present 1-2 brief hypothetical situations relevant to the {job_title} role and ask how they would approach it (focus on their thought process).
+
+7.  **HR / Logistics:**
+    * **(If JD mentions relocation):** "The job description mentions potential relocation to [Location, if known, otherwise 'a different location']. Is that something you're open to discussing?"
+    * **(If JD mentions salary or implies negotiation is possible):** "Regarding compensation, the range for this role is typically [mention range if known, otherwise 'competitive']. Do you have any initial expectations you'd like to share?" (Allow candidate to practice negotiation briefly, but don't get stuck. You can respond neutrally like "Okay, thank you for sharing that."). If salary isn't mentioned or relevant, skip this.
+    * Ask: "Do you have any questions for me about the role or the process based on this mock interview?" (Answer questions generically about the mock process itself, not the hypothetical company).
+
+8.  **Closing:**
+    * Provide a brief, neutral summary: "Thank you, {candidate_name}. We've covered your experience, technical skills, and discussed some situational questions. You [mention one brief positive observation if appropriate, e.g., 'shared some interesting project details' or 'provided clear examples']." (Avoid detailed critique).
+    * State next steps clearly: "A detailed analysis report of this mock interview, including feedback on your performance and suggestions for improvement, will be available to you shortly after we conclude."
+    * End professionally: "That concludes our mock interview for the {job_title} role. Thank you for your time today. We wish you the best in your preparation."
+
+**Important Constraints:**
+- **One Question Focus:** Strictly ask only one main question per turn. Follow-ups are okay *after* the candidate responds.
+- **Stay in Role:** You are IRIS, the interviewer. Do not provide answers, hints, or extensive feedback during the interview.
+- **Patience:** Allow the candidate adequate time to think and respond. Do not interrupt.
+- **Conciseness:** Keep your questions and transitions clear and reasonably brief.
 """
     return system_prompt
 
@@ -1337,13 +1386,13 @@ def rewrite_resume_section_route():
 def start_mock_interview():
     """
     Initializes a new mock interview session in Firestore, with usage limit checks,
-    increments counter, and returns updated usage info.
+    increments counter, and returns updated usage info. (MODIFIED: No interviewType)
     """
     try:
         data = request.get_json()
         if not data: return jsonify({'error': 'Invalid JSON payload'}), 400
         session_id = data.get('sessionId')
-        interview_type = data.get('interviewType', 'general')
+        # interview_type = data.get('interviewType', 'general') # <-- REMOVED THIS LINE
         if not session_id: return jsonify({'error': 'Session ID required'}), 400
         if not db: return jsonify({'error': 'Database unavailable'}), 503
 
@@ -1374,7 +1423,6 @@ def start_mock_interview():
         if not resume_data or not job_data: return jsonify({'error': 'Required analysis data missing'}), 500
 
         # --- Increment Usage Counter BEFORE creating interview ---
-        # This function now returns {'success': True/False, 'used': N, 'limit': M, 'remaining': X}
         increment_result = increment_usage_counter(user_id, 'mockInterviews')
         if not increment_result.get('success', False):
             error_msg = increment_result.get('error', 'Failed to update usage counter')
@@ -1383,10 +1431,12 @@ def start_mock_interview():
 
         # --- Create interview ID and generate system prompt ---
         interview_id = str(uuid.uuid4())
-        system_prompt = create_mock_interviewer_prompt(resume_data, job_data, interview_type)
+        # system_prompt = create_mock_interviewer_prompt(resume_data, job_data, interview_type) # Pass type removed
+        system_prompt = create_mock_interviewer_prompt(resume_data, job_data) # Call updated function
 
         # --- Generate initial greeting ---
-        initial_prompt = f"Start the '{interview_type}' interview with {resume_data.get('name', 'the candidate')}. Give a brief professional greeting and ask your first question."
+        # initial_prompt = f"Start the '{interview_type}' interview with {resume_data.get('name', 'the candidate')}. Give a brief professional greeting and ask your first question." # Type removed
+        initial_prompt = f"Start the interview with {resume_data.get('name', 'the candidate')}. Give a brief professional greeting and ask your first question (e.g., Tell me about yourself)." # Generic start
         try:
             greeting = call_claude_api(
                 messages=[{"role": "user", "content": initial_prompt}],
@@ -1394,14 +1444,15 @@ def start_mock_interview():
             )
         except Exception as e:
             print(f"[{session_id}] Error generating greeting for interview {interview_id}: {e}")
-            greeting = f"Hello {resume_data.get('name', 'there')}. Welcome to your {interview_type} mock interview. Let's begin. Can you start by telling me a bit about yourself and your background?"
+            # greeting = f"Hello {resume_data.get('name', 'there')}. Welcome to your {interview_type} mock interview. Let's begin. Can you start by telling me a bit about yourself and your background?" # Type removed
+            greeting = f"Hello {resume_data.get('name', 'there')}. Welcome to your mock interview. Let's begin. Can you start by telling me a bit about yourself and your background?" # Generic greeting
 
         # --- Create interview document in Firestore ---
         interview_doc_ref = db.collection('interviews').document(interview_id)
         interview_data_to_save = {
             'sessionId': session_id,
-            'userId': user_id,  # Store user ID directly in interview doc
-            'interviewType': interview_type,
+            'userId': user_id,
+            # 'interviewType': interview_type, # <-- REMOVED THIS FIELD
             'system_prompt_summary': system_prompt[:1000] + "...",
             'conversation': [{'role': 'assistant', 'content': greeting, 'timestamp': datetime.now().isoformat()}],
             'status': 'active',
@@ -1411,7 +1462,6 @@ def start_mock_interview():
             'job_data_snapshot': job_data,
             'analysis_status': 'not_started',
             'analysis': None,
-            # Add usage tracking info to interview (using data from increment_result)
             'usage_info': {
                 'feature': 'mockInterviews',
                 'used': increment_result.get('used', 0),
@@ -1419,16 +1469,16 @@ def start_mock_interview():
             }
         }
         interview_doc_ref.set(interview_data_to_save)
-        print(f"[{session_id}] Started interview {interview_id} of type {interview_type} for user {user_id}.")
+        # print(f"[{session_id}] Started interview {interview_id} of type {interview_type} for user {user_id}.") # Type removed
+        print(f"[{session_id}] Started interview {interview_id} for user {user_id}.") # Generic log
 
-        # *** CORRECTED RETURN VALUE ***
-        # Return the latest usage info obtained from increment_result
+        # *** Return updated usage info ***
         return jsonify({
             'interviewId': interview_id,
             'sessionId': session_id,
-            'interviewType': interview_type,
+            # 'interviewType': interview_type, # <-- REMOVED
             'greeting': greeting,
-            'usageInfo': { # Include updated usage info
+            'usageInfo': {
                 'feature': 'mockInterviews',
                 'used': increment_result.get('used', 0),
                 'limit': increment_result.get('limit', 0),
@@ -1440,7 +1490,6 @@ def start_mock_interview():
         print(f"Error in /start-mock-interview: {e}")
         traceback.print_exc()
         return jsonify({'error': f'Server error starting interview: {str(e)}'}), 500
-
 
 @app.route('/interview-response', methods=['POST'])
 def interview_response():
