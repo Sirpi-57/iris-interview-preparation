@@ -896,6 +896,7 @@
                             <button class="btn btn-outline-primary" data-type="behavioral">Behavioral</button>
                         </div>
     
+                        <!-- Interview Container -->
                         <div class="interview-container">
                             <div class="row">
                                 <!-- Candidate Video Feed -->
@@ -903,8 +904,12 @@
                                     <div class="card video-card">
                                         <div class="card-body p-0">
                                             <div class="video-container">
-                                                <video id="candidateVideo" autoplay muted playsinline></video>
-                                                <!-- Face detection canvas will be inserted here by JS -->
+                                                <video id="candidateVideo" autoplay muted></video>
+                                                <div class="fullscreen-control">
+                                                    <button id="fullscreenBtn" class="btn btn-sm btn-light">
+                                                        <i class="fas fa-expand"></i>
+                                                    </button>
+                                                </div>
                                                 <div class="video-controls">
                                                     <button id="toggleCameraBtn" class="btn btn-sm btn-light">
                                                         <i class="fas fa-video"></i>
@@ -925,11 +930,11 @@
                                         </div>
                                     </div>
                                 </div>
-    
+
                                 <!-- AI Interviewer Avatar -->
                                 <div class="col-md-6">
                                     <div class="card avatar-card">
-                                        <div class="card-body">
+                                        <div class="card-body p-0">
                                             <div class="avatar-container">
                                                 <div class="avatar-circle" id="interviewerAvatar">
                                                     <i class="fas fa-user-tie"></i>
@@ -943,7 +948,7 @@
                                         </div>
                                         <div class="card-footer">
                                             <div class="interviewer-speaking-indicator">
-                                                <div class="audio-waves active" id="interviewerSpeakingWaves">
+                                                <div class="audio-waves" id="interviewerSpeakingWaves">
                                                     <span></span><span></span><span></span><span></span>
                                                 </div>
                                                 <span>IRIS</span>
@@ -952,7 +957,7 @@
                                     </div>
                                 </div>
                             </div>
-    
+
                             <!-- Interview Conversation -->
                             <div class="card mt-4 conversation-card">
                                 <div class="card-header">

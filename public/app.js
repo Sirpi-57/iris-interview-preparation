@@ -607,6 +607,7 @@ function initButtons() {
     
     // --- Add new event listener for Upgrade Plan button ---
     document.getElementById('upgradePlanBtn')?.addEventListener('click', showPaymentModal);
+    document.getElementById('fullscreenBtn')?.addEventListener('click', toggleFullscreen);
 }
 
 function initForms() {
@@ -3581,4 +3582,52 @@ function lockAllSections() {
    lockSection('mock-interview');
    lockSection('performance');
    lockSection('history');
+}
+
+function toggleFullscreen() {
+    const videoContainer = document.querySelector('.video-container');
+    if (!videoContainer) return;
+    
+    const fullscreenBtn = document.getElementById('fullscreenBtn');
+    const icon = fullscreenBtn?.querySelector('i');
+    
+    if (!document.fullscreenElement) {
+        // Enter fullscreen
+        if (videoContainer.requestFullscreen) {
+            videoContainer.requestFullscreen();
+        } else if (videoContainer.webkitRequestFullscreen) { /* Safari */
+            videoContainer.webkitRequestFullscreen();
+        } else if (videoContainer.msRequestFullscreen) { /* IE11 */
+            videoContainer.msRequestFullscreen();
+        }
+        if (icon) icon.className = 'fas fa-compress';
+    } else {
+        // Exit fullscreen
+        if (document.exitFullscreen) {
+            document.exitFullscreen();
+        } else if (document.webkitExitFullscreen) { /* Safari */
+            document.webkitExitFullscreen();
+        } else if (document.msExitFullscreen) { /* IE11 */
+            document.msExitFullscreen();
+        }
+        if (icon) icon.className = 'fas fa-expand';
+    }
+}
+
+// Add a listener to handle fullscreen change
+document.addEventListener('fullscreenchange', updateFullscreenButtonState);
+document.addEventListener('webkitfullscreenchange', updateFullscreenButtonState);
+document.addEventListener('mozfullscreenchange', updateFullscreenButtonState);
+document.addEventListener('MSFullscreenChange', updateFullscreenButtonState);
+
+function updateFullscreenButtonState() {
+    const fullscreenBtn = document.getElementById('fullscreenBtn');
+    const icon = fullscreenBtn?.querySelector('i');
+    if (!icon) return;
+    
+    if (document.fullscreenElement) {
+        icon.className = 'fas fa-compress';
+    } else {
+        icon.className = 'fas fa-expand';
+    }
 }

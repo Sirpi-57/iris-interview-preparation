@@ -586,20 +586,40 @@ h2:after {
     border: none;
     border-radius: 10px;
     overflow: hidden;
+    display: flex;
+    flex-direction: column;
 }
 
-.video-container {
+.video-container, .avatar-container {
     width: 100%;
-    height: 350px;
-    background-color: #292929;
+    flex-grow: 1;
     position: relative;
     overflow: hidden;
+    background-color: #292929;
+}
+
+.avatar-container {
+    background-color: #f5f7fa;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
 video {
     width: 100%;
     height: 100%;
     object-fit: cover;
+    background-color: #292929;
+}
+
+/* New fullscreen controls */
+.fullscreen-control {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    display: flex;
+    gap: 10px;
+    z-index: 100;
 }
 
 .video-controls {
@@ -608,16 +628,7 @@ video {
     right: 20px;
     display: flex;
     gap: 10px;
-}
-
-.avatar-container {
-    width: 100%;
-    height: 350px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    position: relative;
-    background-color: #f5f7fa;
+    z-index: 100;
 }
 
 .avatar-circle {
@@ -726,9 +737,19 @@ video {
     }
 }
 
+/* Improve the speaking indicators to be consistent */
 .candidate-speaking-indicator, .interviewer-speaking-indicator {
     display: flex;
     align-items: center;
+    justify-content: center;
+    padding: 5px 0;
+}
+
+.card-footer {
+    padding: 8px 15px;
+    background-color: #f8f9fa;
+    border-top: 1px solid rgba(0, 0, 0, 0.125);
+    text-align: center;
 }
 
 .conversation-card {
@@ -1250,4 +1271,110 @@ deo-card, .avatar-card {
 
 #paymentProcessingModal .progress-bar {
     background: linear-gradient(to right, var(--gradient-start), var(--gradient-end));
+}
+
+/* Add to your styles.css file */
+.video-container.fullscreen {
+    background-color: black;
+    width: 100vw;
+    height: 100vh;
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: 9999;
+}
+
+/* Make sure video takes full width and height and centers properly */
+.video-container.fullscreen video {
+    width: 100%;
+    height: 100%;
+    object-fit: contain; /* Change to 'contain' when fullscreen for better visibility */
+    background-color: black;
+}
+
+/* Improve the audio waves animation for better indication */
+.audio-waves {
+    display: flex;
+    align-items: center;
+    height: 20px;
+    width: 30px;
+    margin-right: 10px;
+}
+
+.audio-waves span {
+    display: inline-block;
+    width: 4px;
+    height: 5px;
+    margin: 0 2px;
+    background-color: #ccc;
+    border-radius: 1px;
+    animation: none;
+}
+
+.audio-waves.active span {
+    animation: soundWave 1s infinite;
+    background-color: #4a6fdc; /* Use primary color for active state */
+}
+
+/* Give speaking indicators more prominence */
+.candidate-speaking-indicator, .interviewer-speaking-indicator {
+    font-weight: 500;
+    color: #333;
+}
+
+/* Make the speaking indicator more prominent when active */
+.speaking .avatar-circle {
+    box-shadow: 0 0 15px rgba(74, 111, 220, 0.7);
+    transition: box-shadow 0.3s ease;
+}
+
+/* Add to your media queries in styles.css */
+@media (max-width: 768px) {
+    .video-card, .avatar-card {
+        height: 250px; /* Smaller height on mobile */
+    }
+    
+    .conversation-container {
+        height: 200px; /* Smaller height for conversation on mobile */
+    }
+    
+    .video-controls, .fullscreen-control {
+        transform: scale(0.9); /* Slightly smaller controls on mobile */
+    }
+}
+
+@media (min-width: 1200px) {
+    .interview-container {
+        max-width: 1200px; /* Prevent excessive stretching on large screens */
+        margin: 0 auto;
+    }
+    
+    .video-card, .avatar-card {
+        height: 450px; /* Larger height on bigger screens */
+    }
+}
+
+/* Add to styles.css */
+.avatar-circle {
+    width: 150px;
+    height: 150px;
+    background: linear-gradient(to right, var(--gradient-start), var(--gradient-end));
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 10px 20px rgba(74, 111, 220, 0.2);
+    z-index: 2;
+    transition: all 0.3s ease;
+}
+
+.avatar-circle i {
+    font-size: 80px;
+    color: white;
+}
+
+/* Make the avatar react when the interviewer is speaking */
+#interviewerSpeakingWaves.active + span {
+    font-weight: bold;
+    color: var(--primary-color);
 }
