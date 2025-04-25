@@ -235,22 +235,17 @@ def extract_text_from_pdf(file_path):
 
 def call_claude_api(messages, system_prompt, model=CLAUDE_MODEL, temperature=0.7, max_tokens=4096, current_time_str=None):
     """Calls the Claude API with specified parameters, optionally injecting current time."""
-    # Assuming CLAUDE_API_KEY is defined globally or fetched from environment
     if not CLAUDE_API_KEY: raise ValueError("Claude API Key is not configured.")
-
+    
     # Filter out system messages if they exist in the messages list
     user_assistant_messages = [msg for msg in messages if msg.get("role") != "system"]
     if not user_assistant_messages:
-        # Add a placeholder if the conversation history is empty (e.g., for the very first turn)
-        user_assistant_messages = [{"role": "user", "content": "<BEGIN_INTERVIEW>"}] # More specific placeholder
+        # Add a placeholder if the conversation history is empty
+        user_assistant_messages = [{"role": "user", "content": "<BEGIN_INTERVIEW>"}]
 
     # --- Inject Current Time into System Prompt (Optional) ---
-    # You can add the time context directly into the system prompt string before passing it here,
-    # OR you can inject it dynamically like this:
     final_system_prompt = system_prompt
     if current_time_str:
-        # Example: Append time info if placeholder exists, or just prepend/append
-        # Assuming your system_prompt might have a placeholder like "[Current Time Context]"
         if "[Current Time Context]" in final_system_prompt:
              final_system_prompt = final_system_prompt.replace("[Current Time Context]", f"Current time is approximately {current_time_str}.")
         else:
@@ -259,9 +254,7 @@ def call_claude_api(messages, system_prompt, model=CLAUDE_MODEL, temperature=0.7
     # --- End Time Injection ---
 
     print(f"--- Calling Claude ({model}) with Temp: {temperature} ---")
-    # Log part of the system prompt to verify time injection (optional)
-    # print(f"System Prompt Snippet: {final_system_prompt[:200]}...")
-
+    
     payload = {
         "model": model,
         "max_tokens": max_tokens,
@@ -287,9 +280,7 @@ def call_claude_api(messages, system_prompt, model=CLAUDE_MODEL, temperature=0.7
         # Check if the response text is empty or only whitespace
         if not claude_response_text.strip():
             print(f"Warning: Claude API returned empty text content. Blocks: {content_blocks}")
-            # Decide how to handle empty response, maybe raise an exception or return a default message
-            # raise Exception("Claude API response content block has no text.")
-            return "[IRIS encountered an issue generating a response. Please try again.]" # Example fallback
+            return "[IRIS encountered an issue generating a response. Please try again.]"
 
         return claude_response_text
     except requests.exceptions.RequestException as e:
@@ -632,7 +623,6 @@ Strictly follow JSON format. No extra text or markdown.
         return {"timeline": [], "error": f"Failed to generate timeline: {str(e)}"}
 
 # REVISED function in backend.py (keeping interview_type parameter)
-# REVISED function in backend.py (v2 - Stricter cadence, minimal acknowledgements allowed)
 def create_mock_interviewer_prompt(resume_data, job_data, interview_type="general"):
     """Creates the system prompt for the AI interviewer (REVISED v2 for stricter flow, cadence, role adherence, and length constraints)."""
     job_title = job_data.get("jobRequirements", {}).get("jobTitle", "the position")
@@ -1420,21 +1410,18 @@ def rewrite_resume_section_route():
 
 
 # Replace this entire route function in backend.py
-app.route('/start-mock-interview', methods=['POST'])
+@app.route('/start-mock-interview', methods=['POST'])
 def start_mock_interview():
     """
     Initializes a new mock interview session in Firestore, with usage limit checks,
-    increments counter, and returns updated usage info. (MODIFIED for time/temp)
+    increments counter, and returns updated usage info.
     """
-    session_id = None # Define session_id at the start
-    interview_id = None # Define interview_id at the start
     try:
         data = request.get_json()
         if not data: return jsonify({'error': 'Invalid JSON payload'}), 400
         session_id = data.get('sessionId')
         interview_type = data.get('interviewType', 'general')
         if not session_id: return jsonify({'error': 'Session ID required'}), 400
-        # Assuming `db` is the initialized Firestore client global variable
         if not db: return jsonify({'error': 'Database unavailable'}), 503
 
         # --- Get session data to retrieve user ID ---
@@ -1475,40 +1462,39 @@ def start_mock_interview():
         system_prompt = create_mock_interviewer_prompt(resume_data, job_data, interview_type)
 
         # --- Generate initial greeting ---
-        initial_prompt_content = f"Start the '{interview_type}' interview with {resume_data.get('name', 'the candidate')}. Give a brief professional greeting (consider the current time) and ask your first question."
-        greeting = f"Hello {resume_data.get('name', 'there')}. Welcome to your {interview_type} mock interview. Let's begin. Can you start by telling me a bit about yourself and your background?" # Fallback greeting
+        initial_prompt = f"Start the '{interview_type}' interview with {resume_data.get('name', 'the candidate')}. Give a brief professional greeting and ask your first question."
         try:
             # Get current time for context
-            current_time_str = datetime.datetime.now().strftime("%I:%M %p") # e.g., "01:15 PM"
-
+            current_time_str = datetime.now().strftime("%I:%M %p")  # e.g., "01:15 PM"
+            
             greeting = call_claude_api(
-                messages=[{"role": "user", "content": initial_prompt_content}],
-                system_prompt=system_prompt,
+                messages=[{"role": "user", "content": initial_prompt}],
+                system_prompt=system_prompt, 
                 model=CLAUDE_MODEL,
-                temperature=0.3, # <-- SET TEMPERATURE
-                current_time_str=current_time_str # <-- PASS CURRENT TIME
+                temperature=0.3,  # Lower temperature for more consistency
+                current_time_str=current_time_str  # Pass current time
             )
         except Exception as e:
             print(f"[{session_id}] Error generating greeting for interview {interview_id}: {e}")
-            # Fallback greeting is already set above
+            greeting = f"Hello {resume_data.get('name', 'there')}. Welcome to your {interview_type} mock interview. Let's begin. Can you start by telling me a bit about yourself and your background?"
 
         # --- Create interview document in Firestore ---
-        # Assuming `firestore` is the imported firebase_admin.firestore module
         interview_doc_ref = db.collection('interviews').document(interview_id)
         interview_data_to_save = {
             'sessionId': session_id,
-            'userId': user_id,
+            'userId': user_id,  # Store user ID directly in interview doc
             'interviewType': interview_type,
-            'system_prompt_summary': system_prompt[:1000] + "...", # Store summary for reference
-            'conversation': [{'role': 'assistant', 'content': greeting, 'timestamp': datetime.datetime.now().isoformat()}],
+            'system_prompt_summary': system_prompt[:1000] + "...",
+            'conversation': [{'role': 'assistant', 'content': greeting, 'timestamp': datetime.now().isoformat()}],
             'status': 'active',
-            'start_time': datetime.datetime.now().isoformat(),
+            'start_time': datetime.now().isoformat(),
             'last_updated': firestore.SERVER_TIMESTAMP,
-            'resume_data_snapshot': resume_data, # Store snapshot for context later
-            'job_data_snapshot': job_data, # Store snapshot for context later
+            'resume_data_snapshot': resume_data,
+            'job_data_snapshot': job_data,
             'analysis_status': 'not_started',
             'analysis': None,
-            'usage_info': { # Store usage info at time of creation
+            # Add usage tracking info to interview (using data from increment_result)
+            'usage_info': {
                 'feature': 'mockInterviews',
                 'used': increment_result.get('used', 0),
                 'limit': increment_result.get('limit', 0)
@@ -1517,7 +1503,7 @@ def start_mock_interview():
         interview_doc_ref.set(interview_data_to_save)
         print(f"[{session_id}] Started interview {interview_id} of type {interview_type} for user {user_id}.")
 
-        # *** Return updated usage info ***
+        # Return the latest usage info obtained from increment_result
         return jsonify({
             'interviewId': interview_id,
             'sessionId': session_id,
@@ -1529,12 +1515,10 @@ def start_mock_interview():
                 'limit': increment_result.get('limit', 0),
                 'remaining': increment_result.get('remaining', 0)
             }
-        }), 200 # OK
+        })
 
     except Exception as e:
-        # Ensure IDs have values before using in the error message
-        sid_log = session_id if session_id else "Unknown Session"
-        print(f"Error in /start-mock-interview for session {sid_log}: {e}")
+        print(f"Error in /start-mock-interview: {e}")
         traceback.print_exc()
         return jsonify({'error': f'Server error starting interview: {str(e)}'}), 500
 
