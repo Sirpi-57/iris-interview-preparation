@@ -889,14 +889,16 @@
                     <div class="container-fluid">
                         <h2>Mock Interview</h2>
                         <p class="section-description">Practice with our AI interviewer in a realistic interview setting</p>
-
+    
                         <div class="interview-container">
                             <div class="row">
+                                <!-- Candidate Video Feed -->
                                 <div class="col-md-6">
                                     <div class="card video-card">
                                         <div class="card-body p-0">
                                             <div class="video-container">
                                                 <video id="candidateVideo" autoplay muted></video>
+                                                <!-- Face detection canvas will be inserted here by JS -->
                                                 <div class="video-controls">
                                                     <button id="toggleCameraBtn" class="btn btn-sm btn-light">
                                                         <i class="fas fa-video"></i>
@@ -917,7 +919,8 @@
                                         </div>
                                     </div>
                                 </div>
-
+    
+                                <!-- AI Interviewer Avatar -->
                                 <div class="col-md-6">
                                     <div class="card avatar-card">
                                         <div class="card-body">
@@ -943,8 +946,39 @@
                                     </div>
                                 </div>
                             </div>
-
+    
+                            <!-- Interview Conversation -->
+                            <div class="card mt-4 conversation-card">
+                                <div class="card-header">
+                                    <h3>Interview Conversation</h3>
+                                </div>
+                                <div class="card-body">
+                                    <div id="conversationContainer" class="conversation-container">
+                                        <!-- Messages will be added here -->
+                                    </div>
+                                    <div class="reply-container mt-3">
+                                        <div class="input-group">
+                                            <input type="text" id="userReplyInput" class="form-control" placeholder="Type your response or use microphone...">
+                                            <button class="btn btn-primary" id="sendReplyBtn">
+                                                <i class="fas fa-paper-plane"></i>
+                                            </button>
+                                            <button class="btn btn-secondary" id="voiceReplyBtn">
+                                                <i class="fas fa-microphone"></i>
+                                            </button>
+                                        </div>
+                                        <div id="recordingIndicator" class="recording-indicator">
+                                            Recording... <span id="recordingTime">0:00</span>
+                                            <button id="stopRecordingBtn" class="btn btn-sm btn-danger">
+                                                <i class="fas fa-stop"></i> Stop
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="card-footer">
+                                    <button id="endInterviewBtn" class="btn btn-danger">End Interview & Analyze</button>
+                                </div>
                             </div>
+                        </div>
                     </div>
                 </section>
     
