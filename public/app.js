@@ -11,7 +11,7 @@ const state = {
     recordingStartTime: null,
     recordingTimer: null,
     videoStream: null,
-    // interviewType: 'general',
+    interviewType: 'general',
     conversationHistory: [],
 
     // Voice detection state
@@ -574,19 +574,18 @@ function initButtons() {
             showPermissionsModal();
         }
     });
-    // --- Mock Interview Controls ---
+
+    // --- Mock Interview Controls --- [Keep existing code]
     document.getElementById('endInterviewBtn')?.addEventListener('click', endInterview);
 
-    // --- REMOVE THE INTERVIEW TYPE BUTTON LISTENERS ---
-    // const interviewTypeButtons = document.querySelectorAll('#interviewTypeSelector button'); [cite: 563]
-    // interviewTypeButtons.forEach(button => { [cite: 564]
-    //     button.addEventListener('click', function() {
-    //         interviewTypeButtons.forEach(btn => btn.classList.remove('active'));
-    //         this.classList.add('active');
-    //         state.interviewType = this.getAttribute('data-type');
-    //     });
-    // });
-    // --- END OF REMOVAL ---
+    const interviewTypeButtons = document.querySelectorAll('#interviewTypeSelector button');
+    interviewTypeButtons.forEach(button => {
+        button.addEventListener('click', function() {
+            interviewTypeButtons.forEach(btn => btn.classList.remove('active'));
+            this.classList.add('active');
+            state.interviewType = this.getAttribute('data-type');
+        });
+    });
 
     document.getElementById('toggleCameraBtn')?.addEventListener('click', toggleCamera);
     document.getElementById('toggleMicBtn')?.addEventListener('click', toggleMicrophone);
@@ -596,6 +595,7 @@ function initButtons() {
     document.getElementById('userReplyInput')?.addEventListener('keyup', (event) => {
         if (event.key === 'Enter') sendTextReply();
     });
+
     // Permissions Modal
     document.getElementById('grantPermissionsBtn')?.addEventListener('click', setupMediaDevices);
 
@@ -604,6 +604,7 @@ function initButtons() {
     const stopRecordingBtn = document.getElementById('stopRecordingBtn');
     if(voiceReplyBtn) voiceReplyBtn.style.display = 'none';
     if(stopRecordingBtn) stopRecordingBtn.style.display = 'none';
+    
     // --- Add new event listener for Upgrade Plan button ---
     document.getElementById('upgradePlanBtn')?.addEventListener('click', showPaymentModal);
 }
@@ -1798,7 +1799,6 @@ function setupMediaRecorder(stream) {
 
 
 // --- Updated startMockInterview function ---
-// --- Updated startMockInterview function ---
 function startMockInterview() {
     // Feature access checked before calling setupMediaDevices which calls this
 
@@ -1814,8 +1814,7 @@ function startMockInterview() {
         return;
     }
 
-    // console.log(`Starting ${state.interviewType} interview for session: ${state.sessionId}`); // REMOVE Type
-    console.log(`Starting comprehensive interview for session: ${state.sessionId}`); // Use generic term
+    console.log(`Starting ${state.interviewType} interview for session: ${state.sessionId}`);
     state.isInterviewActive = true;
     state.isAIResponding = false;
     state.conversationHistory = [];
@@ -1823,8 +1822,8 @@ function startMockInterview() {
     const conversationContainer = document.getElementById('conversationContainer');
     if (conversationContainer) conversationContainer.innerHTML = '';
 
-    // addMessageToConversation("system", `Starting ${state.interviewType} interview...`); // REMOVE Type
-    addMessageToConversation("system", `Starting interview...`); // Use generic term
+    addMessageToConversation("system", `Starting ${state.interviewType} interview...`);
+
     // Show loading/starting state
     // Identify potential buttons that trigger this
     const startBtn1 = document.getElementById('startInterviewBtn');
@@ -1838,14 +1837,13 @@ function startMockInterview() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-            sessionId: state.sessionId
-            // interviewType: state.interviewType // <-- REMOVED THIS LINE [cite: 835]
-            // No need to send type anymore
+            sessionId: state.sessionId,
+            interviewType: state.interviewType
         })
     })
     .then(response => {
-         if (!response.ok) {
-           return response.json().then(errData => {
+        if (!response.ok) {
+             return response.json().then(errData => {
                 if (errData.limitReached) {
                      showMessage(errData.error || 'Usage limit reached.', 'warning');
                      showUpgradeModal('mockInterviews');
@@ -1855,8 +1853,8 @@ function startMockInterview() {
             }).catch((jsonParseError) => {
                 console.error("Could not parse error JSON from backend:", jsonParseError);
                  if (jsonParseError.message === 'Limit Reached') {
-                     throw jsonParseError;
-                 }
+                    throw jsonParseError;
+                }
                 throw new Error(`Failed to start interview (${response.status} ${response.statusText})`);
             });
         }
@@ -1883,13 +1881,14 @@ function startMockInterview() {
 
         // Update usage display with the potentially updated local state
         updateUsageDisplay();
+
         // Remove "Starting..." message
         const systemMessages = conversationContainer?.querySelectorAll('.message.system');
         systemMessages?.forEach(msg => msg.remove());
+
         // Display and speak greeting
         addMessageToConversation('interviewer', data.greeting);
-        generateAndPlayTTS(data.greeting);
-        // Triggers listening when done
+        generateAndPlayTTS(data.greeting); // Triggers listening when done
 
         // Reset button states (or maybe hide/change function)
         if(startBtn1) { startBtn1.disabled = false; startBtn1.textContent = 'Start Interview'; }
@@ -1897,6 +1896,7 @@ function startMockInterview() {
         if(startBtn3) { startBtn3.disabled = false; startBtn3.textContent = 'Start Another Interview'; }
         // Consider navigating to the interview screen here if not already done
         // navigateTo('mock-interview');
+
         return data;
     })
     .catch(error => {
@@ -1907,7 +1907,7 @@ function startMockInterview() {
              alert(`Error starting interview: ${error.message}`);
              addMessageToConversation("system", `Error starting interview: ${error.message}. Please try again.`);
          } else {
-             addMessageToConversation("system", `Mock interview limit reached. Please upgrade your plan.`);
+              addMessageToConversation("system", `Mock interview limit reached. Please upgrade your plan.`);
          }
 
         // Reset button states on error
