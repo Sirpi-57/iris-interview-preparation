@@ -778,63 +778,109 @@ def generate_suggested_answers(transcript, resume_data, job_data):
     """Generates suggested answers for interviewer questions found in the transcript."""
     print("--- Generating Suggested Answers ---")
     if not CLAUDE_API_KEY: raise ValueError("Claude API Key not configured.")
-    resume_str = json.dumps(resume_data, indent=2)
-    job_req_str = json.dumps(job_data.get("jobRequirements", {}), indent=2)
-    skill_gaps_str = json.dumps(job_data.get("skillGaps", []), indent=2)
+    
+    # Create simplified data to reduce token usage
+    resume_summary = {
+        "name": resume_data.get("name", ""),
+        "currentPosition": resume_data.get("currentPosition", ""),
+        "yearsOfExperience": resume_data.get("yearsOfExperience", ""),
+        "technicalSkills": resume_data.get("technicalSkills", [])[:5] # Limit skills
+    }
+    resume_str = json.dumps(resume_summary, indent=2)
+    
+    # Extract only required job information
+    job_req_summary = {
+        "jobTitle": job_data.get("jobRequirements", {}).get("jobTitle", ""),
+        "requiredSkills": job_data.get("jobRequirements", {}).get("requiredSkills", [])[:5]
+    }
+    job_req_str = json.dumps(job_req_summary, indent=2)
+    
+    # Extract just interviewer questions to save tokens
+    lines = transcript.split('\n')
+    interviewer_lines = [line for line in lines if line.startswith('Interviewer:')]
+    
     system_prompt = f"""
-You are an expert interview coach reviewing a mock interview transcript. Provide strong alternative answers the candidate could have given, tailored to their profile.
-Candidate Profile: {resume_str[:5000]}
-Job Requirements: {job_req_str}
-Identified Skill Gaps: {skill_gaps_str}
-Interview Transcript:
---- BEGIN TRANSCRIPT ---
-{transcript[:20000]}
---- END TRANSCRIPT ---
+You are an expert interview coach reviewing a mock interview. For each interviewer question, provide ONE strong alternative answer the candidate could have given.
 
-Instructions:
-1. Identify ONLY the questions asked by the 'Interviewer'.
-2. For each distinct Interviewer question:
-   a. Generate 1-2 distinct, strong example answers *this candidate* could give based on their resume/job reqs.
-   b. If addressing a skill gap, frame it positively.
-   c. For each answer, provide a brief (1-sentence) 'rationale' (why it's good - e.g., "Uses STAR method," "Highlights relevant skill X," "Quantifies achievement").
-3. Format output as a single, valid JSON object ONLY (no extra text):
+Interview Context:
+- Candidate: {resume_summary.get("name", "")}, {resume_summary.get("currentPosition", "")}
+- Job: {job_req_summary.get("jobTitle", "")}
+- Skills Required: {", ".join(job_req_summary.get("requiredSkills", []))}
+
+Interview Questions:
+{json.dumps(interviewer_lines, indent=2)[:1000]}
+
+For each question, provide ONLY ONE better sample answer. Format as valid JSON:
 {{
 "suggestedAnswers": [
   {{
-    "question": "<Exact Interviewer question>",
-    "suggestions": [ {{"answer": "<Example Answer 1>", "rationale": "<Rationale 1>"}}, {{"answer": "<Example Answer 2>", "rationale": "<Rationale 2>"}} ]
-  }}
-  // ... repeat for each Interviewer question
+    "question": "<Question text>",
+    "suggestions": [
+      {{"answer": "<Better answer>", "rationale": "<Why this answer is strong>"}}
+    ]
+  }},
+  // Repeat for other questions
 ]
 }}
+
+Return ONLY the JSON with NO additional text before or after.
 """
-    messages = [{"role": "user", "content": "Analyze the transcript and provide suggested answers for the interviewer questions."}]
-    response_content = ""
+    
+    messages = [{"role": "user", "content": "Provide one strong alternative answer for each question in this interview."}]
+    
     try:
+        # Use shorter max_tokens and higher temperature for creativity
         response_content = call_claude_api(
-            messages=messages, system_prompt=system_prompt, model=CLAUDE_MODEL,
-            max_tokens=4096, temperature=0.6
+            messages=messages, 
+            system_prompt=system_prompt, 
+            model=CLAUDE_MODEL,
+            max_tokens=3000,  # Reduce token usage
+            temperature=0.7   # More creative responses
         )
-        json_start = response_content.find('{')
-        json_end = response_content.rfind('}') + 1
-        if json_start != -1 and json_end != -1 and json_end > json_start:
-            json_text_raw = response_content[json_start:json_end].strip()
-            suggested_data = json.loads(json_text_raw, strict=False)
-            if "suggestedAnswers" not in suggested_data or not isinstance(suggested_data["suggestedAnswers"], list):
-                 print("Warning: 'suggestedAnswers' key missing or invalid in Claude response.")
-                 suggested_data = {"suggestedAnswers": []}
-            print("Suggested answers generated successfully.")
-            return suggested_data
-        else:
-            raise ValueError("Valid JSON object not found for suggested answers.")
-    except json.JSONDecodeError as e:
-         print(f"*** JSON Decode Error for suggested answers: {e}")
-         print(f"--- Raw Text Failed Parsing ---\n{json_text_raw[:2000]}\n---")
-         raise Exception("Failed to parse suggested answers JSON.") from e
+        
+        # Clean the response to extract JSON
+        response_text = response_content.strip()
+        
+        # Handle if response is wrapped in markdown code blocks
+        if response_text.startswith('```json'):
+            response_text = response_text[7:]
+        if response_text.endswith('```'):
+            response_text = response_text[:-3]
+        response_text = response_text.strip()
+        
+        # Try parsing the JSON directly first
+        try:
+            suggested_data = json.loads(response_text)
+        except json.JSONDecodeError:
+            # Fall back to finding JSON objects in the text
+            json_start = response_content.find('{')
+            json_end = response_content.rfind('}') + 1
+            
+            if json_start >= 0 and json_end > json_start:
+                json_text = response_content[json_start:json_end].strip()
+                suggested_data = json.loads(json_text)
+            else:
+                # If we can't parse JSON at all, return empty data with error
+                return {"suggestedAnswers": [], "error": "Failed to extract valid JSON from response"}
+        
+        # Ensure proper structure
+        if "suggestedAnswers" not in suggested_data or not isinstance(suggested_data.get("suggestedAnswers"), list):
+            print("Warning: 'suggestedAnswers' key missing or invalid in Claude response.")
+            suggested_data = {"suggestedAnswers": []}
+        
+        # Ensure each question has exactly one suggestion
+        for qa in suggested_data.get("suggestedAnswers", []):
+            if "suggestions" in qa and len(qa["suggestions"]) > 1:
+                qa["suggestions"] = [qa["suggestions"][0]]  # Keep only the first suggestion
+                
+        print(f"Suggested answers generated successfully: {len(suggested_data.get('suggestedAnswers', []))} questions")
+        return suggested_data
+        
     except Exception as e:
         print(f"Error generating suggested answers: {e}")
-        # print(f"Full Claude response content on error:\n{response_content}") # Uncomment for deep debug
-        raise Exception(f"Failed to generate suggestions: {str(e)}") from e
+        traceback.print_exc()
+        # Return valid structure even on error
+        return {"suggestedAnswers": [], "error": str(e)}
 
 
 def rewrite_resume_section(resume_data, job_description, section_to_improve):
