@@ -778,8 +778,8 @@ def generate_suggested_answers(transcript, resume_data, job_data):
     """Generates suggested answers for interviewer questions found in the transcript."""
     print("--- Generating Suggested Answers ---")
     if not CLAUDE_API_KEY: raise ValueError("Claude API Key not configured.")
-    
-    # Create simplified data to reduce token usage
+
+    # --- (Keep the existing code for resume_summary, job_req_summary, interviewer_lines, system_prompt, messages) ---
     resume_summary = {
         "name": resume_data.get("name", ""),
         "currentPosition": resume_data.get("currentPosition", ""),
@@ -787,18 +787,18 @@ def generate_suggested_answers(transcript, resume_data, job_data):
         "technicalSkills": resume_data.get("technicalSkills", [])[:5] # Limit skills
     }
     resume_str = json.dumps(resume_summary, indent=2)
-    
+
     # Extract only required job information
     job_req_summary = {
         "jobTitle": job_data.get("jobRequirements", {}).get("jobTitle", ""),
         "requiredSkills": job_data.get("jobRequirements", {}).get("requiredSkills", [])[:5]
     }
     job_req_str = json.dumps(job_req_summary, indent=2)
-    
+
     # Extract just interviewer questions to save tokens
     lines = transcript.split('\n')
     interviewer_lines = [line for line in lines if line.startswith('Interviewer:')]
-    
+
     system_prompt = f"""
 You are an expert interview coach reviewing a mock interview. For each interviewer question, provide ONE strong alternative answer the candidate could have given.
 
@@ -823,59 +823,77 @@ For each question, provide ONLY ONE better sample answer. Format as valid JSON:
 ]
 }}
 
-Return ONLY the JSON with NO additional text before or after.
-"""
-    
+Return ONLY the JSON with NO additional text before or after. Avoid using problematic control characters in the 'answer' and 'rationale' strings.
+""" # Added note to LLM as well, although sanitization is key.
+
     messages = [{"role": "user", "content": "Provide one strong alternative answer for each question in this interview."}]
-    
+
+
     try:
-        # Use shorter max_tokens and higher temperature for creativity
         response_content = call_claude_api(
-            messages=messages, 
-            system_prompt=system_prompt, 
+            messages=messages,
+            system_prompt=system_prompt,
             model=CLAUDE_MODEL,
-            max_tokens=3000,  # Reduce token usage
-            temperature=0.7   # More creative responses
+            max_tokens=3000,
+            temperature=0.7
         )
-        
-        # Clean the response to extract JSON
+
         response_text = response_content.strip()
-        
-        # Handle if response is wrapped in markdown code blocks
+
+        # Handle markdown code blocks
         if response_text.startswith('```json'):
             response_text = response_text[7:]
         if response_text.endswith('```'):
             response_text = response_text[:-3]
         response_text = response_text.strip()
-        
-        # Try parsing the JSON directly first
+
+        raw_parsed_data = {}
         try:
-            suggested_data = json.loads(response_text)
+            # Parse the potentially unclean JSON from LLM
+            raw_parsed_data = json.loads(response_text)
         except json.JSONDecodeError:
-            # Fall back to finding JSON objects in the text
+            # Fallback find {} block (keep this logic)
             json_start = response_content.find('{')
             json_end = response_content.rfind('}') + 1
-            
             if json_start >= 0 and json_end > json_start:
                 json_text = response_content[json_start:json_end].strip()
-                suggested_data = json.loads(json_text)
+                try:
+                   raw_parsed_data = json.loads(json_text)
+                except json.JSONDecodeError as e:
+                   print(f"Error decoding JSON even after finding braces: {e}")
+                   return {"suggestedAnswers": [], "error": f"Failed to extract valid JSON from response: {e}"}
             else:
-                # If we can't parse JSON at all, return empty data with error
-                return {"suggestedAnswers": [], "error": "Failed to extract valid JSON from response"}
-        
-        # Ensure proper structure
-        if "suggestedAnswers" not in suggested_data or not isinstance(suggested_data.get("suggestedAnswers"), list):
-            print("Warning: 'suggestedAnswers' key missing or invalid in Claude response.")
-            suggested_data = {"suggestedAnswers": []}
-        
-        # Ensure each question has exactly one suggestion
-        for qa in suggested_data.get("suggestedAnswers", []):
-            if "suggestions" in qa and len(qa["suggestions"]) > 1:
-                qa["suggestions"] = [qa["suggestions"][0]]  # Keep only the first suggestion
-                
-        print(f"Suggested answers generated successfully: {len(suggested_data.get('suggestedAnswers', []))} questions")
-        return suggested_data
-        
+                return {"suggestedAnswers": [], "error": "Failed to extract any JSON object from response"}
+
+
+        # *** START SANITIZATION ***
+        sanitized_suggested_answers = []
+        if "suggestedAnswers" in raw_parsed_data and isinstance(raw_parsed_data.get("suggestedAnswers"), list):
+            for qa_item in raw_parsed_data["suggestedAnswers"]:
+                sanitized_qa = {}
+                sanitized_qa["question"] = sanitize_string_for_json(qa_item.get("question"))
+
+                sanitized_suggestions = []
+                # Ensure suggestions exist and keep only the first one
+                suggestions = qa_item.get("suggestions", [])
+                if suggestions and isinstance(suggestions, list):
+                     first_suggestion = suggestions[0]
+                     if isinstance(first_suggestion, dict):
+                          sanitized_suggestions.append({
+                              "answer": sanitize_string_for_json(first_suggestion.get("answer")),
+                              "rationale": sanitize_string_for_json(first_suggestion.get("rationale"))
+                          })
+
+                sanitized_qa["suggestions"] = sanitized_suggestions
+                sanitized_suggested_answers.append(sanitized_qa)
+        # *** END SANITIZATION ***
+
+        # Construct the final data structure with sanitized content
+        final_data = {"suggestedAnswers": sanitized_suggested_answers}
+
+        print(f"Suggested answers generated and sanitized successfully: {len(final_data.get('suggestedAnswers', []))} questions")
+        return final_data # Return the sanitized data
+
     except Exception as e:
         print(f"Error generating suggested answers: {e}")
         traceback.print_exc()
@@ -1115,6 +1133,20 @@ def increment_usage_counter(user_id, feature_type):
         print(f"Error incrementing usage counter for {user_id} ({feature_type}): {e}")
         traceback.print_exc()
         return {'success': False, 'error': f'Server error: {str(e)}'}
+
+# Helper function to sanitize strings for JSON embedding
+def sanitize_string_for_json(text):
+    """Removes or escapes control characters problematic for JSON."""
+    if not isinstance(text, str):
+        return text # Return non-strings as is
+    # Remove characters typically causing issues (adjust based on observation)
+    # This removes null bytes, vertical tabs, form feeds, etc.
+    # It also replaces common whitespace like newline, tab, carriage return with spaces
+    # to prevent them breaking JSON strings if not properly handled by json.loads downstream.
+    text = re.sub(r'[\x00-\x1F\x7F]', ' ', text) # Replace control chars 0-31 and 127 with space
+    # Alternatively, more aggressive removal:
+    # text = ''.join(char for char in text if 31 < ord(char) < 127)
+    return text.strip() # Remove leading/trailing whitespace
 
 
 
@@ -1846,6 +1878,7 @@ def get_interview_analysis(interview_id):
         return jsonify({'error': f'Server error retrieving interview analysis: {str(e)}'}), 500
 
 
+# --- Make sure the route uses the updated function ---
 @app.route('/get-suggested-answers/<interview_id>', methods=['GET'])
 def get_suggested_answers_route(interview_id):
     """Generates and returns suggested answers for the interview questions."""
@@ -1853,13 +1886,10 @@ def get_suggested_answers_route(interview_id):
         if not db: return jsonify({'error': 'Database unavailable'}), 503
         interview_data = get_interview_data(interview_id)
         if interview_data is None: return jsonify({'error': 'Interview session not found'}), 404
-        # Require analysis to be complete? Or just need transcript? Let's require completion for now.
-        # if interview_data.get('analysis_status') != 'completed':
-        #     return jsonify({'error': 'Interview analysis must be completed first'}), 400
 
         conversation = interview_data.get('conversation', [])
         resume_data = interview_data.get('resume_data_snapshot')
-        job_data = interview_data.get('job_data_snapshot') # Contains match results etc.
+        job_data = interview_data.get('job_data_snapshot')
         if not conversation or not resume_data or not job_data:
              return jsonify({'error': 'Missing required data for generating suggestions'}), 500
 
@@ -1867,10 +1897,14 @@ def get_suggested_answers_route(interview_id):
             f"{'Interviewer' if msg.get('role') == 'assistant' else 'Candidate'}: {msg.get('content', '')}"
             for msg in conversation
         ])
+        # This call now uses the modified function with sanitization
         suggestions = generate_suggested_answers(transcript_text, resume_data, job_data)
+
+        # The 'jsonify' function will correctly handle the final Python dict
+        # It handles escaping for standard JSON transmission.
         return jsonify(suggestions)
     except Exception as e:
-        print(f"Error in /get-suggested-answers for {interview_id}: {e}")
+        print(f"Error in /get-suggested-answers route for {interview_id}: {e}")
         traceback.print_exc()
         return jsonify({'error': f'Server error generating suggestions: {str(e)}'}), 500
 
