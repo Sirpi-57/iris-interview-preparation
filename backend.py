@@ -233,30 +233,64 @@ def extract_text_from_pdf(file_path):
         traceback.print_exc()
         raise Exception(f"Failed to extract text from PDF source: {e}") from e
 
-def call_claude_api(messages, system_prompt, model=CLAUDE_MODEL, temperature=0.7, max_tokens=4096):
+def call_claude_api(messages, system_prompt, model=CLAUDE_MODEL, temperature=0.7, max_tokens=4096, current_time_str=None):
+    """Calls the Claude API with specified parameters, optionally injecting current time."""
+    # Assuming CLAUDE_API_KEY is defined globally or fetched from environment
     if not CLAUDE_API_KEY: raise ValueError("Claude API Key is not configured.")
+
+    # Filter out system messages if they exist in the messages list
     user_assistant_messages = [msg for msg in messages if msg.get("role") != "system"]
     if not user_assistant_messages:
-        user_assistant_messages = [{"role": "user", "content": "<BEGIN>"}] # Placeholder if needed
+        # Add a placeholder if the conversation history is empty (e.g., for the very first turn)
+        user_assistant_messages = [{"role": "user", "content": "<BEGIN_INTERVIEW>"}] # More specific placeholder
 
-    print(f"--- Calling Claude ({model}) ---")
+    # --- Inject Current Time into System Prompt (Optional) ---
+    # You can add the time context directly into the system prompt string before passing it here,
+    # OR you can inject it dynamically like this:
+    final_system_prompt = system_prompt
+    if current_time_str:
+        # Example: Append time info if placeholder exists, or just prepend/append
+        # Assuming your system_prompt might have a placeholder like "[Current Time Context]"
+        if "[Current Time Context]" in final_system_prompt:
+             final_system_prompt = final_system_prompt.replace("[Current Time Context]", f"Current time is approximately {current_time_str}.")
+        else:
+            # Fallback: Prepend the time info if no placeholder found
+            final_system_prompt = f"(Current time is approximately {current_time_str})\n\n{system_prompt}"
+    # --- End Time Injection ---
+
+    print(f"--- Calling Claude ({model}) with Temp: {temperature} ---")
+    # Log part of the system prompt to verify time injection (optional)
+    # print(f"System Prompt Snippet: {final_system_prompt[:200]}...")
+
     payload = {
-        "model": model, "max_tokens": max_tokens, "messages": user_assistant_messages,
-        "system": system_prompt, "temperature": temperature
+        "model": model,
+        "max_tokens": max_tokens,
+        "messages": user_assistant_messages,
+        "system": final_system_prompt, # Use the potentially modified prompt
+        "temperature": temperature
     }
     headers = {
-        "Content-Type": "application/json", "anthropic-version": "2023-06-01",
+        "Content-Type": "application/json",
+        "anthropic-version": "2023-06-01",
         "x-api-key": CLAUDE_API_KEY
     }
     try:
-        response = requests.post("https://api.anthropic.com/v1/messages", headers=headers, json=payload, timeout=90) # Increased timeout
+        response = requests.post("https://api.anthropic.com/v1/messages", headers=headers, json=payload, timeout=90)
         print(f"Claude API response status: {response.status_code}")
         response.raise_for_status()
         response_data = response.json()
         content_blocks = response_data.get("content", [])
         if not content_blocks: raise Exception(f"Claude API response missing 'content'. Data: {response_data}")
+
         claude_response_text = "".join([block.get("text", "") for block in content_blocks if block.get("type") == "text"])
-        if not claude_response_text: raise Exception(f"Claude API response content block has no text. Blocks: {content_blocks}")
+
+        # Check if the response text is empty or only whitespace
+        if not claude_response_text.strip():
+            print(f"Warning: Claude API returned empty text content. Blocks: {content_blocks}")
+            # Decide how to handle empty response, maybe raise an exception or return a default message
+            # raise Exception("Claude API response content block has no text.")
+            return "[IRIS encountered an issue generating a response. Please try again.]" # Example fallback
+
         return claude_response_text
     except requests.exceptions.RequestException as e:
         error_msg = f"Claude API request error ({model}): {e}"
@@ -598,8 +632,9 @@ Strictly follow JSON format. No extra text or markdown.
         return {"timeline": [], "error": f"Failed to generate timeline: {str(e)}"}
 
 # REVISED function in backend.py (keeping interview_type parameter)
+# REVISED function in backend.py (v2 - Stricter cadence, minimal acknowledgements allowed)
 def create_mock_interviewer_prompt(resume_data, job_data, interview_type="general"):
-    """Creates the system prompt for the AI interviewer (REVISED for stricter flow, cadence, role adherence, and length constraints)."""
+    """Creates the system prompt for the AI interviewer (REVISED v2 for stricter flow, cadence, role adherence, and length constraints)."""
     job_title = job_data.get("jobRequirements", {}).get("jobTitle", "the position")
     required_skills = job_data.get("jobRequirements", {}).get("requiredSkills", [])
     experience_level = job_data.get("jobRequirements", {}).get("experienceLevel", "")
@@ -622,7 +657,7 @@ def create_mock_interviewer_prompt(resume_data, job_data, interview_type="genera
 
     # Note: Current time needs to be injected into the *API call* context.
     system_prompt = f"""
-You are IRIS, an AI Interviewer from the Interview Readiness & Improvement System. Your ONLY role is to conduct a realistic, structured, and concise mock interview for the specified `interview_type`.
+You are IRIS, an AI Interviewer. Your ONLY role is to conduct a realistic, structured, and concise mock interview for the specified `interview_type`. You must be strict in following instructions.
 
 **Target Role:** {job_title} (Requires: {experience_level} experience, Skills: {skills_str})
 **Candidate:** {candidate_name} ({current_position}{experience_str})
@@ -630,32 +665,33 @@ You are IRIS, an AI Interviewer from the Interview Readiness & Improvement Syste
 **Identified Gaps:** {skill_gaps_str}
 **Interview Type Focus:** '{interview_type}' (Adapt question depth accordingly)
 
-**Core Directives:**
-* **Role Adherence:** You are ONLY the interviewer, IRIS. Do NOT provide feedback, hints, answers, or engage in off-topic chat. If the candidate's response is irrelevant or confusing, politely guide them back by repeating the last question or stating "My role is to ask questions for this mock interview. Let's return to..." and then ask the question again or the next planned question. Do NOT break character.
-* **Question Cadence:** Ask **ONLY ONE** main question per turn. Avoid lists of sub-questions. A single, essential clarifying question (e.g., "Could you elaborate on the specific technology used?") is permissible *after* the candidate responds, but limit this.
-* **No In-Interview Feedback:** Do NOT provide summaries or feedback on the candidate's answers during the interview. Simply transition smoothly to the next question. Vary your transitions; avoid repeating phrases like "Given your experience...". Use phrases like "Okay, let's move on to...", "Building on that...", "Next, I'd like to ask about...", "Understood. Now, regarding...", "Let's shift focus to...".
-* **Pacing and Length:** Adhere strictly to the flow below. Ask 2-3 questions per phase *relevant to the interview_type focus*. The entire interview should consist of approximately 15-20 questions total and last roughly 30-40 minutes (aim for a maximum of 50-60 total conversation turns including candidate responses). Move promptly between phases after covering the necessary questions for that phase based on the '{interview_type}'.
+**Critical Directives - Follow Strictly:**
+* **Role Adherence:** You are ONLY the interviewer, IRIS. Do NOT provide feedback, hints, answers, or engage in off-topic chat. If the candidate's response is irrelevant or confusing, politely guide them back by repeating the last question or stating "My role is to ask questions for this mock interview. Let's return to..." and then ask the question again or the next planned question. Do NOT break character under any circumstances.
+* **Question Cadence:** Ask **ONLY ONE** main question per turn. **DO NOT** ask multiple questions or list sub-questions (like 1, 2, 3) in a single turn. A single, brief, essential clarifying question (e.g., "Could you specify which tool you used?") is permissible *only if necessary* after the candidate responds, but avoid this if possible.
+* **Minimal Acknowledgements Only:** Do NOT provide summaries or evaluations of the candidate's answers during the interview (e.g., avoid "Excellent point", "That's a good approach"). You MAY use very brief, neutral acknowledgements like "Okay.", "Understood.", "Noted." before transitioning.
+* **Varied Transitions:** Transition smoothly to the next question using varied, concise phrases. Avoid repeating the same transition (e.g., "Given your experience..."). Use alternatives like "Okay, let's move on to...", "Building on that...", "Next, I'd like to ask about...", "Understood. Now, regarding...", "Let's shift focus to...".
+* **Pacing and Length:** Adhere strictly to the flow below. Ask 2-3 questions per phase *relevant to the interview_type focus*. The entire interview should consist of approximately 15-20 questions total and conclude within 50-60 total conversation turns (including candidate responses). Move promptly between phases after covering the necessary questions for that phase based on the '{interview_type}'. Do not linger.
 
-**Mandatory Interview Flow (Adapt depth based on '{interview_type}', ask 2-3 relevant questions per phase):**
+**Mandatory Interview Flow (Adapt depth based on '{interview_type}', ask 2-3 relevant questions per phase, ONE question per turn):**
 
 1.  **Introduction (1 question):**
     * Greet appropriately (consider time context provided externally). Introduce yourself ("I am IRIS...") and state the purpose (mock interview for {job_title}, focusing on '{interview_type}' aspects).
     * Ask ONLY: "To start, could you please tell me a bit about yourself and your background?"
 
 2.  **Experience / Projects (2-3 questions):**
-    * **(If Experienced):** Ask about a relevant previous role/achievement. Then ask about ONE significant project (contribution, challenge, outcome), focusing questions based on '{interview_type}'.
-    * **(If Inexperienced):** Ask about ONE significant academic or personal project (motivation, role, tech, challenge, learning), focusing questions based on '{interview_type}'. Ask one follow-up about a specific aspect.
+    * **(If Experienced):** Ask about a relevant previous role OR achievement. Then ask about ONE significant project (contribution OR challenge OR outcome), focusing questions based on '{interview_type}'.
+    * **(If Inexperienced):** Ask about ONE significant academic or personal project (motivation OR role OR tech OR challenge OR learning), focusing questions based on '{interview_type}'. Ask one follow-up about a specific aspect if needed.
 
 3.  **Technical - Fundamentals (2-3 questions, *if {technical_focus}*):**
     * Ask questions about core concepts related to the required skills ({skills_str}). Skip or minimize if interview_type is purely 'behavioral'.
 
 4.  **Technical - Deep Dive & Validation (2-3 questions, *if {technical_focus}*):**
-    * Ask a more specific technical question or present a brief scenario related to {skills_str}.
+    * Ask a more specific technical question OR present a brief scenario related to {skills_str}.
     * Ask a question to validate one key skill listed on their resume ({candidate_skills_str}).
     * Ask a question based directly on a technical requirement from the Job Description. Skip or minimize if interview_type is purely 'behavioral'.
 
 5.  **Skill Gap Exploration (1-2 questions, *relevant to {interview_type}*):**
-    * If a relevant skill gap ({skill_gaps_str}) exists (technical gap for technical focus, potentially soft skill gap for behavioral), politely ask ONE question related to it (e.g., "The role involves [Gap Skill]. Can you share your familiarity or experience with it?").
+    * If a relevant skill gap ({skill_gaps_str}) exists, politely ask ONE question related to it (e.g., "The role involves [Gap Skill]. Can you share your familiarity or experience with it?").
 
 6.  **Behavioral Assessment (2-3 questions, *if {behavioral_focus}*):**
     * Ask a STAR method question ("Tell me about a time you handled [situation relevant to role/type]").
@@ -673,9 +709,10 @@ You are IRIS, an AI Interviewer from the Interview Readiness & Improvement Syste
     * Statement 2: "A detailed analysis report of this mock interview, including feedback and suggestions based on our conversation, will be available to you shortly after we conclude."
     * Statement 3: "This concludes our mock interview. We wish you the best in your preparation." (End conversation here).
 
-**REMEMBER:** Stick strictly to the INTERVIEWER role (IRIS). ONE question per turn. NO feedback during the interview. Follow the flow and pacing based on the '{interview_type}'. Keep it concise and professional.
+**REMEMBER:** Strict adherence to the INTERVIEWER role (IRIS) is paramount. ONE question per turn. Minimal neutral acknowledgements ONLY (no feedback/summaries). Follow the flow and pacing strictly based on the '{interview_type}'. Keep it concise and professional.
 """
     return system_prompt
+
 
 
 def analyze_interview_performance(interview_transcript, job_requirements, resume_data):
@@ -1383,18 +1420,21 @@ def rewrite_resume_section_route():
 
 
 # Replace this entire route function in backend.py
-@app.route('/start-mock-interview', methods=['POST'])
+app.route('/start-mock-interview', methods=['POST'])
 def start_mock_interview():
     """
     Initializes a new mock interview session in Firestore, with usage limit checks,
-    increments counter, and returns updated usage info.
+    increments counter, and returns updated usage info. (MODIFIED for time/temp)
     """
+    session_id = None # Define session_id at the start
+    interview_id = None # Define interview_id at the start
     try:
         data = request.get_json()
         if not data: return jsonify({'error': 'Invalid JSON payload'}), 400
         session_id = data.get('sessionId')
         interview_type = data.get('interviewType', 'general')
         if not session_id: return jsonify({'error': 'Session ID required'}), 400
+        # Assuming `db` is the initialized Firestore client global variable
         if not db: return jsonify({'error': 'Database unavailable'}), 503
 
         # --- Get session data to retrieve user ID ---
@@ -1424,7 +1464,6 @@ def start_mock_interview():
         if not resume_data or not job_data: return jsonify({'error': 'Required analysis data missing'}), 500
 
         # --- Increment Usage Counter BEFORE creating interview ---
-        # This function now returns {'success': True/False, 'used': N, 'limit': M, 'remaining': X}
         increment_result = increment_usage_counter(user_id, 'mockInterviews')
         if not increment_result.get('success', False):
             error_msg = increment_result.get('error', 'Failed to update usage counter')
@@ -1436,33 +1475,40 @@ def start_mock_interview():
         system_prompt = create_mock_interviewer_prompt(resume_data, job_data, interview_type)
 
         # --- Generate initial greeting ---
-        initial_prompt = f"Start the '{interview_type}' interview with {resume_data.get('name', 'the candidate')}. Give a brief professional greeting and ask your first question."
+        initial_prompt_content = f"Start the '{interview_type}' interview with {resume_data.get('name', 'the candidate')}. Give a brief professional greeting (consider the current time) and ask your first question."
+        greeting = f"Hello {resume_data.get('name', 'there')}. Welcome to your {interview_type} mock interview. Let's begin. Can you start by telling me a bit about yourself and your background?" # Fallback greeting
         try:
+            # Get current time for context
+            current_time_str = datetime.datetime.now().strftime("%I:%M %p") # e.g., "01:15 PM"
+
             greeting = call_claude_api(
-                messages=[{"role": "user", "content": initial_prompt}],
-                system_prompt=system_prompt, model=CLAUDE_MODEL
+                messages=[{"role": "user", "content": initial_prompt_content}],
+                system_prompt=system_prompt,
+                model=CLAUDE_MODEL,
+                temperature=0.3, # <-- SET TEMPERATURE
+                current_time_str=current_time_str # <-- PASS CURRENT TIME
             )
         except Exception as e:
             print(f"[{session_id}] Error generating greeting for interview {interview_id}: {e}")
-            greeting = f"Hello {resume_data.get('name', 'there')}. Welcome to your {interview_type} mock interview. Let's begin. Can you start by telling me a bit about yourself and your background?"
+            # Fallback greeting is already set above
 
         # --- Create interview document in Firestore ---
+        # Assuming `firestore` is the imported firebase_admin.firestore module
         interview_doc_ref = db.collection('interviews').document(interview_id)
         interview_data_to_save = {
             'sessionId': session_id,
-            'userId': user_id,  # Store user ID directly in interview doc
+            'userId': user_id,
             'interviewType': interview_type,
-            'system_prompt_summary': system_prompt[:1000] + "...",
-            'conversation': [{'role': 'assistant', 'content': greeting, 'timestamp': datetime.now().isoformat()}],
+            'system_prompt_summary': system_prompt[:1000] + "...", # Store summary for reference
+            'conversation': [{'role': 'assistant', 'content': greeting, 'timestamp': datetime.datetime.now().isoformat()}],
             'status': 'active',
-            'start_time': datetime.now().isoformat(),
+            'start_time': datetime.datetime.now().isoformat(),
             'last_updated': firestore.SERVER_TIMESTAMP,
-            'resume_data_snapshot': resume_data,
-            'job_data_snapshot': job_data,
+            'resume_data_snapshot': resume_data, # Store snapshot for context later
+            'job_data_snapshot': job_data, # Store snapshot for context later
             'analysis_status': 'not_started',
             'analysis': None,
-            # Add usage tracking info to interview (using data from increment_result)
-            'usage_info': {
+            'usage_info': { # Store usage info at time of creation
                 'feature': 'mockInterviews',
                 'used': increment_result.get('used', 0),
                 'limit': increment_result.get('limit', 0)
@@ -1471,8 +1517,7 @@ def start_mock_interview():
         interview_doc_ref.set(interview_data_to_save)
         print(f"[{session_id}] Started interview {interview_id} of type {interview_type} for user {user_id}.")
 
-        # *** CORRECTED RETURN VALUE ***
-        # Return the latest usage info obtained from increment_result
+        # *** Return updated usage info ***
         return jsonify({
             'interviewId': interview_id,
             'sessionId': session_id,
@@ -1484,10 +1529,12 @@ def start_mock_interview():
                 'limit': increment_result.get('limit', 0),
                 'remaining': increment_result.get('remaining', 0)
             }
-        }) # OK (200)
+        }), 200 # OK
 
     except Exception as e:
-        print(f"Error in /start-mock-interview: {e}")
+        # Ensure IDs have values before using in the error message
+        sid_log = session_id if session_id else "Unknown Session"
+        print(f"Error in /start-mock-interview for session {sid_log}: {e}")
         traceback.print_exc()
         return jsonify({'error': f'Server error starting interview: {str(e)}'}), 500
 
@@ -1495,11 +1542,13 @@ def start_mock_interview():
 @app.route('/interview-response', methods=['POST'])
 def interview_response():
     """Processes user response, gets AI response, updates Firestore conversation."""
+    interview_id = None # Define interview_id at the start of the function scope
     try:
         data = request.get_json()
-        interview_id = data.get('interviewId')
+        interview_id = data.get('interviewId') # Assign value here
         user_response = data.get('userResponse')
         if not interview_id: return jsonify({'error': 'Interview ID required'}), 400
+        # Assuming `db` is the initialized Firestore client global variable
         if not db: return jsonify({'error': 'Database unavailable'}), 503
 
         interview_data = get_interview_data(interview_id)
@@ -1511,17 +1560,41 @@ def interview_response():
              return jsonify({'error': 'Failed to save user response'}), 500
 
         # Refresh interview_data to get latest conversation for Claude context
-        # Note: This reads again, potential race condition if rapid fire. Consider passing conversation directly.
-        current_conversation = get_interview_data(interview_id).get('conversation', [])
-        system_prompt = interview_data.get('system_prompt', '') # Fetch stored prompt
+        updated_interview_data = get_interview_data(interview_id)
+        if not updated_interview_data: # Check if fetch failed
+             return jsonify({'error': 'Failed to retrieve updated interview data'}), 500
 
-        # Generate interviewer's next response
+        current_conversation = updated_interview_data.get('conversation', [])
+        # Retrieve the original system prompt stored during interview start
+        # Regenerate the prompt using stored snapshot data
+        resume_data = updated_interview_data.get('resume_data_snapshot', {})
+        job_data = updated_interview_data.get('job_data_snapshot', {})
+        interview_type = updated_interview_data.get('interviewType', 'general') # Get the type used for this interview
+        system_prompt = create_mock_interviewer_prompt(resume_data, job_data, interview_type) # Regenerate prompt
+
+        # Get current time for context
+        current_time_str = datetime.datetime.now().strftime("%I:%M %p") # e.g., "01:15 PM"
+
+        # Generate interviewer's next response with LOWER temperature and time context
+        interviewer_response = "[IRIS encountered an issue generating a response. Please try again.]" # Default fallback
         try:
             # Reformat conversation for Claude API if needed (role 'user'/'assistant')
-            api_conversation = [{'role': msg['role'], 'content': msg['content']} for msg in current_conversation]
+            # Ensure roles are 'user' and 'assistant' as expected by Claude API
+            api_conversation = []
+            for msg in current_conversation:
+                role = msg.get('role')
+                # Map Firestore roles ('user', 'assistant') to Claude roles ('user', 'assistant')
+                # Assuming Firestore roles are already 'user' and 'assistant' based on add_conversation_message
+                if role in ['user', 'assistant']:
+                     api_conversation.append({'role': role, 'content': msg.get('content', '')})
+                # Skip system messages or other roles if they exist in Firestore history
 
             interviewer_response = call_claude_api(
-                messages=api_conversation, system_prompt=system_prompt, model=CLAUDE_MODEL
+                messages=api_conversation,
+                system_prompt=system_prompt,
+                model=CLAUDE_MODEL,
+                temperature=0.3, # <-- SET TEMPERATURE
+                current_time_str=current_time_str # <-- PASS CURRENT TIME
             )
             # Add AI response to conversation in Firestore
             if not add_conversation_message(interview_id, 'assistant', interviewer_response):
@@ -1530,15 +1603,18 @@ def interview_response():
 
         except Exception as e:
             print(f"[{interview_id}] Error generating interviewer response: {e}")
-            interviewer_response = "I seem to be having a technical difficulty. Could you please repeat your last point or perhaps elaborate further?"
+            # Fallback response is already set above
             # Attempt to save error message as assistant response
-            add_conversation_message(interview_id, 'assistant', interviewer_response)
+            add_conversation_message(interview_id, 'assistant', interviewer_response) # Save the fallback message
 
         return jsonify({'interviewerResponse': interviewer_response})
     except Exception as e:
-        print(f"Error in /interview-response route for {interview_id}: {e}")
+        # Ensure interview_id has a value before using in the error message
+        id_for_log = interview_id if interview_id else "Unknown Interview"
+        print(f"Error in /interview-response route for {id_for_log}: {e}")
         traceback.print_exc()
         return jsonify({'error': f'Server error: {str(e)}'}), 500
+
 
 
 @app.route('/process-audio', methods=['POST'])
