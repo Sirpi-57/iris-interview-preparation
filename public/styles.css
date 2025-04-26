@@ -15,7 +15,7 @@
     --transition-speed: 0.3s;
 }
 
-/* Base Styles */
+/* ===== Base Styles ===== */
 body {
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     background-color: #f5f7fa;
@@ -54,6 +54,7 @@ body {
     animation: fadeIn 0.5s;
 }
 
+/* Public Footer */
 .public-footer {
     background-color: #2a2f35;
     color: white;
@@ -96,7 +97,7 @@ body {
     background-color: rgba(255, 255, 255, 0.2);
 }
 
-/* Pricing Cards */
+/* ===== Pricing Cards ===== */
 .pricing-card {
     height: 100%;
     transition: transform 0.3s, box-shadow 0.3s;
@@ -131,7 +132,7 @@ body {
     color: white;
 }
 
-/* Auth Modals */
+/* ===== Auth Modals ===== */
 #auth-modal .modal-header {
     background: linear-gradient(to right, var(--gradient-start), var(--gradient-end));
     color: white;
@@ -163,7 +164,7 @@ body {
     min-height: 100vh;
 }
 
-/* Sidebar Styles */
+/* ===== Sidebar Styles ===== */
 #sidebar {
     width: var(--sidebar-width);
     background: linear-gradient(to bottom, var(--gradient-start), var(--gradient-end));
@@ -177,6 +178,7 @@ body {
     box-shadow: 2px 0 10px rgba(0, 0, 0, 0.1);
     display: flex;
     flex-direction: column;
+    flex-shrink: 0; /* Prevent sidebar from shrinking */
 }
 
 .sidebar-header {
@@ -306,23 +308,33 @@ body {
     border-top: 1px solid rgba(255, 255, 255, 0.2);
 }
 
-/* Main Content Area */
+/* ===== Main Content Area ===== */
 #content {
-    flex: 1;
-    padding: 0;
+    flex: 1; /* Allow content to take remaining width */
+    padding: 0; /* Remove default padding if sections handle it */
     overflow-x: hidden;
     transition: all var(--transition-speed);
 }
 
 .content-section {
     display: none;
-    padding: 30px 20px;
+    /* Apply consistent padding directly to the section */
+    padding: 30px;
     min-height: 100vh;
+    box-sizing: border-box; /* Include padding in height calculation */
 }
 
 .content-section.active {
     display: block;
     animation: fadeIn 0.5s;
+}
+
+/* Style adjustment for containers within sections */
+.content-section > .container-fluid {
+    /* Ensure fluid containers inside sections don't add extra padding */
+    /* Padding is now handled by .content-section */
+    padding-left: 0;
+    padding-right: 0;
 }
 
 .section-description {
@@ -348,7 +360,7 @@ h2:after {
     border-radius: 3px;
 }
 
-/* User Profile Styles */
+/* ===== User Profile Styles ===== */
 .subscription-details h4,
 .subscription-details h5 {
     margin-bottom: 15px;
@@ -388,7 +400,7 @@ h2:after {
     border-bottom: none;
 }
 
-/* Landing Page Styles */
+/* ===== Landing Page Styles ===== */
 .hero-section {
     padding: 60px 0;
     text-align: center;
@@ -446,7 +458,7 @@ h2:after {
     box-shadow: 0 10px 20px rgba(74, 111, 220, 0.2);
 }
 
-/* Upload Page Styles */
+/* ===== Upload Page Styles ===== */
 .progress-container {
     margin-top: 30px;
     padding: 20px;
@@ -460,7 +472,7 @@ h2:after {
     margin: 15px 0;
 }
 
-/* Analysis Results Styles */
+/* ===== Analysis Results Styles ===== */
 .match-score-circle {
     width: 150px;
     height: 150px;
@@ -494,7 +506,7 @@ h2:after {
     margin-left: 2px;
 }
 
-/* Prep Plan Styles */
+/* ===== Prep Plan Styles ===== */
 .focus-areas-list {
     list-style-type: none;
     padding: 0;
@@ -559,7 +571,7 @@ h2:after {
     color: var(--primary-color);
 }
 
-/* Mock Interview Styles */
+/* ===== Mock Interview Revamp Styles ===== */
 .interview-type-selector {
     display: flex;
     justify-content: center;
@@ -572,120 +584,305 @@ h2:after {
     font-weight: 600;
 }
 
-.interview-container {
-    background-color: white;
-    border-radius: 10px;
-    padding: 30px;
-    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.05);
-}
-
-.video-card, .avatar-card {
-    height: 400px;
-    margin-bottom: 20px;
-    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.05);
+/* Center the main interview layout card and control its size */
+.interview-layout.card {
     border: none;
-    border-radius: 10px;
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.08); /* Slightly stronger shadow */
+    border-radius: 12px; /* Slightly larger radius */
     overflow: hidden;
-    display: flex;
-    flex-direction: column;
+    margin: 1rem auto; /* Center horizontally, add vertical margin */
+    width: 100%; /* Use full width of the fluid container */
+    max-width: 1600px; /* Limit maximum width on very large screens */
 }
 
-.video-container, .avatar-container {
-    width: 100%;
-    flex-grow: 1;
+/* Increase the height of the panels */
+.video-panel,
+.interaction-panel {
+    height: 80vh;
+    min-height: 550px;
+    position: relative; /* Needed for absolute positioning inside if any */
+}
+
+/* Ensure interaction panel content scrolls if needed */
+.interaction-panel {
+    background-color: #ffffff;
+}
+
+.ai-avatar-area {
+    display: flex;
+    align-items: center;
+    padding: 15px;
+    background-color: #f8f9fa; /* Light header background */
+    border-bottom: 1px solid #e9ecef;
+    flex-shrink: 0; /* Prevent shrinking */
+}
+
+.conversation-area {
+    padding: 0;
+    overflow: hidden;
+    flex-grow: 1; /* Allow this area to take up remaining space */
+}
+
+.conversation-container {
+    height: 100%; /* Fill the conversation-area */
+    overflow-y: auto;
+    padding: 15px;
+    background-color: #ffffff; /* White background for chat */
+}
+
+.input-area {
+    background-color: #f8f9fa;
+    border-top: 1px solid #e9ecef;
+    padding: 15px;
+    flex-shrink: 0; /* Prevent shrinking */
+}
+
+/* Make the end interview button part of the main card, not below */
+.end-interview-footer {
+    background-color: #f8f9fa;
+    border-top: 1px solid #e0e0e0;
+    padding: 15px;
+    border-bottom-left-radius: 12px; /* Match card radius */
+    border-bottom-right-radius: 12px; /* Match card radius */
+}
+
+/* Video Container & Video Element */
+.video-panel .video-container {
+    flex-grow: 1; /* Take available space */
     position: relative;
     overflow: hidden;
-    background-color: #292929;
 }
 
-.avatar-container {
-    background-color: #f5f7fa;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
-video {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    background-color: #292929;
-}
-
-/* New fullscreen controls */
-.fullscreen-control {
-    position: absolute;
-    top: 20px;
-    right: 20px;
-    display: flex;
-    gap: 10px;
-    z-index: 100;
-}
-
-.video-controls {
-    position: absolute;
-    bottom: 20px;
-    right: 20px;
-    display: flex;
-    gap: 10px;
-    z-index: 100;
-}
-
-.avatar-circle {
-    width: 150px;
-    height: 150px;
-    background: linear-gradient(to right, var(--gradient-start), var(--gradient-end));
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    box-shadow: 0 10px 20px rgba(74, 111, 220, 0.2);
-    z-index: 2;
-}
-
-.avatar-circle i {
-    font-size: 80px;
-    color: white;
-}
-
-.avatar-pulse-rings {
-    position: absolute;
-    width: 150px;
-    height: 150px;
-}
-
-.pulse-ring {
+.video-panel video {
     position: absolute;
     top: 0;
     left: 0;
     width: 100%;
     height: 100%;
+    object-fit: cover; /* Default: cover */
+    background-color: #1a1a1a;
+}
+
+/* Video Controls Overlay */
+.video-overlay-controls {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    padding: 15px;
+    background: linear-gradient(to bottom, rgba(0,0,0,0.3) 0%, rgba(0,0,0,0) 20%, rgba(0,0,0,0) 80%, rgba(0,0,0,0.4) 100%);
+    opacity: 0; /* Hide by default */
+    transition: opacity 0.3s ease-in-out;
+    z-index: 50;
+}
+
+.video-panel .video-container:hover .video-overlay-controls {
+    opacity: 1; /* Show on hover */
+}
+
+.video-overlay-controls .top-controls {
+    display: flex;
+    justify-content: flex-end;
+}
+
+.video-overlay-controls .bottom-controls {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+}
+
+/* Fullscreen Specific Styles */
+.video-panel.fullscreen {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    z-index: 9999;
+    background-color: black;
+    padding: 0;
+    border-radius: 0; /* No radius in fullscreen */
+    min-height: 0; /* Override min-height */
+}
+
+.video-panel.fullscreen .video-container video {
+    object-fit: contain; /* Use 'contain' in fullscreen */
+}
+
+.video-panel.fullscreen .video-panel-footer {
+    display: none; /* Hide footer in fullscreen */
+}
+
+/* Video Panel Footer */
+.video-panel-footer {
+    background-color: rgba(0, 0, 0, 0.5); /* Semi-transparent footer */
+    border-top: none;
+    padding: 8px 15px;
+    color: #e0e0e0; /* Lighter text for dark background */
+    flex-shrink: 0; /* Prevent shrinking */
+}
+
+.video-panel-footer .candidate-speaking-indicator span {
+    color: #ffffff; /* Ensure 'YOU' is white */
+    font-weight: 500;
+}
+
+.video-panel-footer .audio-waves span {
+    background-color: #aaa; /* Lighter waves on dark background */
+}
+
+.video-panel-footer .audio-waves.active span {
+    background-color: #ffffff; /* White active waves */
+}
+
+/* ===== Interaction Panel Elements ===== */
+.avatar-container-small {
+    position: relative;
+    width: 50px; /* Smaller avatar */
+    height: 50px;
+}
+
+.avatar-circle-small {
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(to right, var(--gradient-start), var(--gradient-end));
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 8px rgba(74, 111, 220, 0.2);
+    z-index: 2;
+    transition: box-shadow 0.3s ease;
+}
+
+.avatar-circle-small i {
+    font-size: 24px; /* Smaller icon */
+    color: white;
+}
+
+/* Pulse rings adjusted for smaller avatar */
+.avatar-pulse-rings-small {
+    position: absolute;
+    top: 0; 
+    left: 0;
+    width: 100%; 
+    height: 100%;
+}
+
+.avatar-pulse-rings-small .pulse-ring {
+    position: absolute;
+    top: 0; 
+    left: 0;
+    width: 100%; 
+    height: 100%;
     border-radius: 50%;
     background-color: var(--primary-color);
     opacity: 0;
     transform: scale(1);
-    animation: pulse 2s infinite;
+    animation: pulse-small 2s infinite;
 }
 
-.pulse-ring:nth-child(2) {
-    animation-delay: 0.5s;
+.avatar-pulse-rings-small .pulse-ring:nth-child(2) { 
+    animation-delay: 0.5s; 
 }
 
-.pulse-ring:nth-child(3) {
-    animation-delay: 1s;
+.avatar-pulse-rings-small .pulse-ring:nth-child(3) { 
+    animation-delay: 1s; 
 }
 
-@keyframes pulse {
-    0% {
-        transform: scale(1);
-        opacity: 0.7;
+@keyframes pulse-small {
+    0% { 
+        transform: scale(1); 
+        opacity: 0.6; 
     }
-    100% {
-        transform: scale(2);
-        opacity: 0;
+    100% { 
+        transform: scale(1.8); 
+        opacity: 0; 
     }
 }
 
+.interviewer-speaking-indicator {
+    display: flex;
+    align-items: center;
+    font-weight: 500;
+    color: #333;
+}
+
+.interviewer-speaking-indicator .audio-waves.active span {
+    background-color: var(--primary-color);
+}
+
+.interviewer-speaking-indicator span {
+    color: #333; /* Ensure 'IRIS' is visible */
+    font-weight: 500;
+}
+
+/* ===== Message Styles ===== */
+.message {
+    padding: 10px 15px;
+    margin-bottom: 12px;
+    border-radius: 10px;
+    max-width: 90%;
+    position: relative;
+}
+
+.message.interviewer {
+    background-color: #e9f5ff; /* Light blue for IRIS */
+    color: #333;
+    margin-right: auto;
+    border-top-left-radius: 0;
+}
+
+.message.candidate {
+    background-color: #e0e0e0; /* Grey for User */
+    color: #333; /* Dark text for contrast */
+    margin-left: auto;
+    border-top-right-radius: 0;
+}
+
+.message.system {
+    background-color: #f8f9fa;
+    color: #666;
+    margin: 10px auto;
+    font-style: italic;
+    font-size: 0.85rem;
+    text-align: center;
+    border-radius: 5px;
+    max-width: 95%;
+}
+
+.message .sender {
+    font-weight: bold;
+    margin-bottom: 3px;
+    font-size: 0.8rem;
+}
+
+#userReplyInput {
+    border-right: none;
+}
+
+#userReplyInput:focus {
+    box-shadow: none;
+    border-color: #ced4da;
+}
+
+#sendReplyBtn {
+    border-top-left-radius: 0;
+    border-bottom-left-radius: 0;
+}
+
+.recording-indicator {
+    display: none;
+    color: var(--danger-color);
+    font-size: 0.9rem;
+    text-align: center;
+}
+
+/* ===== Audio Waves - General Styling ===== */
 .audio-waves {
     display: flex;
     align-items: center;
@@ -708,113 +905,37 @@ video {
     animation: soundWave 1s infinite;
 }
 
-.audio-waves.active span:nth-child(1) {
-    animation-delay: 0.1s;
-    height: 10px;
+/* Specific timing/heights for wave animation */
+.audio-waves.active span:nth-child(1) { 
+    animation-delay: 0.1s; 
+    height: 10px; 
 }
 
-.audio-waves.active span:nth-child(2) {
-    animation-delay: 0.2s;
-    height: 15px;
+.audio-waves.active span:nth-child(2) { 
+    animation-delay: 0.2s; 
+    height: 15px; 
 }
 
-.audio-waves.active span:nth-child(3) {
-    animation-delay: 0.3s;
-    height: 10px;
+.audio-waves.active span:nth-child(3) { 
+    animation-delay: 0.3s; 
+    height: 10px; 
 }
 
-.audio-waves.active span:nth-child(4) {
-    animation-delay: 0.4s;
-    height: 5px;
+.audio-waves.active span:nth-child(4) { 
+    animation-delay: 0.4s; 
+    height: 5px; 
 }
 
 @keyframes soundWave {
-    0%, 100% {
-        transform: scaleY(1);
+    0%, 100% { 
+        transform: scaleY(1); 
     }
-    50% {
-        transform: scaleY(1.5);
+    50% { 
+        transform: scaleY(1.5); 
     }
 }
 
-/* Improve the speaking indicators to be consistent */
-.candidate-speaking-indicator, .interviewer-speaking-indicator {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 5px 0;
-}
-
-.card-footer {
-    padding: 8px 15px;
-    background-color: #f8f9fa;
-    border-top: 1px solid rgba(0, 0, 0, 0.125);
-    text-align: center;
-}
-
-.conversation-card {
-    border: none;
-    border-radius: 10px;
-    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.05);
-}
-
-.conversation-container {
-    height: 300px;
-    overflow-y: auto;
-    padding: 15px;
-    background-color: #f9f9f9;
-    border-radius: 10px;
-}
-
-.message {
-    padding: 12px 15px;
-    margin-bottom: 15px;
-    border-radius: 10px;
-    max-width: 80%;
-    position: relative;
-}
-
-.message.interviewer {
-    background-color: #ebf5fe;
-    color: #333;
-    margin-right: auto;
-    border-top-left-radius: 0;
-}
-
-.message.candidate {
-    background-color: var(--primary-color);
-    color: white;
-    margin-left: auto;
-    border-top-right-radius: 0;
-}
-
-.message.system {
-    background-color: #f0f0f0;
-    color: #666;
-    margin: 0 auto;
-    font-style: italic;
-    font-size: 0.9rem;
-    text-align: center;
-    border-radius: 5px;
-}
-
-.message .sender {
-    font-weight: bold;
-    margin-bottom: 5px;
-    font-size: 14px;
-}
-
-.recording-indicator {
-    display: none;
-    margin-top: 15px;
-    background-color: #fef8f8;
-    color: var(--danger-color);
-    padding: 10px;
-    border-radius: 5px;
-    text-align: center;
-}
-
-/* Performance Analysis Styles */
+/* ===== Performance Analysis Styles ===== */
 .performance-score-circle {
     width: 150px;
     height: 150px;
@@ -921,7 +1042,24 @@ video {
     margin-bottom: 5px;
 }
 
-/* Progress History Styles */
+/* ===== Suggestion accordion styling ===== */
+.suggestion-block {
+    background-color: #f8f9fa;
+    padding: 10px;
+    border-radius: 5px;
+    margin-bottom: 1rem; /* Added spacing */
+}
+
+.suggestion-block h6 {
+    color: var(--primary-color);
+    margin-bottom: 0.5rem; /* Added spacing */
+}
+
+.suggestion-block p {
+    margin-bottom: 0.5rem; /* Spacing for paragraphs */
+}
+
+/* ===== Progress History Styles ===== */
 .chart-container {
     position: relative;
     height: 300px;
@@ -964,86 +1102,131 @@ video {
     color: var(--primary-color);
 }
 
-/* Animations */
+/* ===== Animations ===== */
 @keyframes fadeIn {
-    from { opacity: 0; }
-    to { opacity: 1; }
+    from { 
+        opacity: 0; 
+    }
+    to { 
+        opacity: 1; 
+    }
 }
 
-/* Error Messages */
+/* ===== Error Messages ===== */
 #error-messages {
     max-width: 400px;
+    position: fixed; /* Keep fixed */
+    top: 1rem; /* Adjust position slightly */
+    right: 1rem;
+    z-index: 11000;
 }
 
-/* Responsive Styles */
+/* ===== Responsive Styles ===== */
 @media (max-width: 992px) {
     #sidebar {
         width: 220px;
     }
-    
+
     .pricing-card-title {
         font-size: 2rem;
     }
+    
+    /* Ensure content section has enough padding when sidebar is smaller */
+    .content-section {
+        padding: 20px;
+    }
 }
 
-@media (max-width: 768px) {
+@media (max-width: 767px) {
     .app-container {
         flex-direction: column;
     }
-    
+
     #sidebar {
         width: 100%;
         height: auto;
-        position: relative;
+        position: relative; /* Or sticky if preferred */
+        box-shadow: 0 2px 5px rgba(0,0,0,0.1); /* Add shadow when stacked */
     }
-    
+
     .nav-item {
         padding: 10px 15px;
     }
-    
-    .vi
-deo-card, .avatar-card {
-        height: 300px;
+
+    /* Make content section padding smaller on mobile */
+    .content-section {
+        padding: 15px;
+        min-height: auto; /* Don't force full height on mobile */
+    }
+
+    /* Adjustments for revamped layout on mobile */
+    .interview-layout.card {
+        width: 100%; /* Full width on mobile */
+        margin: 0.5rem auto;
     }
     
-    .video-container, .avatar-container {
-        height: 250px;
+    .video-panel, .interaction-panel {
+        height: auto;
+        min-height: 300px;
+        max-height: 50vh; /* Limit height on mobile */
     }
     
+    .interaction-panel {
+        border-top: 1px solid #dee2e6;
+        /* Reset max height for interaction panel to allow scrolling */
+        max-height: none;
+    }
+    
+    .video-panel {
+        min-height: 35vh;
+        max-height: 45vh;
+    }
+    
+    .conversation-container {
+        height: 250px; /* Fixed height might be okay on mobile */
+        max-height: none; /* Override max-height */
+    }
+
     .features-grid {
         grid-template-columns: 1fr;
     }
-    
+
     .sidebar-user-info {
         flex-direction: row;
         justify-content: space-between;
+        align-items: center;
     }
-    
+
     .user-avatar {
         width: 40px;
         height: 40px;
     }
-    
+
     .user-plan-badge {
         font-size: 8px;
     }
+
+    .video-overlay-controls .bottom-controls,
+    .video-overlay-controls .top-controls {
+        transform: scale(0.9);
+    }
 }
 
-/* Utilities */
+/* ===== Utilities ===== */
 .text-center {
     text-align: center;
 }
 
-.mt-3 {
-    margin-top: 15px;
+.mt-3 { 
+    margin-top: 1rem !important; 
+} 
+
+.mt-4 { 
+    margin-top: 1.5rem !important; 
 }
 
-.mt-4 {
-    margin-top: 20px;
-}
-
-.mb-4 {
-    margin-bottom: 20px;
+.mb-4 { 
+    margin-bottom: 1.5rem !important; 
 }
 
 .hero-section {
@@ -1069,40 +1252,44 @@ deo-card, .avatar-card {
     margin-bottom: 15px;
 }
 
-/* Spacing between new sections */
+/* Spacing between public view sections */
 #welcome-tab > .container.py-5,
 #welcome-tab > .bg-light.py-5 {
     margin-bottom: 3rem; /* Add space between content blocks */
 }
 
 /* Ensure consistent icon colors if needed */
-.text-primary {
-    color: var(--primary-color) !important;
+.text-primary { 
+    color: var(--primary-color) !important; 
 }
-.text-success {
-     color: var(--success-color) !important;
+
+.text-success { 
+    color: var(--success-color) !important; 
 }
-.text-danger {
-    color: var(--danger-color) !important;
+
+.text-danger { 
+    color: var(--danger-color) !important; 
 }
 
 /* Add some padding to new text sections */
-.container.py-5 h2 + p {
-    margin-top: 1rem;
-}
-.container.py-5 ul {
-    margin-top: 1.5rem;
-    padding-left: 1rem; /* Adjust bullet point indentation */
-}
-.container.py-5 ul li {
-    margin-bottom: 0.75rem;
+.container.py-5 h2 + p { 
+    margin-top: 1rem; 
 }
 
-/* ==== CSS Updates for Package-Based Implementation ==== */
+.container.py-5 ul { 
+    margin-top: 1.5rem; 
+    padding-left: 1rem; 
+}
+
+.container.py-5 ul li { 
+    margin-bottom: 0.75rem; 
+}
+
+/* ===== CSS Updates for Package-Based Implementation ===== */
 
 /* Subscription Card Enhancements */
-.subscription-details {
-    position: relative;
+.subscription-details { 
+    position: relative; 
 }
 
 .current-plan {
@@ -1111,20 +1298,20 @@ deo-card, .avatar-card {
     margin-bottom: 15px;
 }
 
-.plan-description {
-    color: #666;
-    font-size: 0.9rem;
+.plan-description { 
+    color: #666; 
+    font-size: 0.9rem; 
 }
 
-.user-plan {
-    font-size: 0.875rem;
-    font-weight: 600;
+.user-plan { 
+    font-size: 0.875rem; 
+    font-weight: 600; 
 }
 
-.usage-section .progress {
-    height: 8px;
-    border-radius: 4px;
-    background-color: #eee;
+.usage-section .progress { 
+    height: 8px; 
+    border-radius: 4px; 
+    background-color: #eee; 
 }
 
 .usage-section .progress-bar {
@@ -1132,249 +1319,264 @@ deo-card, .avatar-card {
     transition: width 0.5s ease-in-out;
 }
 
-.usage-section .progress-bar.bg-warning {
-    background: linear-gradient(to right, #ffc107, #ffb838);
+.usage-section .progress-bar.bg-warning { 
+    background: linear-gradient(to right, #ffc107, #ffb838); 
 }
 
-.usage-section .progress-bar.bg-danger {
-    background: linear-gradient(to right, #dc3545, #f56565);
+.usage-section .progress-bar.bg-danger { 
+    background: linear-gradient(to right, #dc3545, #f56565); 
 }
 
 /* Plan upgrade section */
-.plan-upgrade {
-    border-top: 1px solid #eee;
-    padding-top: 15px;
-    margin-top: 15px;
+.plan-upgrade { 
+    border-top: 1px solid #eee; 
+    padding-top: 15px; 
+    margin-top: 15px; 
 }
 
-.plan-upgrade ul li {
-    margin-bottom: 8px;
+.plan-upgrade ul li { 
+    margin-bottom: 8px; 
 }
 
-.plan-upgrade .btn-success:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 5px 15px rgba(40, 167, 69, 0.3);
+.plan-upgrade .btn-success:hover { 
+    transform: translateY(-2px); 
+    box-shadow: 0 5px 15px rgba(40, 167, 69, 0.3); 
 }
 
-.plan-upgrade .btn-danger:hover,
-.plan-upgrade .btn-warning:hover {
-    transform: translateY(-2px);
+.plan-upgrade .btn-danger:hover, 
+.plan-upgrade .btn-warning:hover { 
+    transform: translateY(-2px); 
 }
 
-/* ==== Upgrade Modal Styling ==== */
-.modal-dialog.modal-lg {
-    max-width: 900px;
+/* ===== Upgrade Modal Styling ===== */
+.modal-dialog.modal-lg { 
+    max-width: 900px; 
 }
 
-.modal .pricing-card {
-    transition: transform 0.3s, box-shadow 0.3s;
+.modal .pricing-card { 
+    transition: transform 0.3s, box-shadow 0.3s; 
 }
 
-.modal .pricing-card:hover {
-    transform: translateY(-5px);
-    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
+.modal .pricing-card:hover { 
+    transform: translateY(-5px); 
+    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1); 
 }
 
-.modal .pricing-card.border-primary {
-    border-width: 2px !important;
-    box-shadow: 0 5px 15px rgba(74, 111, 220, 0.2);
+.modal .pricing-card.border-primary { 
+    border-width: 2px !important; 
+    box-shadow: 0 5px 15px rgba(74, 111, 220, 0.2); 
 }
 
-.badge.position-absolute {
-    z-index: 2;
+.badge.position-absolute { 
+    z-index: 2; 
 }
 
 /* Payment Success Modal Styling */
 .checkmark-circle {
-    width: 100px;
-    height: 100px;
-    border-radius: 50%;
-    display: flex;
+    width: 100px; 
+    height: 100px; 
+    border-radius: 50%; 
+    display: flex; 
     align-items: center;
-    justify-content: center;
-    background-color: #28a745;
-    margin: 0 auto;
+    justify-content: center; 
+    background-color: #28a745; 
+    margin: 0 auto; 
     color: white;
-    font-size: 50px;
+    font-size: 50px; 
     margin-top: 1rem;
 }
 
-/* ==== Feature Lock/Unlock Indicators ==== */
-.status-indicator.locked,
-.status-indicator.unlocked {
-    transition: all 0.3s ease;
+/* ===== Feature Lock/Unlock Indicators ===== */
+.status-indicator.locked, 
+.status-indicator.unlocked { 
+    transition: all 0.3s ease; 
 }
 
-.status-indicator.locked {
-    background-color: rgba(0, 0, 0, 0.3);
-    color: rgba(255, 255, 255, 0.7);
+.status-indicator.locked { 
+    background-color: rgba(0, 0, 0, 0.3); 
+    color: rgba(255, 255, 255, 0.7); 
 }
 
-.status-indicator.unlocked {
-    background-color: var(--success-color);
-    animation: pulse-success 2s;
+.status-indicator.unlocked { 
+    background-color: var(--success-color); 
+    animation: pulse-success 2s; 
 }
 
 @keyframes pulse-success {
-    0% {
-        box-shadow: 0 0 0 0 rgba(40, 167, 69, 0.7);
+    0% { 
+        box-shadow: 0 0 0 0 rgba(40, 167, 69, 0.7); 
     }
-    70% {
-        box-shadow: 0 0 0 10px rgba(40, 167, 69, 0);
+    70% { 
+        box-shadow: 0 0 0 10px rgba(40, 167, 69, 0); 
     }
-    100% {
-        box-shadow: 0 0 0 0 rgba(40, 167, 69, 0);
+    100% { 
+        box-shadow: 0 0 0 0 rgba(40, 167, 69, 0); 
     }
 }
 
 /* Feature Card Modifications */
-.feature-card.locked {
-    opacity: 0.7;
-    position: relative;
+.feature-card.locked { 
+    opacity: 0.7; 
+    position: relative; 
 }
 
 .feature-card.locked::after {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
+    content: ''; 
+    position: absolute; 
+    top: 0; 
+    left: 0; 
+    right: 0; 
     bottom: 0;
-    background-color: rgba(0, 0, 0, 0.1);
+    background-color: rgba(0, 0, 0, 0.1); 
     z-index: 1;
 }
 
 .feature-card.locked .lock-icon {
-    position: absolute;
-    top: 10px;
-    right: 10px;
-    color: #dc3545;
-    font-size: 1.25rem;
+    position: absolute; 
+    top: 10px; 
+    right: 10px; 
+    color: #dc3545; 
+    font-size: 1.25rem; 
     z-index: 2;
 }
 
 /* Limit Modal */
-#limitReachedModal .modal-header.bg-warning {
-    color: #212529;
+#limitReachedModal .modal-header.bg-warning { 
+    color: #212529; 
 }
 
-#limitReachedModal .btn-primary {
-    background: linear-gradient(to right, var(--gradient-start), var(--gradient-end));
-    border: none;
+#limitReachedModal .btn-primary { 
+    background: linear-gradient(to right, var(--gradient-start), var(--gradient-end)); 
+    border: none; 
 }
 
 /* Payment Processing Modal */
-#paymentProcessingModal .progress {
-    height: 10px;
-    border-radius: 5px;
+#paymentProcessingModal .progress { 
+    height: 10px; 
+    border-radius: 5px; 
 }
 
-#paymentProcessingModal .progress-bar {
-    background: linear-gradient(to right, var(--gradient-start), var(--gradient-end));
-}
-
-/* Add to your styles.css file */
-.video-container.fullscreen {
-    background-color: black;
-    width: 100vw;
-    height: 100vh;
-    position: fixed;
-    top: 0;
-    left: 0;
-    z-index: 9999;
-}
-
-/* Make sure video takes full width and height and centers properly */
-.video-container.fullscreen video {
-    width: 100%;
-    height: 100%;
-    object-fit: contain; /* Change to 'contain' when fullscreen for better visibility */
-    background-color: black;
-}
-
-/* Improve the audio waves animation for better indication */
-.audio-waves {
-    display: flex;
-    align-items: center;
-    height: 20px;
-    width: 30px;
-    margin-right: 10px;
-}
-
-.audio-waves span {
-    display: inline-block;
-    width: 4px;
-    height: 5px;
-    margin: 0 2px;
-    background-color: #ccc;
-    border-radius: 1px;
-    animation: none;
-}
-
-.audio-waves.active span {
-    animation: soundWave 1s infinite;
-    background-color: #4a6fdc; /* Use primary color for active state */
+#paymentProcessingModal .progress-bar { 
+    background: linear-gradient(to right, var(--gradient-start), var(--gradient-end)); 
 }
 
 /* Give speaking indicators more prominence */
-.candidate-speaking-indicator, .interviewer-speaking-indicator {
-    font-weight: 500;
-    color: #333;
+.candidate-speaking-indicator, 
+.interviewer-speaking-indicator { 
+    font-weight: 500; 
 }
 
 /* Make the speaking indicator more prominent when active */
-.speaking .avatar-circle {
-    box-shadow: 0 0 15px rgba(74, 111, 220, 0.7);
-    transition: box-shadow 0.3s ease;
+.avatar-circle-small.speaking { 
+    box-shadow: 0 0 15px rgba(74, 111, 220, 0.7); 
+    transition: box-shadow 0.3s ease; 
 }
 
-/* Add to your media queries in styles.css */
-@media (max-width: 768px) {
-    .video-card, .avatar-card {
-        height: 250px; /* Smaller height on mobile */
-    }
-    
-    .conversation-container {
-        height: 200px; /* Smaller height for conversation on mobile */
-    }
-    
-    .video-controls, .fullscreen-control {
-        transform: scale(0.9); /* Slightly smaller controls on mobile */
-    }
+#interviewerSpeakingWaves.active + span { 
+    font-weight: bold; 
+    color: var(--primary-color); 
 }
 
 @media (min-width: 1200px) {
-    .interview-container {
-        max-width: 1200px; /* Prevent excessive stretching on large screens */
-        margin: 0 auto;
+    /* Revamped layout on large screens */
+    .interview-layout.card {
+        max-width: 1600px; /* Adjusted max-width */
     }
     
-    .video-card, .avatar-card {
-        height: 450px; /* Larger height on bigger screens */
+    .video-panel, 
+    .interaction-panel {
+        height: 80vh; /* Keep consistent large height */
+        min-height: 550px; /* Keep consistent min-height */
     }
 }
 
-/* Add to styles.css */
-.avatar-circle {
+/* Add these styles to your CSS file */
+.video-panel {
+    position: relative;
+    background-color: #1a1a1a;
+    min-height: 400px;
+    /* Make sure height is properly defined */
+    height: 70vh;
+}
+
+.video-container {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+}
+
+#candidateVideo {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    z-index: 5;
+    background-color: #000;
+}
+
+.container-fluid .interview-layout.card {
+    max-width: 1600px;
+    margin: 0 auto;
+}
+
+.container-fluid .row.g-0 {
+    min-height: 500px;
+}
+
+/* Add these styles to your CSS file */
+
+/* Fix for the History and Performance Analysis sections */
+#history .container,
+#performance .container {
+    max-width: 100%;
+    width: 100%;
+    padding-left: 30px;
+    padding-right: 30px;
+}
+
+/* Adjust the card layouts for better fluid spacing */
+#history .card,
+#performance .card {
+    margin-bottom: 20px;
+}
+
+/* Make charts responsive within containers */
+.chart-container {
+    width: 100%;
+    height: 300px; /* Maintain fixed height for charts */
+}
+
+/* Progress History specific adjustments */
+#history .row {
+    width: 100%;
+    margin-left: 0;
+    margin-right: 0;
+}
+
+/* Performance Analysis specific adjustments */
+#performance .row .col-md-4,
+#performance .row .col-md-8 {
+    padding: 10px; /* Add consistent padding */
+}
+
+/* Make score circles responsive but maintain aspect ratio */
+.performance-score-circle {
     width: 150px;
     height: 150px;
-    background: linear-gradient(to right, var(--gradient-start), var(--gradient-end));
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    box-shadow: 0 10px 20px rgba(74, 111, 220, 0.2);
-    z-index: 2;
-    transition: all 0.3s ease;
+    max-width: 100%;
+    margin: 0 auto;
 }
 
-.avatar-circle i {
-    font-size: 80px;
-    color: white;
+/* Ensure progress bars scale properly */
+.score-bar {
+    width: 100%;
 }
 
-/* Make the avatar react when the interviewer is speaking */
-#interviewerSpeakingWaves.active + span {
-    font-weight: bold;
-    color: var(--primary-color);
+/* Make sure tables and lists are properly contained */
+.interview-transcript, 
+.past-interviews-list {
+    width: 100%;
 }

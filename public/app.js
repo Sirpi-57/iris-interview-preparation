@@ -76,21 +76,30 @@ function initializeIRISApp() {
 
     const userProfile = irisAuth?.getUserProfile();
 
-     if (!userProfile) {
-         console.warn("User profile not loaded yet, cannot check for last session.");
-         lockAllSections();
-         navigateTo('upload');
-         return;
-     }
+    if (!userProfile) {
+        console.warn("User profile not loaded yet, cannot check for last session.");
+        lockAllSections();
+        navigateTo('upload');
+        return;
+    }
      
-     // Update usage display
-     updateUsageDisplay();
+    // Update usage display
+    updateUsageDisplay();
 
     const lastSessionId = userProfile.lastActiveSessionId;
 
     if (lastSessionId) {
         console.log(`Found last active session ID from user profile: ${lastSessionId}`);
+        
+        // Store the session ID before checking status
+        state.sessionId = lastSessionId;
+        
+        // First, check and load session status for resume analysis
         checkAndLoadSessionStatus(lastSessionId);
+        
+        // Next, initialize the performance section for interview analysis
+        // This ensures interview data loads regardless of which section is active
+        initializePerformanceSection();
     } else {
         console.log("No last active session found for this user. Starting fresh.");
         lockAllSections();
@@ -638,11 +647,14 @@ function navigateTo(sectionId) {
         targetElement.classList.add('active');
         // Special actions after navigation
         if (sectionId === 'history') {
-             loadProgressHistory(); // Load history data when navigating to history tab
+            loadProgressHistory(); // Load history data when navigating to history tab
         }
-         if (sectionId === 'mock-interview' && !state.videoStream) {
-            // If navigating to interview and stream isn't setup, prompt for permissions
-            // showPermissionsModal(); // This is now triggered by buttons explicitly
+        if (sectionId === 'performance' && state.sessionId) {
+            // If we're navigating to performance, make sure we've loaded the most recent interview
+            checkAndUnlockHistorySections(state.sessionId);
+        }
+        if (sectionId === 'mock-interview' && !state.videoStream) {
+            // No change needed here - keep as is
         }
     } else {
         console.error(`Navigation target not found: ${sectionId}`);
@@ -994,6 +1006,122 @@ function loadAnalysisResults(sessionId) {
     });
 }
 
+// New function to load interview data from the progress history
+function loadLatestInterviewData(sessionId) {
+    console.log(`Attempting to load latest interview data for session: ${sessionId}`);
+    
+    // First get the progress history which contains interview IDs
+    return fetch(`${API_BASE_URL}/get-progress-history/${sessionId}`)
+        .then(response => {
+            if (!response.ok) {
+                if (response.status === 404) {
+                    console.log("No interview history found.");
+                    return { interviews: [] };
+                }
+                throw new Error(`Failed to fetch progress history (${response.status})`);
+            }
+            return response.json();
+        })
+        .then(historyData => {
+            if (!historyData.interviews || historyData.interviews.length === 0) {
+                console.log("No interviews found in history.");
+                return null;
+            }
+            
+            // Find the most recent interview
+            const sortedInterviews = [...historyData.interviews].sort((a, b) => 
+                new Date(b.date) - new Date(a.date)
+            );
+            
+            const mostRecentInterview = sortedInterviews[0];
+            
+            if (!mostRecentInterview.interviewId) {
+                console.log("Most recent interview record has no interviewId.");
+                return null;
+            }
+            
+            console.log(`Loading interview analysis for ID: ${mostRecentInterview.interviewId}`);
+            
+            // Fetch the interview analysis using the interviewId
+            return fetch(`${API_BASE_URL}/get-interview-analysis/${mostRecentInterview.interviewId}`)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`Failed to fetch interview analysis (${response.status})`);
+                    }
+                    return response.json();
+                })
+                .then(analysisData => {
+                    console.log('Successfully loaded interview analysis:', analysisData);
+                    return analysisData;
+                });
+        })
+        .catch(error => {
+            console.error('Error loading interview data:', error);
+            return null;
+        });
+}
+
+// Add this function to be called during initialization
+function initializePerformanceSection() {
+    if (!state.sessionId) {
+        console.log('No session ID available, cannot load interview data');
+        return;
+    }
+    
+    console.log(`Initializing performance section for session: ${state.sessionId}`);
+    
+    // Show loading state in performance section
+    const performanceSection = document.getElementById('performance');
+    if (performanceSection) {
+        performanceSection.innerHTML = `
+            <div class="container text-center mt-5">
+                <h2>Loading Interview Performance Data...</h2>
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+            </div>`;
+    }
+    
+    // Load the latest interview data
+    loadLatestInterviewData(state.sessionId)
+        .then(analysisData => {
+            if (!analysisData) {
+                console.log('No interview analysis data available');
+                if (performanceSection) {
+                    performanceSection.innerHTML = `
+                        <div class="container">
+                            <h2>Interview Performance Analysis</h2>
+                            <p class="section-description">No interview data found. Complete a mock interview to see analysis here.</p>
+                        </div>`;
+                }
+                return;
+            }
+            
+            // Ensure the performance section structure is restored
+            restorePerformanceSectionHTML();
+            
+            // Display the interview analysis data
+            displayInterviewAnalysis(analysisData);
+            
+            // Also load suggested answers if available
+            if (analysisData.interviewId) {
+                loadSuggestedAnswers(analysisData.interviewId);
+            }
+            
+            // Unlock the performance section
+            unlockSection('performance');
+        })
+        .catch(error => {
+            console.error('Error initializing performance section:', error);
+            if (performanceSection) {
+                performanceSection.innerHTML = `
+                    <div class="container">
+                        <div class="alert alert-danger">Error loading interview data: ${error.message}</div>
+                    </div>`;
+            }
+        });
+}
+
 function loadPreparationPlan(sessionId) {
      fetch(`${API_BASE_URL}/get-full-analysis/${sessionId}`)
     .then(response => {
@@ -1009,6 +1137,8 @@ function loadPreparationPlan(sessionId) {
          document.getElementById('prep-plan').innerHTML = `<div class="alert alert-danger">Error loading preparation plan: ${error.message}</div>`;
     });
 }
+
+
 
 function rewriteResumeSection(section) {
     if (!state.sessionId) {
@@ -1642,7 +1772,7 @@ function showPermissionsModal() {
 function setupMediaDevices() {
     // Close the permissions modal if it exists and is shown
     const modalElement = document.getElementById('permissionsModal');
-     if(modalElement) {
+    if(modalElement) {
         const modalInstance = bootstrap.Modal.getInstance(modalElement);
         modalInstance?.hide();
     }
@@ -1655,11 +1785,69 @@ function setupMediaDevices() {
 
             const videoElement = document.getElementById('candidateVideo');
             if (videoElement) {
+                // Force explicit styles directly on the video element
+                videoElement.style.position = 'absolute';
+                videoElement.style.top = '0';
+                videoElement.style.left = '0';
+                videoElement.style.width = '100%';
+                videoElement.style.height = '100%';
+                videoElement.style.objectFit = 'cover';
+                videoElement.style.backgroundColor = '#000';
+                videoElement.style.zIndex = '5';
+                videoElement.style.display = 'block';
+                videoElement.style.opacity = '1';
+                videoElement.style.visibility = 'visible';
+                
+                // Set stream to video element
                 videoElement.srcObject = stream;
-                videoElement.play().catch(e => console.error("Video play error:", e)); // Handle autoplay restrictions
+                
+                // Try to force the video to play after a small delay
+                setTimeout(() => {
+                    videoElement.play()
+                        .then(() => console.log("Video playing successfully"))
+                        .catch(err => console.error("Error playing video:", err));
+                }, 100);
+                
+                console.log("Video stream connected to video element");
+                
+                // Add debug check for video element dimensions
+                setTimeout(() => {
+                    const rect = videoElement.getBoundingClientRect();
+                    console.log("Video element dimensions:", rect.width, "x", rect.height);
+                    console.log("Video element position:", rect.top, rect.left);
+                    console.log("Video element visibility:", 
+                        window.getComputedStyle(videoElement).visibility,
+                        window.getComputedStyle(videoElement).display);
+                    
+                    // Check parent containers too
+                    const videoContainer = videoElement.parentElement;
+                    if (videoContainer) {
+                        const containerRect = videoContainer.getBoundingClientRect();
+                        console.log("Video container dimensions:", containerRect.width, "x", containerRect.height);
+                    }
+                }, 1000);
+            } else {
+                console.error("candidateVideo element not found in DOM");
             }
 
             setupMediaRecorder(stream);
+
+            // Fix for potential video container visibility issues
+            const videoPanel = document.querySelector('.video-panel');
+            if (videoPanel) {
+                videoPanel.style.minHeight = '400px';
+                videoPanel.style.height = '70vh';
+                videoPanel.style.position = 'relative';
+                videoPanel.style.backgroundColor = '#1a1a1a';
+            }
+
+            const videoContainer = document.querySelector('.video-container');
+            if (videoContainer) {
+                videoContainer.style.position = 'relative';
+                videoContainer.style.width = '100%';
+                videoContainer.style.height = '100%';
+                videoContainer.style.overflow = 'hidden';
+            }
 
             // Only start the interview *after* media is set up
             startMockInterview();
@@ -3242,33 +3430,50 @@ function checkAndLoadSessionStatus(sessionId) {
         });
 }
 
-// NEW Helper function in app.js to check history and unlock sections
+// Modify the checkAndUnlockHistorySections function to call loadLatestInterviewData
 function checkAndUnlockHistorySections(sessionIdToCheck) {
-   if (!sessionIdToCheck) return; // Need a session ID
+    if (!sessionIdToCheck) return; // Need a session ID
+    
     fetch(`${API_BASE_URL}/get-progress-history/${sessionIdToCheck}`)
-         .then(res => {
-             if (!res.ok) { // Handle non-200 responses gracefully (e.g., 404 if no history yet)
-                 console.log(`No history found or error fetching for session ${sessionIdToCheck} (status: ${res.status}). Keeping sections locked.`);
-                  return null;
-             }
-             return res.json();
-         })
-         .then(historyData => {
-             if (historyData && historyData.interviews?.length > 0) {
-                  console.log(`Found ${historyData.interviews.length} past interviews for session ${sessionIdToCheck}. Unlocking performance/history.`);
-                  unlockSection('performance');
-                  unlockSection('history');
-             } else {
-                  console.log(`No interview history found for session ${sessionIdToCheck}. Keeping performance/history locked.`);
-                  lockSection('performance'); // Ensure they remain locked if no history
-                  lockSection('history');
-             }
-         })
-          .catch(err => {
-             console.error(`Error checking history for session ${sessionIdToCheck}:`, err);
-             lockSection('performance'); // Lock on error
-             lockSection('history');
-          });
+        .then(res => {
+            if (!res.ok) {
+                console.log(`No history found or error fetching for session ${sessionIdToCheck} (status: ${res.status}). Keeping sections locked.`);
+                return null;
+            }
+            return res.json();
+        })
+        .then(historyData => {
+            if (historyData && historyData.interviews?.length > 0) {
+                console.log(`Found ${historyData.interviews.length} past interviews for session ${sessionIdToCheck}. Unlocking performance/history.`);
+                unlockSection('performance');
+                unlockSection('history');
+                
+                // Load the interview data and display it
+                loadLatestInterviewData(sessionIdToCheck)
+                    .then(analysisData => {
+                        if (analysisData) {
+                            restorePerformanceSectionHTML();
+                            displayInterviewAnalysis(analysisData);
+                            
+                            if (analysisData.interviewId) {
+                                loadSuggestedAnswers(analysisData.interviewId);
+                            }
+                        }
+                    })
+                    .catch(err => {
+                        console.error('Error loading interview analysis in checkAndUnlockHistorySections:', err);
+                    });
+            } else {
+                console.log(`No interview history found for session ${sessionIdToCheck}. Keeping performance/history locked.`);
+                lockSection('performance');
+                lockSection('history');
+            }
+        })
+        .catch(err => {
+            console.error(`Error checking history for session ${sessionIdToCheck}:`, err);
+            lockSection('performance');
+            lockSection('history');
+        });
 }
 
 // --- Function to check feature access before performing actions ---
@@ -3584,23 +3789,27 @@ function lockAllSections() {
    lockSection('history');
 }
 
+// Replace the existing toggleFullscreen function in app.js
 function toggleFullscreen() {
-    const videoContainer = document.querySelector('.video-container');
-    if (!videoContainer) return;
-    
+    // Target the video panel which includes the container and footer
+    const videoPanel = document.querySelector('.video-panel');
+    if (!videoPanel) return;
     const fullscreenBtn = document.getElementById('fullscreenBtn');
     const icon = fullscreenBtn?.querySelector('i');
-    
-    if (!document.fullscreenElement) {
+
+    if (!document.fullscreenElement &&
+        !document.webkitFullscreenElement && // Safari
+        !document.msFullscreenElement) {     // IE11
         // Enter fullscreen
-        if (videoContainer.requestFullscreen) {
-            videoContainer.requestFullscreen();
-        } else if (videoContainer.webkitRequestFullscreen) { /* Safari */
-            videoContainer.webkitRequestFullscreen();
-        } else if (videoContainer.msRequestFullscreen) { /* IE11 */
-            videoContainer.msRequestFullscreen();
+        if (videoPanel.requestFullscreen) {
+            videoPanel.requestFullscreen();
+        } else if (videoPanel.webkitRequestFullscreen) { /* Safari */
+            videoPanel.webkitRequestFullscreen();
+        } else if (videoPanel.msRequestFullscreen) { /* IE11 */
+            videoPanel.msRequestFullscreen();
         }
         if (icon) icon.className = 'fas fa-compress';
+        videoPanel.classList.add('fullscreen'); // Add class to panel
     } else {
         // Exit fullscreen
         if (document.exitFullscreen) {
@@ -3610,7 +3819,8 @@ function toggleFullscreen() {
         } else if (document.msExitFullscreen) { /* IE11 */
             document.msExitFullscreen();
         }
-        if (icon) icon.className = 'fas fa-expand';
+         if (icon) icon.className = 'fas fa-expand';
+         videoPanel.classList.remove('fullscreen'); // Remove class from panel
     }
 }
 
@@ -3620,14 +3830,19 @@ document.addEventListener('webkitfullscreenchange', updateFullscreenButtonState)
 document.addEventListener('mozfullscreenchange', updateFullscreenButtonState);
 document.addEventListener('MSFullscreenChange', updateFullscreenButtonState);
 
+// Modify updateFullscreenButtonState to check the panel class as well
 function updateFullscreenButtonState() {
     const fullscreenBtn = document.getElementById('fullscreenBtn');
     const icon = fullscreenBtn?.querySelector('i');
+    const videoPanel = document.querySelector('.video-panel'); // Check the panel
     if (!icon) return;
-    
-    if (document.fullscreenElement) {
+
+    // Check both document state AND the panel's class for robustness
+    if (document.fullscreenElement || document.webkitFullscreenElement || document.msFullscreenElement) {
         icon.className = 'fas fa-compress';
+        videoPanel?.classList.add('fullscreen'); // Ensure class is added
     } else {
         icon.className = 'fas fa-expand';
+        videoPanel?.classList.remove('fullscreen'); // Ensure class is removed
     }
 }

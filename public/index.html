@@ -517,7 +517,7 @@
 
                 <!-- Upload Resume & Job Description -->
                 <section id="upload" class="content-section">
-                    <div class="container">
+                    <div class="container-fluid">
                         <h2>Upload Your Resume & Job Description</h2>
                         <p class="section-description">Let's analyze your resume against a specific job to create a personalized interview preparation plan.</p>
                         
@@ -549,7 +549,7 @@
 
                 <!-- User Profile Section (New) -->
                 <section id="user-profile" class="content-section">
-                    <div class="container">
+                    <div class="container-fluid">
                         <h2>My Profile</h2>
                         <p class="section-description">Manage your account information and subscription</p>
                         
@@ -739,7 +739,7 @@
                 </section>
 
                 <section id="analysis" class="content-section">
-                    <div class="container">
+                    <div class="container-fluid">
                         <h2>Resume Analysis Results</h2>
                         <p class="section-description">Here's how your resume matches with the job requirements</p>
                         
@@ -825,7 +825,7 @@
     
                 <!-- Interview Preparation Plan -->
                 <section id="prep-plan" class="content-section">
-                    <div class="container">
+                    <div class="container-fluid">
                         <h2>Your Interview Preparation Plan</h2>
                         <p class="section-description">Based on your resume analysis, here's a personalized plan to help you prepare</p>
     
@@ -889,113 +889,90 @@
                     <div class="container-fluid">
                         <h2>Mock Interview</h2>
                         <p class="section-description">Practice with our AI interviewer in a realistic interview setting</p>
-                        
+
                         <div class="interview-type-selector mb-4" id="interviewTypeSelector">
                             <button class="btn btn-outline-primary active" data-type="general">General</button>
                             <button class="btn btn-outline-primary" data-type="technical">Technical</button>
                             <button class="btn btn-outline-primary" data-type="behavioral">Behavioral</button>
                         </div>
-    
-                        <!-- Interview Container -->
-                        <div class="interview-container">
-                            <div class="row">
-                                <!-- Candidate Video Feed -->
-                                <div class="col-md-6">
-                                    <div class="card video-card">
-                                        <div class="card-body p-0">
-                                            <div class="video-container">
-                                                <video id="candidateVideo" autoplay muted></video>
-                                                <div class="fullscreen-control">
-                                                    <button id="fullscreenBtn" class="btn btn-sm btn-light">
-                                                        <i class="fas fa-expand"></i>
-                                                    </button>
-                                                </div>
-                                                <div class="video-controls">
-                                                    <button id="toggleCameraBtn" class="btn btn-sm btn-light">
-                                                        <i class="fas fa-video"></i>
-                                                    </button>
-                                                    <button id="toggleMicBtn" class="btn btn-sm btn-light">
-                                                        <i class="fas fa-microphone"></i>
-                                                    </button>
-                                                </div>
+
+                        <div class="interview-layout card">
+                            <div class="row g-0"> <div class="col-md-7 video-panel">
+                                    <div class="video-container card-body p-0">
+                                        <video id="candidateVideo" autoplay muted playsinline></video> <div class="video-overlay-controls">
+                                            <div class="top-controls">
+                                                 <button id="fullscreenBtn" class="btn btn-sm btn-outline-light">
+                                                    <i class="fas fa-expand"></i>
+                                                </button>
+                                            </div>
+                                            <div class="bottom-controls">
+                                                <button id="toggleCameraBtn" class="btn btn-sm btn-light">
+                                                    <i class="fas fa-video"></i>
+                                                </button>
+                                                <button id="toggleMicBtn" class="btn btn-sm btn-light">
+                                                    <i class="fas fa-microphone"></i>
+                                                </button>
                                             </div>
                                         </div>
-                                        <div class="card-footer">
-                                            <div class="candidate-speaking-indicator">
-                                                <div class="audio-waves">
-                                                    <span></span><span></span><span></span><span></span>
-                                                </div>
-                                                <span>You</span>
+                                    </div>
+                                    <div class="card-footer video-panel-footer">
+                                        <div class="candidate-speaking-indicator">
+                                            <div class="audio-waves">
+                                                <span></span><span></span><span></span><span></span>
                                             </div>
+                                            <span>You</span>
                                         </div>
                                     </div>
                                 </div>
 
-                                <!-- AI Interviewer Avatar -->
-                                <div class="col-md-6">
-                                    <div class="card avatar-card">
-                                        <div class="card-body p-0">
-                                            <div class="avatar-container">
-                                                <div class="avatar-circle" id="interviewerAvatar">
-                                                    <i class="fas fa-user-tie"></i>
-                                                </div>
-                                                <div class="avatar-pulse-rings">
+                                <div class="col-md-5 interaction-panel d-flex flex-column">
+                                    <div class="ai-avatar-area card-header">
+                                        <div class="avatar-container-small">
+                                            <div class="avatar-circle-small" id="interviewerAvatar">
+                                                <i class="fas fa-user-tie"></i>
+                                                <div class="avatar-pulse-rings-small">
                                                     <div class="pulse-ring"></div>
                                                     <div class="pulse-ring"></div>
                                                     <div class="pulse-ring"></div>
                                                 </div>
                                             </div>
                                         </div>
-                                        <div class="card-footer">
-                                            <div class="interviewer-speaking-indicator">
-                                                <div class="audio-waves" id="interviewerSpeakingWaves">
-                                                    <span></span><span></span><span></span><span></span>
-                                                </div>
-                                                <span>IRIS</span>
+                                        <div class="interviewer-speaking-indicator ms-2">
+                                            <div class="audio-waves" id="interviewerSpeakingWaves">
+                                                <span></span><span></span><span></span><span></span>
                                             </div>
+                                            <span>IRIS</span>
                                         </div>
                                     </div>
-                                </div>
-                            </div>
 
-                            <!-- Interview Conversation -->
-                            <div class="card mt-4 conversation-card">
-                                <div class="card-header">
-                                    <h3>Interview Conversation</h3>
-                                </div>
-                                <div class="card-body">
-                                    <div id="conversationContainer" class="conversation-container">
-                                        <!-- Messages will be added here -->
+                                    <div class="conversation-area card-body flex-grow-1">
+                                        <div id="conversationContainer" class="conversation-container">
+                                            </div>
                                     </div>
-                                    <div class="reply-container mt-3">
-                                        <div class="input-group">
-                                            <input type="text" id="userReplyInput" class="form-control" placeholder="Type your response or use microphone...">
-                                            <button class="btn btn-primary" id="sendReplyBtn">
-                                                <i class="fas fa-paper-plane"></i>
-                                            </button>
-                                            <button class="btn btn-secondary" id="voiceReplyBtn">
-                                                <i class="fas fa-microphone"></i>
-                                            </button>
-                                        </div>
-                                        <div id="recordingIndicator" class="recording-indicator">
+
+                                    <div class="input-area card-footer">
+                                         <div id="recordingIndicator" class="recording-indicator mb-2">
                                             Recording... <span id="recordingTime">0:00</span>
-                                            <button id="stopRecordingBtn" class="btn btn-sm btn-danger">
-                                                <i class="fas fa-stop"></i> Stop
-                                            </button>
+                                            </div>
+                                        <div class="reply-container">
+                                            <div class="input-group">
+                                                <input type="text" id="userReplyInput" class="form-control" placeholder="Your response (Mic is automatically detected)">
+                                                <button class="btn btn-primary" id="sendReplyBtn" title="Send Text Reply">
+                                                    <i class="fas fa-paper-plane"></i>
+                                                </button>
+                                                </div>
                                         </div>
                                     </div>
-                                </div>
-                                <div class="card-footer">
-                                    <button id="endInterviewBtn" class="btn btn-danger">End Interview & Analyze</button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
+                                </div> </div> <div class="card-footer w-100 text-center end-interview-footer">
+                                <button id="endInterviewBtn" class="btn btn-danger">End Interview & Analyze</button>
+                             </div>
+                        </div> 
+                    </div> 
                 </section>
     
                 <!-- Performance Analysis -->
                 <section id="performance" class="content-section">
-                    <div class="container">
+                    <div class="container-fluid">
                         <h2>Interview Performance Analysis</h2>
                         <p class="section-description">Here's how you performed in your mock interview</p>
         
@@ -1140,7 +1117,7 @@
     
                 <!-- Progress History -->
                 <section id="history" class="content-section">
-                    <div class="container">
+                    <div class="container-fluid">
                         <h2>Progress History</h2>
                         <p class="section-description">Track your improvement across multiple mock interviews</p>
                         
