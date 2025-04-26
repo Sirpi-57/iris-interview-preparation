@@ -526,241 +526,274 @@
                                 <button id="downloadResumeBtn" class="btn btn-primary"><i class="fas fa-download me-1"></i> Download Resume (PDF)</button>
                             </div>
                         </div>
-                        <p class="section-description mb-4">Enter your details below. Click <i class="fas fa-magic text-primary"></i> to enhance specific sections using AI.</p>
+                        <p class="section-description mb-4">Enter your details below. The preview on the right will update as you type. Click <i class="fas fa-magic text-primary"></i> to enhance sections using AI.</p>
                 
-                        <div class="row">
-                            <div class="col-lg-8">
-                                <div class="resume-form-container card card-body shadow-sm mb-4">
+                        <div class="row g-4">
                 
-                                    <div class="resume-section mb-4" data-section="personal">
-                                        <h5 class="mb-3">Personal Details</h5>
-                                        <div class="row g-3">
-                                            <div class="col-md-6">
-                                                <label for="resumeName" class="form-label">Full Name</label>
-                                                <input type="text" class="form-control" id="resumeName" placeholder="e.g., Jane Doe">
-                                            </div>
-                                            <div class="col-md-6">
-                                                <label for="resumeLocation" class="form-label">Location</label>
-                                                <input type="text" class="form-control" id="resumeLocation" placeholder="e.g., San Francisco, CA">
-                                            </div>
-                                            <div class="col-md-6">
-                                                <label for="resumePhone" class="form-label">Phone</label>
-                                                <input type="tel" class="form-control" id="resumePhone" placeholder="e.g., (123) 456-7890">
-                                            </div>
-                                            <div class="col-md-6">
-                                                <label for="resumeEmail" class="form-label">Email</label>
-                                                <input type="email" class="form-control" id="resumeEmail" placeholder="e.g., jane.doe@email.com">
-                                            </div>
-                                            <div class="col-12">
-                                                <label for="resumeWebsite" class="form-label">Website/Portfolio/LinkedIn (Optional)</label>
-                                                <input type="url" class="form-control" id="resumeWebsite" placeholder="e.g., https://linkedin.com/in/janedoe">
-                                            </div>
-                                        </div>
-                                    </div>
+                            <div class="col-lg-6 resume-editor-pane">
+                                <div class="sticky-lg-top" style="top: 20px;"> <div class="resume-form-container card card-body shadow-sm mb-4">
                 
-                                    <div class="resume-section mb-4" data-section="objective">
-                                        <div class="d-flex justify-content-between align-items-center mb-2">
-                                            <h5>Objective / Professional Summary</h5>
-                                            <button class="btn btn-sm btn-outline-primary ai-generate-btn" data-target="resumeObjective" data-type="objective" title="Enhance Objective with AI">
-                                                <i class="fas fa-magic"></i> Enhance
-                                            </button>
-                                        </div>
-                                        <textarea class="form-control" id="resumeObjective" rows="3" placeholder="Write a brief summary or objective..."></textarea>
-                                        <div class="section-controls text-end mt-1">
-                                           <button class="btn btn-sm btn-outline-secondary hide-section-btn"><i class="fas fa-eye-slash"></i> Hide</button>
-                                        </div>
-                                    </div>
-                
-                                    <div class="resume-section mb-4" data-section="experience">
-                                        <div class="d-flex justify-content-between align-items-center mb-2">
-                                            <h5>Work Experience</h5>
-                                            <button class="btn btn-sm btn-success add-item-btn" data-target="experienceItems" data-template="experienceTemplate"><i class="fas fa-plus"></i> Add Experience</button>
-                                        </div>
-                                        <div id="experienceItems">
-                                            </div>
-                                        <div class="section-controls text-end mt-1">
-                                           <button class="btn btn-sm btn-outline-secondary hide-section-btn"><i class="fas fa-eye-slash"></i> Hide</button>
-                                        </div>
-                                    </div>
-                
-                                    <div class="resume-section mb-4" data-section="education">
-                                        <div class="d-flex justify-content-between align-items-center mb-2">
-                                            <h5>Education</h5>
-                                            <button class="btn btn-sm btn-success add-item-btn" data-target="educationItems" data-template="educationTemplate"><i class="fas fa-plus"></i> Add School</button>
-                                        </div>
-                                        <div id="educationItems">
-                                            </div>
-                                        <div class="section-controls text-end mt-1">
-                                           <button class="btn btn-sm btn-outline-secondary hide-section-btn"><i class="fas fa-eye-slash"></i> Hide</button>
-                                        </div>
-                                    </div>
-                
-                                    <div class="resume-section mb-4" data-section="projects">
-                                        <div class="d-flex justify-content-between align-items-center mb-2">
-                                            <h5>Projects</h5>
-                                            <button class="btn btn-sm btn-success add-item-btn" data-target="projectItems" data-template="projectTemplate"><i class="fas fa-plus"></i> Add Project</button>
-                                        </div>
-                                        <div id="projectItems">
-                                            </div>
-                                        <div class="section-controls text-end mt-1">
-                                           <button class="btn btn-sm btn-outline-secondary hide-section-btn"><i class="fas fa-eye-slash"></i> Hide</button>
-                                        </div>
-                                    </div>
-                
-                                    <div class="resume-section mb-4" data-section="skills">
-                                         <div class="d-flex justify-content-between align-items-center mb-2">
-                                            <h5>Skills</h5>
-                                            <button class="btn btn-sm btn-outline-primary ai-generate-btn" data-target="resumeSkills" data-type="skills" title="Format Skills List with AI">
-                                                <i class="fas fa-magic"></i> Format List
-                                            </button>
-                                        </div>
-                                        <textarea class="form-control" id="resumeSkills" rows="4" placeholder="List your skills, separated by commas or new lines (e.g., JavaScript, Python, Project Management, Team Leadership)"></textarea>
-                                        <div class="section-controls text-end mt-1">
-                                           <button class="btn btn-sm btn-outline-secondary hide-section-btn"><i class="fas fa-eye-slash"></i> Hide</button>
-                                        </div>
-                                    </div>
-                
-                                    <div class="d-none">
-                                        <div id="experienceTemplate" class="resume-item card card-body bg-light mb-3">
+                                        <div class="resume-section mb-4" data-section="personal">
+                                            <h5 class="mb-3">Personal Details</h5>
                                             <div class="row g-3">
                                                 <div class="col-md-6">
-                                                    <label class="form-label">Company</label>
-                                                    <input type="text" class="form-control" data-field="company" placeholder="e.g., Tech Solutions Inc.">
+                                                    <label for="resumeName" class="form-label">Full Name</label>
+                                                    <input type="text" class="form-control" id="resumeName" placeholder="e.g., Jane Doe">
                                                 </div>
                                                 <div class="col-md-6">
-                                                    <label class="form-label">Job Title</label>
-                                                    <input type="text" class="form-control" data-field="jobTitle" placeholder="e.g., Software Engineer">
+                                                    <label for="resumeLocation" class="form-label">Location</label>
+                                                    <input type="text" class="form-control" id="resumeLocation" placeholder="e.g., San Francisco, CA">
                                                 </div>
                                                 <div class="col-md-6">
-                                                    <label class="form-label">Location</label>
-                                                    <input type="text" class="form-control" data-field="location" placeholder="e.g., New York, NY">
+                                                    <label for="resumePhone" class="form-label">Phone</label>
+                                                    <input type="tel" class="form-control" id="resumePhone" placeholder="e.g., (123) 456-7890">
                                                 </div>
                                                 <div class="col-md-6">
-                                                    <label class="form-label">Date Range</label>
-                                                    <input type="text" class="form-control" data-field="date" placeholder="e.g., Jan 2020 - Present or 2019 - 2021">
+                                                    <label for="resumeEmail" class="form-label">Email</label>
+                                                    <input type="email" class="form-control" id="resumeEmail" placeholder="e.g., jane.doe@email.com">
                                                 </div>
                                                 <div class="col-12">
-                                                    <label class="form-label d-flex justify-content-between">
-                                                        Description / Responsibilities
-                                                        <button class="btn btn-sm btn-outline-primary ai-generate-btn" data-target="description" data-type="experience" title="Enhance Description with AI">
-                                                            <i class="fas fa-magic"></i> Enhance
-                                                        </button>
-                                                    </label>
-                                                    <textarea class="form-control" data-field="description" rows="3" placeholder="Describe your responsibilities and achievements. Use bullet points starting with action verbs."></textarea>
+                                                    <label for="resumeWebsite" class="form-label">Website/Portfolio/LinkedIn (Optional)</label>
+                                                    <input type="url" class="form-control" id="resumeWebsite" placeholder="e.g., https://linkedin.com/in/janedoe">
                                                 </div>
-                                            </div>
-                                            <div class="item-controls text-end mt-2">
-                                                <button class="btn btn-sm btn-outline-danger remove-item-btn"><i class="fas fa-trash"></i> Remove</button>
                                             </div>
                                         </div>
                 
-                                        <div id="educationTemplate" class="resume-item card card-body bg-light mb-3">
-                                            <div class="row g-3">
-                                                <div class="col-md-6">
-                                                    <label class="form-label">School/University</label>
-                                                    <input type="text" class="form-control" data-field="school" placeholder="e.g., State University">
-                                                </div>
-                                                <div class="col-md-6">
-                                                    <label class="form-label">Location</label>
-                                                    <input type="text" class="form-control" data-field="location" placeholder="e.g., City, State">
-                                                </div>
-                                                 <div class="col-md-6">
-                                                    <label class="form-label">Degree & Major</label>
-                                                    <input type="text" class="form-control" data-field="degreeMajor" placeholder="e.g., B.S. Computer Science">
-                                                </div>
-                                                <div class="col-md-3">
-                                                    <label class="form-label">Graduation Date</label>
-                                                    <input type="text" class="form-control" data-field="date" placeholder="e.g., May 2020 or 2024">
-                                                </div>
-                                                <div class="col-md-3">
-                                                    <label class="form-label">GPA (Optional)</label>
-                                                    <input type="text" class="form-control" data-field="gpa" placeholder="e.g., 3.8/4.0">
-                                                </div>
-                                                <div class="col-12">
-                                                    <label class="form-label">Relevant Coursework / Honors (Optional)</label>
-                                                    <textarea class="form-control" data-field="additionalInfo" rows="2" placeholder="e.g., Dean's List, Data Structures, Algorithms"></textarea>
-                                                </div>
+                                        <div class="resume-section mb-4" data-section="objective">
+                                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                                <h5>Objective / Professional Summary</h5>
+                                                <button class="btn btn-sm btn-outline-primary ai-generate-btn" data-target="resumeObjective" data-type="objective" title="Enhance Objective with AI">
+                                                    <i class="fas fa-magic"></i> Enhance
+                                                </button>
                                             </div>
-                                            <div class="item-controls text-end mt-2">
-                                                <button class="btn btn-sm btn-outline-danger remove-item-btn"><i class="fas fa-trash"></i> Remove</button>
+                                            <textarea class="form-control" id="resumeObjective" rows="3" placeholder="Write a brief summary or objective..."></textarea>
+                                            <div class="section-controls text-end mt-1">
+                                               <button class="btn btn-sm btn-outline-secondary hide-section-btn"><i class="fas fa-eye-slash"></i> Hide</button>
                                             </div>
                                         </div>
                 
-                                        <div id="projectTemplate" class="resume-item card card-body bg-light mb-3">
-                                            <div class="row g-3">
-                                                <div class="col-md-6">
-                                                    <label class="form-label">Project Name</label>
-                                                    <input type="text" class="form-control" data-field="projectName" placeholder="e.g., Personal Portfolio Website">
-                                                </div>
-                                                <div class="col-md-6">
-                                                    <label class="form-label">Date / Duration (Optional)</label>
-                                                    <input type="text" class="form-control" data-field="date" placeholder="e.g., Fall 2022 or 3 Months">
-                                                </div>
-                                                <div class="col-12">
-                                                    <label class="form-label d-flex justify-content-between">
-                                                        Description
-                                                         <button class="btn btn-sm btn-outline-primary ai-generate-btn" data-target="description" data-type="project" title="Enhance Description with AI">
-                                                            <i class="fas fa-magic"></i> Enhance
-                                                        </button>
-                                                    </label>
-                                                    <textarea class="form-control" data-field="description" rows="3" placeholder="Describe the project, your role, technologies used, and key outcomes or features. Use bullet points."></textarea>
-                                                </div>
-                                                <div class="col-12">
-                                                    <label class="form-label">Link (Optional)</label>
-                                                    <input type="url" class="form-control" data-field="link" placeholder="e.g., GitHub repo or live demo link">
-                                                </div>
+                                        <div class="resume-section mb-4" data-section="experience">
+                                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                                <h5>Work Experience</h5>
+                                                <button class="btn btn-sm btn-success add-item-btn" data-target="experienceItems" data-template="experienceTemplate"><i class="fas fa-plus"></i> Add Experience</button>
                                             </div>
-                                           <div class="item-controls text-end mt-2">
-                                                <button class="btn btn-sm btn-outline-danger remove-item-btn"><i class="fas fa-trash"></i> Remove</button>
+                                            <div id="experienceItems">
+                                                </div>
+                                            <div class="section-controls text-end mt-1">
+                                               <button class="btn btn-sm btn-outline-secondary hide-section-btn"><i class="fas fa-eye-slash"></i> Hide</button>
                                             </div>
                                         </div>
-                                    </div> </div> </div> <div class="col-lg-4">
-                                <div class="resume-settings-container card card-body shadow-sm sticky-lg-top" style="top: 20px;">
-                                    <h5 class="mb-3">Resume Settings</h5>
                 
-                                    <div class="mb-3">
-                                        <label for="resumeFontFamily" class="form-label">Font Family</label>
-                                        <select class="form-select" id="resumeFontFamily">
-                                            <option value="'Roboto', sans-serif" selected>Roboto</option>
-                                            <option value="'Lato', sans-serif">Lato</option>
-                                            <option value="'Montserrat', sans-serif">Montserrat</option>
-                                            <option value="'Open Sans', sans-serif">Open Sans</option>
-                                            <option value="'Raleway', sans-serif">Raleway</option>
-                                            <option value="'Noto Serif', serif">Noto Serif</option>
-                                            <option value="'Lora', serif">Lora</option>
-                                            <option value="'Roboto Slab', serif">Roboto Slab</option>
-                                            <option value="'Playfair Display', serif">Playfair Display</option>
-                                            <option value="'Merriweather', serif">Merriweather</option>
-                                        </select>
-                                    </div>
-                
-                                    <div class="mb-3">
-                                        <label class="form-label">Font Size</label>
-                                        <div class="btn-group w-100" role="group" aria-label="Font Size">
-                                            <input type="radio" class="btn-check" name="resumeFontSize" id="fontCompact" value="compact" autocomplete="off">
-                                            <label class="btn btn-outline-secondary" for="fontCompact">Compact</label>
-                
-                                            <input type="radio" class="btn-check" name="resumeFontSize" id="fontStandard" value="standard" autocomplete="off" checked>
-                                            <label class="btn btn-outline-secondary" for="fontStandard">Standard</label>
-                
-                                            <input type="radio" class="btn-check" name="resumeFontSize" id="fontLarge" value="large" autocomplete="off">
-                                            <label class="btn btn-outline-secondary" for="fontLarge">Large</label>
+                                        <div class="resume-section mb-4" data-section="education">
+                                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                                <h5>Education</h5>
+                                                <button class="btn btn-sm btn-success add-item-btn" data-target="educationItems" data-template="educationTemplate"><i class="fas fa-plus"></i> Add School</button>
+                                            </div>
+                                            <div id="educationItems">
+                                                </div>
+                                            <div class="section-controls text-end mt-1">
+                                               <button class="btn btn-sm btn-outline-secondary hide-section-btn"><i class="fas fa-eye-slash"></i> Hide</button>
+                                            </div>
                                         </div>
-                                    </div>
                 
-                                     <div class="mb-3">
-                                        <label class="form-label">Document Size</label>
-                                         <div class="btn-group w-100" role="group" aria-label="Document Size">
-                                            <input type="radio" class="btn-check" name="resumeDocSize" id="docLetter" value="letter" autocomplete="off" checked>
-                                            <label class="btn btn-outline-secondary" for="docLetter">Letter</label>
-                
-                                            <input type="radio" class="btn-check" name="resumeDocSize" id="docA4" value="a4" autocomplete="off">
-                                            <label class="btn btn-outline-secondary" for="docA4">A4</label>
+                                        <div class="resume-section mb-4" data-section="projects">
+                                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                                <h5>Projects</h5>
+                                                <button class="btn btn-sm btn-success add-item-btn" data-target="projectItems" data-template="projectTemplate"><i class="fas fa-plus"></i> Add Project</button>
+                                            </div>
+                                            <div id="projectItems">
+                                                </div>
+                                            <div class="section-controls text-end mt-1">
+                                               <button class="btn btn-sm btn-outline-secondary hide-section-btn"><i class="fas fa-eye-slash"></i> Hide</button>
+                                            </div>
                                         </div>
-                                        <div class="form-text text-center">(Letter: US/Canada, A4: Other countries)</div>
-                                    </div>
                 
-                                    </div>
+                                        <div class="resume-section mb-4" data-section="skills">
+                                             <div class="d-flex justify-content-between align-items-center mb-2">
+                                                <h5>Skills</h5>
+                                                <button class="btn btn-sm btn-outline-primary ai-generate-btn" data-target="resumeSkills" data-type="skills" title="Format Skills List with AI">
+                                                    <i class="fas fa-magic"></i> Format List
+                                                </button>
+                                            </div>
+                                            <textarea class="form-control" id="resumeSkills" rows="4" placeholder="List your skills, separated by commas or new lines (e.g., JavaScript, Python, Project Management, Team Leadership)"></textarea>
+                                            <div class="section-controls text-end mt-1">
+                                               <button class="btn btn-sm btn-outline-secondary hide-section-btn"><i class="fas fa-eye-slash"></i> Hide</button>
+                                            </div>
+                                        </div>
+                
+                                         <div class="resume-section mb-4" data-section="certifications">
+                                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                                <h5>Certifications (Optional)</h5>
+                                                <button class="btn btn-sm btn-success add-item-btn" data-target="certificationItems" data-template="certificationTemplate"><i class="fas fa-plus"></i> Add Certification</button>
+                                            </div>
+                                            <div id="certificationItems">
+                                                </div>
+                                            <div class="section-controls text-end mt-1">
+                                               <button class="btn btn-sm btn-outline-secondary hide-section-btn"><i class="fas fa-eye-slash"></i> Hide</button>
+                                            </div>
+                                        </div>
+                
+                
+                                        <div class="d-none">
+                                            <div id="experienceTemplate" class="resume-item card card-body bg-light mb-3">
+                                                <div class="row g-3">
+                                                    <div class="col-md-6">
+                                                        <label class="form-label">Company</label>
+                                                        <input type="text" class="form-control" data-field="company" placeholder="e.g., Tech Solutions Inc.">
+                                                    </div>
+                                                    <div class="col-md-6">
+                                                        <label class="form-label">Job Title</label>
+                                                        <input type="text" class="form-control" data-field="jobTitle" placeholder="e.g., Software Engineer">
+                                                    </div>
+                                                    <div class="col-md-6">
+                                                        <label class="form-label">Location</label>
+                                                        <input type="text" class="form-control" data-field="location" placeholder="e.g., New York, NY">
+                                                    </div>
+                                                    <div class="col-md-6">
+                                                        <label class="form-label">Date Range</label>
+                                                        <input type="text" class="form-control" data-field="date" placeholder="e.g., Jan 2020 - Present">
+                                                    </div>
+                                                    <div class="col-12">
+                                                        <label class="form-label d-flex justify-content-between">
+                                                            Description / Responsibilities
+                                                            <button class="btn btn-sm btn-outline-primary ai-generate-btn" data-target="description" data-type="experience" title="Enhance Description with AI">
+                                                                <i class="fas fa-magic"></i> Enhance
+                                                            </button>
+                                                        </label>
+                                                        <textarea class="form-control" data-field="description" rows="3" placeholder="Describe achievements using bullet points..."></textarea>
+                                                    </div>
+                                                </div>
+                                                <div class="item-controls text-end mt-2">
+                                                    <button class="btn btn-sm btn-outline-danger remove-item-btn"><i class="fas fa-trash"></i> Remove</button>
+                                                </div>
+                                            </div>
+                
+                                            <div id="educationTemplate" class="resume-item card card-body bg-light mb-3">
+                                                <div class="row g-3">
+                                                    <div class="col-md-6">
+                                                        <label class="form-label">School/University</label>
+                                                        <input type="text" class="form-control" data-field="school" placeholder="e.g., State University">
+                                                    </div>
+                                                    <div class="col-md-6">
+                                                        <label class="form-label">Location</label>
+                                                        <input type="text" class="form-control" data-field="location" placeholder="e.g., City, State">
+                                                    </div>
+                                                     <div class="col-md-6">
+                                                        <label class="form-label">Degree & Major</label>
+                                                        <input type="text" class="form-control" data-field="degreeMajor" placeholder="e.g., B.S. Computer Science">
+                                                    </div>
+                                                    <div class="col-md-3">
+                                                        <label class="form-label">Graduation Date</label>
+                                                        <input type="text" class="form-control" data-field="date" placeholder="e.g., May 2020">
+                                                    </div>
+                                                    <div class="col-md-3">
+                                                        <label class="form-label">GPA (Optional)</label>
+                                                        <input type="text" class="form-control" data-field="gpa" placeholder="e.g., 3.8/4.0">
+                                                    </div>
+                                                    <div class="col-12">
+                                                        <label class="form-label">Relevant Coursework / Honors (Optional)</label>
+                                                        <textarea class="form-control" data-field="additionalInfo" rows="2" placeholder="e.g., Dean's List..."></textarea>
+                                                    </div>
+                                                </div>
+                                                <div class="item-controls text-end mt-2">
+                                                    <button class="btn btn-sm btn-outline-danger remove-item-btn"><i class="fas fa-trash"></i> Remove</button>
+                                                </div>
+                                            </div>
+                
+                                            <div id="projectTemplate" class="resume-item card card-body bg-light mb-3">
+                                                <div class="row g-3">
+                                                    <div class="col-md-6">
+                                                        <label class="form-label">Project Name</label>
+                                                        <input type="text" class="form-control" data-field="projectName" placeholder="e.g., Portfolio Website">
+                                                    </div>
+                                                    <div class="col-md-6">
+                                                        <label class="form-label">Date / Duration (Optional)</label>
+                                                        <input type="text" class="form-control" data-field="date" placeholder="e.g., Fall 2022">
+                                                    </div>
+                                                    <div class="col-12">
+                                                        <label class="form-label d-flex justify-content-between">
+                                                            Description
+                                                             <button class="btn btn-sm btn-outline-primary ai-generate-btn" data-target="description" data-type="project" title="Enhance Description with AI">
+                                                                <i class="fas fa-magic"></i> Enhance
+                                                            </button>
+                                                        </label>
+                                                        <textarea class="form-control" data-field="description" rows="3" placeholder="Describe the project, tech used, outcomes..."></textarea>
+                                                    </div>
+                                                    <div class="col-12">
+                                                        <label class="form-label">Link (Optional)</label>
+                                                        <input type="url" class="form-control" data-field="link" placeholder="e.g., GitHub or live demo link">
+                                                    </div>
+                                                </div>
+                                               <div class="item-controls text-end mt-2">
+                                                    <button class="btn btn-sm btn-outline-danger remove-item-btn"><i class="fas fa-trash"></i> Remove</button>
+                                                </div>
+                                            </div>
+                
+                                             <div id="certificationTemplate" class="resume-item card card-body bg-light mb-3">
+                                                <div class="row g-3">
+                                                    <div class="col-md-6">
+                                                        <label class="form-label">Certification Name</label>
+                                                        <input type="text" class="form-control" data-field="certificationName" placeholder="e.g., Certified Scrum Master">
+                                                    </div>
+                                                    <div class="col-md-4">
+                                                        <label class="form-label">Issuing Body</label>
+                                                        <input type="text" class="form-control" data-field="issuingBody" placeholder="e.g., Scrum Alliance">
+                                                    </div>
+                                                    <div class="col-md-2">
+                                                        <label class="form-label">Date (Optional)</label>
+                                                        <input type="text" class="form-control" data-field="date" placeholder="e.g., 2023">
+                                                    </div>
+                                                </div>
+                                               <div class="item-controls text-end mt-2">
+                                                    <button class="btn btn-sm btn-outline-danger remove-item-btn"><i class="fas fa-trash"></i> Remove</button>
+                                                </div>
+                                            </div>
+                
+                                        </div> </div><div class="resume-settings-container card card-body shadow-sm mb-4">
+                                         <h5 class="mb-3">Resume Settings</h5>
+                                         <div class="mb-3">
+                                              <label for="resumeFontFamily" class="form-label">Font Family</label>
+                                              <select class="form-select" id="resumeFontFamily">
+                                                  <option value="'Roboto', sans-serif" selected>Roboto</option>
+                                                  <option value="'Lato', sans-serif">Lato</option>
+                                                  <option value="'Montserrat', sans-serif">Montserrat</option>
+                                                  <option value="'Open Sans', sans-serif">Open Sans</option>
+                                                  <option value="'Raleway', sans-serif">Raleway</option>
+                                                  <option value="'Noto Serif', serif">Noto Serif</option>
+                                                  <option value="'Lora', serif">Lora</option>
+                                                  <option value="'Roboto Slab', serif">Roboto Slab</option>
+                                                  <option value="'Playfair Display', serif">Playfair Display</option>
+                                                  <option value="'Merriweather', serif">Merriweather</option>
+                                              </select>
+                                         </div>
+                                         <div class="mb-3">
+                                              <label class="form-label">Font Size</label>
+                                              <div class="btn-group w-100" role="group" aria-label="Font Size">
+                                                  <input type="radio" class="btn-check" name="resumeFontSize" id="fontCompact" value="compact" autocomplete="off">
+                                                  <label class="btn btn-outline-secondary" for="fontCompact">Compact</label>
+                
+                                                  <input type="radio" class="btn-check" name="resumeFontSize" id="fontStandard" value="standard" autocomplete="off" checked>
+                                                  <label class="btn btn-outline-secondary" for="fontStandard">Standard</label>
+                
+                                                  <input type="radio" class="btn-check" name="resumeFontSize" id="fontLarge" value="large" autocomplete="off">
+                                                  <label class="btn btn-outline-secondary" for="fontLarge">Large</label>
+                                              </div>
+                                         </div>
+                                          <div class="mb-3">
+                                              <label class="form-label">Document Size</label>
+                                               <div class="btn-group w-100" role="group" aria-label="Document Size">
+                                                  <input type="radio" class="btn-check" name="resumeDocSize" id="docLetter" value="letter" autocomplete="off" checked>
+                                                  <label class="btn btn-outline-secondary" for="docLetter">Letter</label>
+                
+                                                  <input type="radio" class="btn-check" name="resumeDocSize" id="docA4" value="a4" autocomplete="off">
+                                                  <label class="btn btn-outline-secondary" for="docA4">A4</label>
+                                              </div>
+                                              <div class="form-text text-center">(Letter: US/Canada, A4: Other countries)</div>
+                                         </div>
+                                    </div></div> </div> <div class="col-lg-6 resume-preview-pane">
+                                <div id="resumePreviewArea" class="resume-preview-area card card-body shadow-sm sticky-lg-top" style="top: 20px;">
+                                    <p class="text-center text-muted initial-preview-message">Resume preview will appear here as you enter details.</p>
+                                </div>
                             </div> 
                         </div> 
                     </div> 

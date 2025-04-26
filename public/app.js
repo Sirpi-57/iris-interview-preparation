@@ -3884,50 +3884,93 @@ let projectCounter = 0;
 
 // Function to initialize resume builder listeners (call when navigating to it)
 function initResumeBuilder() {
-    console.log("Initializing Resume Builder Listeners...");
+    console.log("Initializing Resume Builder Listeners (with Live Preview)...");
     const resumeBuilderSection = document.getElementById('resume-builder');
-    if (!resumeBuilderSection) return;
+    const editorPane = resumeBuilderSection?.querySelector('.resume-editor-pane'); // Target editor pane
 
-    // Add Item Buttons (Experience, Education, Project)
-    resumeBuilderSection.querySelectorAll('.add-item-btn').forEach(button => {
-        // Check if listener already attached to prevent duplicates
-        if (!button.dataset.listenerAttached) {
-             button.addEventListener('click', handleAddItem);
-             button.dataset.listenerAttached = 'true'; // Mark as attached
-        }
-    });
+    if (!resumeBuilderSection || !editorPane) {
+        console.error("Resume builder section or editor pane not found.");
+        return;
+    }
 
-    // Remove Item Buttons (using event delegation on parent containers)
-    setupRemoveItemListener('experienceItems');
-    setupRemoveItemListener('educationItems');
-    setupRemoveItemListener('projectItems');
+    // --- Event Listener Setup ---
+    // Use event delegation on the editor pane for input changes
+    if (!editorPane.dataset.inputListenerAttached) {
+        const debouncedUpdate = debounce(updateResumePreview, 300); // Update preview 300ms after last input
+        editorPane.addEventListener('input', (event) => {
+            // Listen for changes in inputs, textareas, selects
+            if (event.target.matches('input, textarea, select')) {
+                debouncedUpdate();
+            }
+        });
+        editorPane.dataset.inputListenerAttached = 'true';
+        console.log("Input listener attached to editor pane.");
+    }
 
-    // AI Generate Buttons (using event delegation)
-    setupAIGenerateListener(resumeBuilderSection);
+    // Add/Remove Item Buttons (using delegation, now also triggers preview update)
+    if (!editorPane.dataset.addItemListenerAttached) {
+         editorPane.addEventListener('click', function(event){
+             const addButton = event.target.closest('.add-item-btn');
+             const removeButton = event.target.closest('.remove-item-btn');
+             if (addButton) {
+                 handleAddItem(event);
+                 updateResumePreview(); // Update preview immediately after adding
+             } else if (removeButton) {
+                 handleRemoveItem(removeButton); // Pass the button to handleRemoveItem
+                 updateResumePreview(); // Update preview immediately after removing
+             }
+         });
+         editorPane.dataset.addItemListenerAttached = 'true';
+         console.log("Add/Remove item listeners attached.");
+    }
 
-    // Section Hide/Show Buttons (using event delegation)
-    setupSectionToggleListener(resumeBuilderSection);
+    // AI Generate Buttons (already delegated, no preview update needed here)
+    if (!editorPane.dataset.aiListenerAttached) {
+         setupAIGenerateListener(editorPane); // Pass editorPane instead of whole section
+         console.log("AI listener attached.");
+    }
 
-    // Settings Controls
-    document.getElementById('resumeFontFamily')?.addEventListener('change', applyResumeStyles);
-    resumeBuilderSection.querySelectorAll('input[name="resumeFontSize"]').forEach(radio => {
-         if (!radio.dataset.listenerAttached) {
-            radio.addEventListener('change', applyResumeStyles);
-            radio.dataset.listenerAttached = 'true';
-         }
-    });
-     resumeBuilderSection.querySelectorAll('input[name="resumeDocSize"]').forEach(radio => {
-         if (!radio.dataset.listenerAttached) {
-             radio.addEventListener('change', applyResumeStyles);
-             radio.dataset.listenerAttached = 'true';
-         }
-    });
 
-    // Download Button
+    // Section Hide/Show Buttons (now also triggers preview update)
+     if (!editorPane.dataset.toggleListenerAttached) {
+        editorPane.addEventListener('click', function(event) {
+            const button = event.target.closest('.hide-section-btn, .show-section-btn');
+            if (button) {
+                handleToggleSection(button);
+                updateResumePreview(); // Update preview after toggling
+            }
+        });
+        editorPane.dataset.toggleListenerAttached = 'true';
+        console.log("Section toggle listener attached.");
+     }
+
+    // Settings Controls (now trigger preview update via applyResumeStyles)
+    const settingsContainer = editorPane.querySelector('.resume-settings-container');
+    if (settingsContainer) {
+         settingsContainer.querySelectorAll('select, input[type="radio"]').forEach(control => {
+              if (!control.dataset.listenerAttached) {
+                 control.addEventListener('change', applyResumeStyles); // applyResumeStyles will call updateResumePreview
+                 control.dataset.listenerAttached = 'true';
+              }
+         });
+          console.log("Settings listeners attached.");
+    }
+
+
+    // Download Button (no change needed)
     document.getElementById('downloadResumeBtn')?.addEventListener('click', downloadResumePDF);
 
-     // Apply initial styles based on default settings
-    applyResumeStyles();
+     // Initial preview render and style application
+    applyResumeStyles(); // Applies styles and triggers initial preview render
+    console.log("Initial resume builder setup complete.");
+}
+
+// --- Ensure handleRemoveItem uses the passed button ---
+function handleRemoveItem(button) { // Modify signature
+    const itemToRemove = button.closest('.resume-item');
+    if (itemToRemove) {
+        itemToRemove.remove();
+    }
 }
 
 // Function to attach AI Generate listener using delegation
@@ -4028,13 +4071,6 @@ function handleAddItem(event) {
     targetContainer.appendChild(newItem);
 }
 
-// Remove an item
-function handleRemoveItem(button) {
-    const itemToRemove = button.closest('.resume-item');
-    if (itemToRemove) {
-        itemToRemove.remove();
-    }
-}
 
 // Toggle Section Visibility
 function handleToggleSection(button) {
@@ -4049,27 +4085,33 @@ function handleToggleSection(button) {
 }
 
 
-// Apply Font and Size Styles (Example)
+// Apply Font and Size Styles AND Update Preview
 function applyResumeStyles() {
     const fontFamily = document.getElementById('resumeFontFamily')?.value || "'Roboto', sans-serif";
     const fontSizeOption = document.querySelector('input[name="resumeFontSize"]:checked')?.value || 'standard';
-    // const docSize = document.querySelector('input[name="resumeDocSize"]:checked')?.value || 'letter';
 
-    // Apply font family to the whole resume builder section or a preview area
-    const resumeContainer = document.getElementById('resume-builder'); // Apply to whole section for now
-    if(resumeContainer) {
-        resumeContainer.style.fontFamily = fontFamily;
+    // Apply styles to the PREVIEW AREA
+    const previewArea = document.getElementById('resumePreviewArea');
+    if(previewArea) {
+        // Apply font family via style attribute for dynamic change
+        previewArea.style.fontFamily = fontFamily;
+        console.log(`Applying preview font family: ${fontFamily}`); // Debug log
 
         // Apply font size class
-        resumeContainer.classList.remove('font-compact', 'font-standard', 'font-large');
-        resumeContainer.classList.add(`font-${fontSizeOption}`);
+        previewArea.classList.remove('font-compact', 'font-standard', 'font-large');
+        previewArea.classList.add(`font-${fontSizeOption}`);
+         console.log(`Applying preview font size class: font-${fontSizeOption}`); // Debug log
     }
-     console.log(`Applying styles: Font=<span class="math-inline">\{fontFamily\}, Size\=</span>{fontSizeOption}`);
-     // Add CSS rules in styles.css for .font-compact, .font-standard, .font-large if needed
-     // Example:
-     // #resume-builder.font-compact { font-size: 12px; }
-     // #resume-builder.font-standard { font-size: 14px; }
-     // #resume-builder.font-large { font-size: 16px; }
+
+    // Apply styles to EDITOR AREA if desired (optional)
+    // const editorContainer = document.querySelector('.resume-editor-pane');
+    // if(editorContainer) {
+    //     editorContainer.style.fontFamily = fontFamily;
+    //     editorContainer.classList.remove('font-compact', 'font-standard', 'font-large');
+    //     editorContainer.classList.add(`font-${fontSizeOption}`);
+    // }
+    console.log(`Styles applied: Font=<span class="math-inline">\{fontFamily\}, Size\=</span>{fontSizeOption}. Triggering preview update.`);
+    updateResumePreview(); // Trigger preview update whenever styles change
 }
 
 // AI Content Enhancement
@@ -4428,4 +4470,188 @@ function downloadResumePDF() {
     const filename = `Resume_${(resumeData.personal.name || 'User').replace(/ /g, '_')}.pdf`;
     pdf.save(filename);
     showToast(`📄 Resume downloaded as ${filename}`, 'success');
+}
+
+// Debounce function
+function debounce(func, wait) {
+    let timeout;
+    return function executedFunction(...args) {
+        const later = () => {
+            clearTimeout(timeout);
+            func(...args);
+        };
+        clearTimeout(timeout);
+        timeout = setTimeout(later, wait);
+    };
+}
+
+// --- Live Preview Update Function ---
+function updateResumePreview() {
+    console.log("Updating resume preview...");
+    const resumeData = getResumeData();
+    const previewArea = document.getElementById('resumePreviewArea');
+    if (!previewArea) return;
+
+    // Clear previous preview content (except the initial message if empty)
+    previewArea.innerHTML = '';
+
+    if (Object.values(resumeData.personal).every(val => !val) && !resumeData.objective && !resumeData.experience.length && !resumeData.education.length && !resumeData.projects.length && !resumeData.skills && !resumeData.certifications.length) {
+         previewArea.innerHTML = '<p class="text-center text-muted initial-preview-message">Resume preview will appear here as you enter details.</p>';
+         return; // Show placeholder if no data
+    }
+
+
+    // Re-apply font size class and font family (in case it was cleared)
+    applyResumeStyles(); // Ensures preview area has correct classes/style attribute
+
+    // --- Helper function to safely create HTML ---
+    const createHtml = (tag, className = '', content = '', attributes = {}) => {
+        const el = document.createElement(tag);
+        if (className) el.className = className;
+        // Use textContent for safety unless HTML is intended (like lists)
+        if (typeof content === 'string' && !content.startsWith('<')) {
+             el.textContent = content;
+        } else if (typeof content === 'string') {
+             el.innerHTML = content; // Use innerHTML carefully for list structures etc.
+        } else if (Array.isArray(content)) {
+             content.forEach(child => el.appendChild(child));
+        } else if (content instanceof Node) {
+             el.appendChild(content);
+        }
+        for (const attr in attributes) {
+            el.setAttribute(attr, attributes[attr]);
+        }
+        return el;
+    };
+
+     // --- Build Preview HTML ---
+     const fragment = document.createDocumentFragment(); // More efficient updates
+
+    // Header
+    if (resumeData.personal && Object.values(resumeData.personal).some(val => val)) {
+        const headerDiv = createHtml('div', 'preview-header');
+        if (resumeData.personal.name) {
+            headerDiv.appendChild(createHtml('div', 'name', resumeData.personal.name));
+        }
+        let contactInfo = [
+            resumeData.personal.location,
+            resumeData.personal.phone,
+            resumeData.personal.email,
+            resumeData.personal.website
+        ].filter(Boolean).join(' | '); // Filter out empty strings
+        if (contactInfo) {
+             headerDiv.appendChild(createHtml('div', 'contact-info', contactInfo));
+        }
+        fragment.appendChild(headerDiv);
+    }
+
+
+    // Objective
+    if (resumeData.objective) {
+         const objectiveDiv = createHtml('div', 'preview-objective preview-section'); // Added preview-section
+         // Skip heading for objective
+         objectiveDiv.appendChild(createHtml('p', '', resumeData.objective));
+         fragment.appendChild(objectiveDiv);
+    }
+
+    // Function to render section items (Experience, Education, Projects)
+    const renderSectionItems = (title, sectionKey, items) => {
+         // Check if section should be hidden (based on editor section class)
+         const editorSection = document.querySelector(`.resume-section[data-section="${sectionKey}"]`);
+         const isHidden = editorSection?.classList.contains('hidden');
+
+         if (!items || items.length === 0) return null; // Skip empty sections
+
+         const sectionDiv = createHtml('div', `preview-section preview-${sectionKey} ${isHidden ? 'hidden' : ''}`); // Add hidden class if needed
+         sectionDiv.appendChild(createHtml('h2', '', title));
+
+         items.forEach(item => {
+             const itemDiv = createHtml('div', 'preview-item');
+             const itemHeader = createHtml('div', 'item-header');
+             let titleText = '';
+             let dateText = '';
+             let subtitleText = '';
+
+             // Customize based on section
+             if (sectionKey === 'experience') {
+                 titleText = item.jobTitle || 'Job Title';
+                 dateText = item.date || '';
+                 subtitleText = `${item.company || 'Company'} | ${item.location || 'Location'}`;
+             } else if (sectionKey === 'education') {
+                 titleText = item.degreeMajor || 'Degree/Major';
+                 dateText = item.date || '';
+                 subtitleText = `${item.school || 'School'} | ${item.location || 'Location'} ${item.gpa ? `| GPA: ${item.gpa}` : ''}`;
+             } else if (sectionKey === 'projects') {
+                 titleText = item.projectName || 'Project Name';
+                 dateText = item.date || '';
+                 subtitleText = item.link ? `<a href="<span class="math-inline">\{item\.link\}" target\="\_blank"\></span>{item.link}</a>` : ''; // Add link if present
+             } else if (sectionKey === 'certifications') {
+                  titleText = `<strong>${item.certificationName || 'Certification'}</strong> - ${item.issuingBody || 'Issuing Body'}`;
+                  dateText = item.date || '';
+             }
+
+
+             itemHeader.appendChild(createHtml('span', 'item-title', titleText));
+              if (dateText) {
+                  itemHeader.appendChild(createHtml('span', 'item-date', dateText));
+              }
+             itemDiv.appendChild(itemHeader);
+
+             if (subtitleText) {
+                 itemDiv.appendChild(createHtml('div', 'item-subtitle', subtitleText)); // Use innerHTML for potential link
+             }
+
+             // Handle descriptions (common for experience/projects)
+             if (item.description) {
+                 const descLines = item.description.split('\n').map(line => line.trim()).filter(line => line);
+                 if (descLines.length > 0) {
+                     const ul = createHtml('ul');
+                     descLines.forEach(line => {
+                          // Remove potential leading bullet characters before adding text content
+                          const cleanLine = line.replace(/^[\*\-\•]\s*/, '');
+                          ul.appendChild(createHtml('li', '', cleanLine));
+                     });
+                     itemDiv.appendChild(ul);
+                 }
+             }
+              // Handle education additional info
+              if (sectionKey === 'education' && item.additionalInfo) {
+                  itemDiv.appendChild(createHtml('p', 'small text-muted', `Relevant Info: ${item.additionalInfo}`));
+              }
+
+             sectionDiv.appendChild(itemDiv);
+         });
+         return sectionDiv;
+    };
+
+     // Render sections
+     const expSection = renderSectionItems('Work Experience', 'experience', resumeData.experience);
+     if (expSection) fragment.appendChild(expSection);
+
+     const eduSection = renderSectionItems('Education', 'education', resumeData.education);
+      if (eduSection) fragment.appendChild(eduSection);
+
+     const projSection = renderSectionItems('Projects', 'projects', resumeData.projects);
+      if (projSection) fragment.appendChild(projSection);
+
+     // Skills
+     const skillsSectionEditor = document.querySelector('.resume-section[data-section="skills"]');
+     const skillsHidden = skillsSectionEditor?.classList.contains('hidden');
+     if (resumeData.skills) {
+         const skillsSection = createHtml('div', `preview-section preview-skills ${skillsHidden ? 'hidden' : ''}`);
+         skillsSection.appendChild(createHtml('h2', '', 'Skills'));
+         // Format skills as a simple paragraph for preview
+         const skillsList = resumeData.skills.split(/[\n,]+/).map(s => s.trim()).filter(s => s);
+         skillsSection.appendChild(createHtml('p', '', skillsList.join(', ')));
+         fragment.appendChild(skillsSection);
+     }
+
+     // Certifications
+     const certSection = renderSectionItems('Certifications', 'certifications', resumeData.certifications);
+     if (certSection) fragment.appendChild(certSection);
+
+
+     // Append the built fragment to the preview area
+    previewArea.appendChild(fragment);
+    console.log("Preview updated.");
 }

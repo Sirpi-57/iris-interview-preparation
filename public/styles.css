@@ -1674,3 +1674,135 @@ h2:after {
     background-color: #f8f9fa; /* Light background */
     padding: 1rem;
 }
+
+
+@media (min-width: 992px) { /* lg breakpoint */
+    .resume-editor-pane > .sticky-lg-top,
+    .resume-preview-pane > .sticky-lg-top {
+        max-height: calc(100vh - 40px); /* Adjust 40px based on potential navbars */
+        overflow-y: auto;
+        /* Add padding to prevent scrollbar overlap if needed */
+         padding-right: 15px;
+    }
+    /* Custom scrollbar styling (optional) */
+    .resume-editor-pane > .sticky-lg-top::-webkit-scrollbar,
+    .resume-preview-pane > .sticky-lg-top::-webkit-scrollbar {
+         width: 6px;
+    }
+    .resume-editor-pane > .sticky-lg-top::-webkit-scrollbar-track,
+    .resume-preview-pane > .sticky-lg-top::-webkit-scrollbar-track {
+         background: #f1f1f1;
+         border-radius: 3px;
+    }
+    .resume-editor-pane > .sticky-lg-top::-webkit-scrollbar-thumb,
+    .resume-preview-pane > .sticky-lg-top::-webkit-scrollbar-thumb {
+         background: #ccc;
+         border-radius: 3px;
+    }
+    .resume-editor-pane > .sticky-lg-top::-webkit-scrollbar-thumb:hover,
+    .resume-preview-pane > .sticky-lg-top::-webkit-scrollbar-thumb:hover {
+         background: #aaa;
+    }
+}
+
+
+/* Preview Area Styling */
+.resume-preview-area {
+    background-color: #fff;
+    /* Mimic paper aspect ratio (e.g., Letter size 8.5 x 11) */
+    /* Aspect ratio requires careful handling - this is a basic setup */
+    /* Consider setting width and using padding-top for aspect ratio */
+    padding: 40pt; /* Use points like in PDF */
+    font-family: 'Helvetica', 'Arial', sans-serif; /* Default font, will be overridden by JS */
+    min-height: 500px; /* Ensure it has some height */
+    color: #333;
+    line-height: 1.4;
+    transition: font-family 0.3s ease, font-size 0.3s ease; /* Smooth transitions for settings */
+}
+ .resume-preview-area .initial-preview-message {
+    margin-top: 50px; /* Center placeholder text vertically */
+}
+
+/* Font size classes for Preview */
+.resume-preview-area.font-compact { font-size: 9pt; }
+.resume-preview-area.font-standard { font-size: 10pt; } /* Default */
+.resume-preview-area.font-large { font-size: 11pt; }
+
+ /* Example Preview Element Styles (make these match your desired PDF look) */
+.preview-header .name {
+    font-size: 20pt; /* Example: Larger name */
+    font-weight: bold;
+    color: var(--primary-color); /* Use theme color */
+    text-align: center;
+    margin-bottom: 8pt;
+}
+.preview-header .contact-info {
+    font-size: 9pt;
+    text-align: center;
+    color: #555;
+    margin-bottom: 15pt;
+}
+.preview-objective p {
+    font-style: italic;
+    margin-bottom: 15pt;
+    text-align: justify;
+}
+.preview-section h2 {
+    font-size: 14pt;
+    font-weight: bold;
+    color: var(--primary-color);
+    border-bottom: 1px solid var(--primary-color);
+    padding-bottom: 3pt;
+    margin-top: 5pt;
+    margin-bottom: 10pt;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+.preview-item {
+    margin-bottom: 12pt;
+}
+.preview-item .item-header {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 2pt;
+}
+.preview-item .item-title {
+    font-size: 11pt;
+    font-weight: bold;
+}
+ .preview-item .item-date {
+    font-size: 10pt;
+    font-style: italic;
+    color: #666;
+}
+.preview-item .item-subtitle {
+    font-size: 10pt;
+    font-style: italic;
+    margin-bottom: 4pt;
+}
+.preview-item ul {
+    list-style: disc;
+    margin-left: 15pt;
+    padding-left: 5pt;
+    margin-top: 3pt;
+}
+ .preview-item ul li {
+     margin-bottom: 3pt;
+     text-align: justify; /* Justify bullet points */
+ }
+ .preview-skills p {
+     font-size: 10pt;
+     line-height: 1.5;
+ }
+  .preview-certifications .item-title {
+     font-size: 10pt; /* Slightly smaller for certs */
+     font-weight: normal;
+ }
+  .preview-certifications .item-title strong {
+     font-weight: bold;
+ }
+
+ /* Styles for hidden sections in PREVIEW */
+ .resume-preview-area .preview-section.hidden {
+     display: none;
+ }
