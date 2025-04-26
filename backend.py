@@ -1187,6 +1187,52 @@ def sanitize_string_for_json(text):
     
     return checked_text.strip()  # Remove leading/trailing whitespace
 
+def call_haiku_for_enhancement(section_type, original_content):
+    """Calls Claude Haiku to enhance a specific resume section."""
+    if not CLAUDE_API_KEY:
+        raise ValueError("Claude API Key is not configured.")
+
+    # --- Define specific prompts based on section type ---
+    if section_type == 'objective':
+        system_prompt = "You are an expert resume writer. Rewrite this professional summary/objective to be concise, impactful, and tailored for showcasing skills and career goals. Focus on clarity and professionalism. Respond with ONLY the rewritten text."
+        user_content = f"Original Objective/Summary:\n{original_content}"
+        max_tokens = 200
+        temperature = 0.6
+    elif section_type == 'experience':
+        system_prompt = "You are an expert resume writer specializing in action verbs and quantifying achievements. Rewrite the following work experience description using strong action verbs at the start of each point. Ensure it uses bullet points (use '*' or '-' for bullets) and highlights responsibilities and measurable accomplishments where possible. Respond with ONLY the rewritten bullet points."
+        user_content = f"Original Experience Description:\n{original_content}"
+        max_tokens = 400
+        temperature = 0.5
+    elif section_type == 'project':
+        system_prompt = "You are an expert resume writer. Rewrite the following project description to clearly state the project goal, technologies used, the candidate's contribution, and key outcomes or features. Use bullet points (use '*' or '-'). Respond with ONLY the rewritten bullet points."
+        user_content = f"Original Project Description:\n{original_content}"
+        max_tokens = 350
+        temperature = 0.5
+    elif section_type == 'skills':
+        system_prompt = "You are an expert resume formatter. Take the following list of skills (which might be comma-separated, newline-separated, or mixed) and format it into a clean, comma-separated list. Remove duplicates and categorize briefly if obvious categories emerge (e.g., Languages, Frameworks, Tools), but prioritize a simple comma-separated list if categorization isn't clear. Respond with ONLY the formatted comma-separated list."
+        user_content = f"Original Skills List:\n{original_content}"
+        max_tokens = 250
+        temperature = 0.3
+    else:
+        # Fallback for unknown types
+        system_prompt = "You are a helpful assistant. Briefly rewrite the following text for clarity and conciseness. Respond with ONLY the rewritten text."
+        user_content = f"Original Text:\n{original_content}"
+        max_tokens = 300
+        temperature = 0.7
+
+    messages = [{"role": "user", "content": user_content}]
+
+    print(f"--- Calling Claude Haiku for '{section_type}' enhancement ---")
+    # Use the call_claude_api helper, specifying the Haiku model
+    enhanced_content = call_claude_api(
+        messages=messages,
+        system_prompt=system_prompt,
+        model=CLAUDE_HAIKU_MODEL, # Specify Haiku model
+        temperature=temperature,
+        max_tokens=max_tokens
+    )
+    return enhanced_content
+
 
 
 # === Flask Routes ===
@@ -2098,6 +2144,39 @@ def get_user_usage_route(user_id):
         print(f"Error in /get-user-usage: {e}")
         traceback.print_exc()
         return jsonify({'error': f'Server error: {str(e)}'}), 500
+
+@app.route('/enhance-resume-content', methods=['POST'])
+def enhance_resume_content_route():
+    """Enhances a specific section of resume content using AI."""
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({'error': 'Invalid JSON payload'}), 400
+
+        section_type = data.get('sectionType')
+        original_content = data.get('originalContent')
+
+        if not section_type or not original_content:
+            return jsonify({'error': 'sectionType and originalContent are required'}), 400
+
+        print(f"Received enhancement request for section: {section_type}")
+
+        enhanced_content = call_haiku_for_enhancement(section_type, original_content)
+
+        return jsonify({'enhancedContent': enhanced_content})
+
+    except ValueError as ve: # Catch API key errors specifically
+         print(f"Configuration Error: {ve}")
+         return jsonify({'error': f'Server configuration error: {str(ve)}'}), 503 # Service Unavailable
+    except Exception as e:
+        print(f"Error in /enhance-resume-content route: {e}")
+        traceback.print_exc()
+        # Check if it's an Anthropic API error from call_claude_api
+        if isinstance(e, Exception) and "Claude API" in str(e):
+             # Pass Anthropic error message to frontend if possible
+             return jsonify({'error': f'AI Enhancement Error: {str(e)}'}), 502 # Bad Gateway
+        else:
+            return jsonify({'error': f'Server error enhancing content: {str(e)}'}), 500
 
 
 # --- Cleanup Function (Needs Review/Replacement with TTL) ---

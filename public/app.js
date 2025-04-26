@@ -535,9 +535,12 @@ function initNavigation() {
     navItems.forEach(item => {
         item.addEventListener('click', function() {
             const targetSection = this.getAttribute('data-target');
-            // Prevent navigation if locked (unless it's the upload/landing section)
+
+            // Prevent navigation if locked (unless it's upload, landing, or resume-builder)
             const isLocked = this.querySelector('.status-indicator.locked');
-            if (this.classList.contains('active') || (isLocked && targetSection !== 'upload' && targetSection !== 'landing')) {
+            // --- Updated Condition ---
+            if (this.classList.contains('active') || (isLocked && !['upload', 'landing', 'resume-builder'].includes(targetSection))) {
+            // --- End Updated Condition ---
                 return;
             }
 
@@ -547,12 +550,29 @@ function initNavigation() {
 
             // Switch active content section
             document.querySelector('.content-section.active')?.classList.remove('active');
-            document.getElementById(targetSection)?.classList.add('active');
+            const targetElement = document.getElementById(targetSection);
+            if (targetElement) {
+                targetElement.classList.add('active');
+            } else {
+                console.warn(`Navigation target element #${targetSection} not found.`);
+            }
+
 
             // Special actions when navigating
             if (targetSection === 'history') {
                 loadProgressHistory();
             }
+             // --- Added Action for Resume Builder ---
+            if (targetSection === 'resume-builder') {
+                // Call function to attach listeners etc. for the resume builder
+                // Ensure initResumeBuilder() is defined elsewhere in your app.js
+                if (typeof initResumeBuilder === 'function') {
+                    initResumeBuilder();
+                } else {
+                    console.warn('initResumeBuilder function not found.');
+                }
+            }
+             // --- End Added Action ---
         });
     });
 }
@@ -3855,4 +3875,557 @@ function updateFullscreenButtonState() {
         icon.className = 'fas fa-expand';
         videoPanel?.classList.remove('fullscreen'); // Ensure class is removed
     }
+}
+
+// Keep track of unique IDs for dynamic items
+let experienceCounter = 0;
+let educationCounter = 0;
+let projectCounter = 0;
+
+// Function to initialize resume builder listeners (call when navigating to it)
+function initResumeBuilder() {
+    console.log("Initializing Resume Builder Listeners...");
+    const resumeBuilderSection = document.getElementById('resume-builder');
+    if (!resumeBuilderSection) return;
+
+    // Add Item Buttons (Experience, Education, Project)
+    resumeBuilderSection.querySelectorAll('.add-item-btn').forEach(button => {
+        // Check if listener already attached to prevent duplicates
+        if (!button.dataset.listenerAttached) {
+             button.addEventListener('click', handleAddItem);
+             button.dataset.listenerAttached = 'true'; // Mark as attached
+        }
+    });
+
+    // Remove Item Buttons (using event delegation on parent containers)
+    setupRemoveItemListener('experienceItems');
+    setupRemoveItemListener('educationItems');
+    setupRemoveItemListener('projectItems');
+
+    // AI Generate Buttons (using event delegation)
+    setupAIGenerateListener(resumeBuilderSection);
+
+    // Section Hide/Show Buttons (using event delegation)
+    setupSectionToggleListener(resumeBuilderSection);
+
+    // Settings Controls
+    document.getElementById('resumeFontFamily')?.addEventListener('change', applyResumeStyles);
+    resumeBuilderSection.querySelectorAll('input[name="resumeFontSize"]').forEach(radio => {
+         if (!radio.dataset.listenerAttached) {
+            radio.addEventListener('change', applyResumeStyles);
+            radio.dataset.listenerAttached = 'true';
+         }
+    });
+     resumeBuilderSection.querySelectorAll('input[name="resumeDocSize"]').forEach(radio => {
+         if (!radio.dataset.listenerAttached) {
+             radio.addEventListener('change', applyResumeStyles);
+             radio.dataset.listenerAttached = 'true';
+         }
+    });
+
+    // Download Button
+    document.getElementById('downloadResumeBtn')?.addEventListener('click', downloadResumePDF);
+
+     // Apply initial styles based on default settings
+    applyResumeStyles();
+}
+
+// Function to attach AI Generate listener using delegation
+function setupAIGenerateListener(container) {
+    if (container.dataset.aiListenerAttached) return; // Prevent duplicates
+    container.addEventListener('click', function(event) {
+        const button = event.target.closest('.ai-generate-btn');
+        if (button) {
+            const targetId = button.dataset.target;
+            const sectionType = button.dataset.type;
+            let contentElement;
+
+            // Find the target element relative to the button
+             if (targetId === 'resumeObjective' || targetId === 'resumeSkills') {
+                contentElement = document.getElementById(targetId);
+             } else {
+                // For items within templates (Experience, Project descriptions)
+                const itemCard = button.closest('.resume-item');
+                if (itemCard) {
+                    contentElement = itemCard.querySelector(`[data-field="${targetId}"]`);
+                }
+             }
+
+
+            if (contentElement) {
+                enhanceResumeContent(sectionType, contentElement, button);
+            } else {
+                 console.error("Target content element not found for AI Generate:", targetId);
+                 showErrorMessage("Could not find the content field to enhance.", "warning");
+            }
+        }
+    });
+    container.dataset.aiListenerAttached = 'true';
+}
+
+ // Function to attach Remove Item listener using delegation
+function setupRemoveItemListener(containerId) {
+    const container = document.getElementById(containerId);
+    if (!container || container.dataset.removeListenerAttached) return;
+    container.addEventListener('click', function(event) {
+         const button = event.target.closest('.remove-item-btn');
+         if (button) {
+             handleRemoveItem(button);
+         }
+    });
+    container.dataset.removeListenerAttached = 'true';
+}
+
+ // Function to attach Section Toggle listener using delegation
+function setupSectionToggleListener(container) {
+    if (container.dataset.toggleListenerAttached) return;
+    container.addEventListener('click', function(event) {
+         const button = event.target.closest('.hide-section-btn, .show-section-btn');
+         if (button) {
+             handleToggleSection(button);
+         }
+    });
+    container.dataset.toggleListenerAttached = 'true';
+}
+
+
+// Add new item (Experience, Education, Project)
+function handleAddItem(event) {
+    const targetContainerId = event.target.dataset.target;
+    const templateId = event.target.dataset.template;
+    const targetContainer = document.getElementById(targetContainerId);
+    const template = document.getElementById(templateId);
+
+    if (!targetContainer || !template) {
+        console.error("Target container or template not found for add item.");
+        return;
+    }
+
+    const newItem = template.cloneNode(true);
+    newItem.id = ''; // Remove template ID from clone
+    newItem.classList.remove('d-none'); // Make it visible
+
+     // Assign unique IDs to inputs/textareas within the cloned item if needed
+    let counter;
+    if (templateId === 'experienceTemplate') counter = ++experienceCounter;
+    else if (templateId === 'educationTemplate') counter = ++educationCounter;
+    else if (templateId === 'projectTemplate') counter = ++projectCounter;
+    else counter = Date.now(); // Fallback
+
+    newItem.querySelectorAll('input, textarea').forEach(el => {
+         if(el.id) el.id = `<span class="math-inline">\{el\.id\}\-</span>{counter}`;
+         const label = newItem.querySelector(`label[for="${el.id.replace(`-${counter}`, '')}"]`);
+         if(label) label.setAttribute('for', el.id);
+         // Find the AI button targeting this element
+         const aiButton = newItem.querySelector(`.ai-generate-btn[data-target="${el.dataset.field}"]`);
+         if(aiButton) {
+             // Set a more specific target reference, perhaps using the counter
+             // For now, the relative search in setupAIGenerateListener should work
+         }
+    });
+
+
+    targetContainer.appendChild(newItem);
+}
+
+// Remove an item
+function handleRemoveItem(button) {
+    const itemToRemove = button.closest('.resume-item');
+    if (itemToRemove) {
+        itemToRemove.remove();
+    }
+}
+
+// Toggle Section Visibility
+function handleToggleSection(button) {
+     const section = button.closest('.resume-section');
+     if (!section) return;
+
+     const isHidden = section.classList.toggle('hidden');
+     button.classList.toggle('hide-section-btn', !isHidden);
+     button.classList.toggle('show-section-btn', isHidden);
+     button.innerHTML = isHidden ? '<i class="fas fa-eye"></i> Show' : '<i class="fas fa-eye-slash"></i> Hide';
+     button.title = isHidden ? 'Show Section' : 'Hide Section';
+}
+
+
+// Apply Font and Size Styles (Example)
+function applyResumeStyles() {
+    const fontFamily = document.getElementById('resumeFontFamily')?.value || "'Roboto', sans-serif";
+    const fontSizeOption = document.querySelector('input[name="resumeFontSize"]:checked')?.value || 'standard';
+    // const docSize = document.querySelector('input[name="resumeDocSize"]:checked')?.value || 'letter';
+
+    // Apply font family to the whole resume builder section or a preview area
+    const resumeContainer = document.getElementById('resume-builder'); // Apply to whole section for now
+    if(resumeContainer) {
+        resumeContainer.style.fontFamily = fontFamily;
+
+        // Apply font size class
+        resumeContainer.classList.remove('font-compact', 'font-standard', 'font-large');
+        resumeContainer.classList.add(`font-${fontSizeOption}`);
+    }
+     console.log(`Applying styles: Font=<span class="math-inline">\{fontFamily\}, Size\=</span>{fontSizeOption}`);
+     // Add CSS rules in styles.css for .font-compact, .font-standard, .font-large if needed
+     // Example:
+     // #resume-builder.font-compact { font-size: 12px; }
+     // #resume-builder.font-standard { font-size: 14px; }
+     // #resume-builder.font-large { font-size: 16px; }
+}
+
+// AI Content Enhancement
+async function enhanceResumeContent(sectionType, contentElement, button) {
+    const originalContent = contentElement.value.trim();
+
+    if (!originalContent) {
+        showErrorMessage('Please enter some content before using AI Enhance.', 'warning');
+        return;
+    }
+
+    // Disable button and show loading state
+    button.disabled = true;
+    const originalButtonText = button.innerHTML;
+    button.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Enhancing...';
+    showToast('✨ Enhancing your content with AI...');
+
+    try {
+        const response = await fetch(`${API_BASE_URL}/enhance-resume-content`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                 // Add Auth headers if your backend requires them
+                // 'Authorization': `Bearer ${await firebase.auth().currentUser.getIdToken()}`
+            },
+            body: JSON.stringify({
+                sectionType: sectionType,
+                originalContent: originalContent
+            })
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({ error: 'Network error or invalid JSON response' }));
+            throw new Error(errorData.error || `Failed to enhance content (${response.status})`);
+        }
+
+        const data = await response.json();
+
+        if (data.enhancedContent) {
+            contentElement.value = data.enhancedContent; // Update the input/textarea
+            showToast('✅ Content enhanced successfully!', 'success');
+            // Trigger input event for potential frameworks that listen to changes
+             contentElement.dispatchEvent(new Event('input', { bubbles: true }));
+        } else {
+            throw new Error(data.error || "Enhancement failed: No content returned.");
+        }
+
+    } catch (error) {
+        console.error('Error enhancing resume content:', error);
+        showErrorMessage(`AI Enhancement Error: ${error.message}`, 'danger');
+        showToast(`❌ Enhancement failed: ${error.message}`, 'danger');
+    } finally {
+        // Re-enable button and restore text
+        button.disabled = false;
+        button.innerHTML = originalButtonText;
+    }
+}
+
+// Function to display simple toast messages (replace with your preferred library if any)
+function showToast(message, type = 'info', duration = 3000) {
+     const toastContainer = document.getElementById('error-messages'); // Reuse error container
+     if (!toastContainer) {
+         console.log("Toast:", message); // Fallback log
+         return;
+     }
+
+     const toastId = `toast-${Date.now()}`;
+     const toast = document.createElement('div');
+     toast.id = toastId;
+     // Use Bootstrap toast classes slightly adapted for the alert container
+     toast.className = `alert alert-${type} alert-dismissible fade show mb-2`;
+     toast.setAttribute('role', 'alert');
+     toast.setAttribute('aria-live', 'assertive');
+     toast.setAttribute('aria-atomic', 'true');
+
+     toast.innerHTML = `
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+     `;
+
+     toastContainer.appendChild(toast);
+
+     // Auto-dismiss
+     setTimeout(() => {
+        const currentToast = document.getElementById(toastId);
+        if (currentToast) {
+            currentToast.classList.remove('show');
+            // Wait for fade out animation before removing
+            setTimeout(() => currentToast.remove(), 500);
+        }
+     }, duration);
+}
+
+
+// Gather Resume Data
+function getResumeData() {
+    const data = {
+        personal: {
+            name: document.getElementById('resumeName')?.value || '',
+            location: document.getElementById('resumeLocation')?.value || '',
+            phone: document.getElementById('resumePhone')?.value || '',
+            email: document.getElementById('resumeEmail')?.value || '',
+            website: document.getElementById('resumeWebsite')?.value || ''
+        },
+        objective: document.getElementById('resumeObjective')?.value || '',
+        experience: [],
+        education: [],
+        projects: [],
+        skills: document.getElementById('resumeSkills')?.value || '',
+        settings: {
+             fontFamily: document.getElementById('resumeFontFamily')?.value || "'Roboto', sans-serif",
+             fontSize: document.querySelector('input[name="resumeFontSize"]:checked')?.value || 'standard',
+             docSize: document.querySelector('input[name="resumeDocSize"]:checked')?.value || 'letter'
+        }
+    };
+
+    // Helper to extract data from item containers
+    const extractItems = (containerId) => {
+        const items = [];
+        document.getElementById(containerId)?.querySelectorAll('.resume-item').forEach(itemEl => {
+            const itemData = {};
+            itemEl.querySelectorAll('input[data-field], textarea[data-field]').forEach(field => {
+                itemData[field.dataset.field] = field.value;
+            });
+             // Check if itemData is not empty before pushing
+             if (Object.keys(itemData).some(key => itemData[key].trim() !== '')) {
+                items.push(itemData);
+             }
+        });
+        return items;
+    };
+
+    data.experience = extractItems('experienceItems');
+    data.education = extractItems('educationItems');
+    data.projects = extractItems('projectItems');
+
+    // Filter out hidden sections
+    document.querySelectorAll('#resume-builder .resume-section.hidden').forEach(hiddenSection => {
+         const sectionKey = hiddenSection.dataset.section;
+         if (data.hasOwnProperty(sectionKey)) {
+             // Mark section as hidden or remove data based on preference
+             // For simplicity, let's just remove the data for PDF generation
+             delete data[sectionKey];
+             // Alternatively: data[sectionKey] = null; or data.settings[`hide_${sectionKey}`] = true;
+         }
+    });
+
+
+    return data;
+}
+
+// Download Resume as PDF (using jsPDF)
+function downloadResumePDF() {
+    if (typeof jspdf === 'undefined') {
+        showErrorMessage('PDF generation library (jsPDF) is not loaded.', 'danger');
+        console.error("jsPDF is not defined. Make sure the library is included.");
+        return;
+    }
+    const { jsPDF } = jspdf;
+    const resumeData = getResumeData();
+    const docSize = resumeData.settings.docSize || 'letter'; // 'letter' or 'a4'
+    const isA4 = docSize === 'a4';
+
+    // --- Document Setup ---
+    const pdf = new jsPDF({
+        orientation: 'portrait',
+        unit: 'pt', // Points are common for font sizes
+        format: docSize
+    });
+
+    // --- Margins and Page Dimensions ---
+    const pageHeight = pdf.internal.pageSize.getHeight();
+    const pageWidth = pdf.internal.pageSize.getWidth();
+    const margin = 40; // Points
+    const contentWidth = pageWidth - 2 * margin;
+    let currentY = margin; // Track current Y position
+
+    // --- Font Settings ---
+    const baseFontSize = resumeData.settings.fontSize === 'compact' ? 9 : (resumeData.settings.fontSize === 'large' ? 11 : 10);
+    const headingFontSize = baseFontSize + 4;
+    const subHeadingFontSize = baseFontSize + 1;
+    const bodyFontSize = baseFontSize;
+    const font = resumeData.settings.fontFamily || "'Helvetica', 'Arial', sans-serif"; // Fallback fonts
+
+     // Note: jsPDF has limited built-in fonts. For others like Roboto, Lato etc.,
+     // you need to load font files (.ttf) and register them using pdf.addFileToVFS and pdf.addFont.
+     // This adds complexity. We'll use standard fonts for simplicity here.
+     // Example using standard fonts:
+     const standardFont = 'Helvetica'; // Or 'Times', 'Courier'
+     pdf.setFont(standardFont);
+
+    // --- Helper Functions ---
+    const addWrappedText = (text, x, y, maxWidth, options = {}) => {
+        const { fontSize = bodyFontSize, style = 'normal', align = 'left', lineHeightFactor = 1.15 } = options;
+        pdf.setFontSize(fontSize);
+        pdf.setFont(standardFont, style); // Use standard font
+        const lines = pdf.splitTextToSize(text || '', maxWidth);
+        pdf.text(lines, x, y, { align: align, lineHeightFactor: lineHeightFactor });
+        return y + (lines.length * fontSize * lineHeightFactor); // Return new Y position
+    };
+
+     const checkAddPage = (requiredHeight) => {
+         if (currentY + requiredHeight > pageHeight - margin) {
+             pdf.addPage();
+             currentY = margin;
+         }
+     };
+
+    const addSectionHeading = (text) => {
+         if (!text) return; // Skip if section data was deleted (hidden)
+         checkAddPage(headingFontSize + 15); // Check space before adding heading
+         currentY += 5; // Small space before heading
+         pdf.setFontSize(headingFontSize);
+         pdf.setFont(standardFont, 'bold'); // Bold heading
+         pdf.text(text.toUpperCase(), margin, currentY);
+         currentY += headingFontSize * 0.5; // Space after heading text
+         pdf.setLineWidth(0.5);
+         pdf.line(margin, currentY, pageWidth - margin, currentY); // Horizontal line
+         currentY += 10; // Space after line
+    };
+
+    // --- Header ---
+    if (resumeData.personal?.name) {
+         pdf.setFontSize(headingFontSize + 4); // Larger name
+         pdf.setFont(standardFont, 'bold');
+         pdf.text(resumeData.personal.name, pageWidth / 2, currentY, { align: 'center' });
+         currentY += (headingFontSize + 4) * 1.1;
+    }
+     let contactInfo = [];
+     if (resumeData.personal?.location) contactInfo.push(resumeData.personal.location);
+     if (resumeData.personal?.phone) contactInfo.push(resumeData.personal.phone);
+     if (resumeData.personal?.email) contactInfo.push(resumeData.personal.email);
+     if (resumeData.personal?.website) contactInfo.push(resumeData.personal.website);
+
+     if (contactInfo.length > 0) {
+        pdf.setFontSize(bodyFontSize);
+        pdf.setFont(standardFont, 'normal');
+        pdf.text(contactInfo.join(' | '), pageWidth / 2, currentY, { align: 'center' });
+        currentY += bodyFontSize * 1.5;
+     }
+
+
+    // --- Objective/Summary ---
+    if (resumeData.objective) {
+        // Don't add heading for summary, just the text
+         currentY = addWrappedText(resumeData.objective, margin, currentY, contentWidth, { fontSize: bodyFontSize, style: 'italic' });
+         currentY += bodyFontSize * 0.7; // Space after summary
+    }
+
+    // --- Experience ---
+     if (resumeData.experience && resumeData.experience.length > 0) {
+         addSectionHeading('Work Experience');
+         resumeData.experience.forEach(exp => {
+             checkAddPage(subHeadingFontSize * 2 + bodyFontSize * 3); // Estimate space needed
+             pdf.setFontSize(subHeadingFontSize);
+             pdf.setFont(standardFont, 'bold');
+             pdf.text(exp.jobTitle || 'Job Title', margin, currentY);
+             pdf.setFont(standardFont, 'normal');
+             pdf.text(exp.date || 'Date', pageWidth - margin, currentY, { align: 'right' });
+             currentY += subHeadingFontSize * 1.1;
+
+             pdf.setFontSize(bodyFontSize);
+             pdf.setFont(standardFont, 'italic'); // Italic company/location
+             pdf.text(`${exp.company || 'Company'} | ${exp.location || 'Location'}`, margin, currentY);
+             currentY += bodyFontSize * 1.2;
+
+             if (exp.description) {
+                  // Simple bullet point handling
+                 const descLines = exp.description.split('\n').map(line => line.trim()).filter(line => line);
+                 descLines.forEach(line => {
+                     checkAddPage(bodyFontSize * 1.2);
+                      // Add bullet point using pdf.circle or text symbol
+                      pdf.setFontSize(bodyFontSize);
+                      pdf.setFont(standardFont, 'normal');
+                      pdf.text('•', margin + 5, currentY); // Simple bullet
+                      currentY = addWrappedText(line, margin + 15, currentY, contentWidth - 15);
+                 });
+             }
+             currentY += bodyFontSize * 0.7; // Space after entry
+         });
+     }
+
+    // --- Education ---
+     if (resumeData.education && resumeData.education.length > 0) {
+         addSectionHeading('Education');
+         resumeData.education.forEach(edu => {
+              checkAddPage(subHeadingFontSize * 2 + bodyFontSize * 2);
+              pdf.setFontSize(subHeadingFontSize);
+              pdf.setFont(standardFont, 'bold');
+              pdf.text(edu.degreeMajor || 'Degree/Major', margin, currentY);
+               pdf.setFont(standardFont, 'normal');
+              pdf.text(edu.date || 'Date', pageWidth - margin, currentY, { align: 'right' });
+              currentY += subHeadingFontSize * 1.1;
+
+              pdf.setFontSize(bodyFontSize);
+              pdf.setFont(standardFont, 'italic');
+              pdf.text(`${edu.school || 'School'} | ${edu.location || 'Location'} ${edu.gpa ? `| GPA: ${edu.gpa}` : ''}`, margin, currentY);
+              currentY += bodyFontSize * 1.2;
+
+              if (edu.additionalInfo) {
+                  checkAddPage(bodyFontSize * 1.2);
+                  currentY = addWrappedText(`Relevant Info: ${edu.additionalInfo}`, margin, currentY, contentWidth, { style: 'italic', fontSize: bodyFontSize -1 });
+              }
+              currentY += bodyFontSize * 0.7;
+         });
+     }
+
+
+    // --- Projects ---
+    if (resumeData.projects && resumeData.projects.length > 0) {
+         addSectionHeading('Projects');
+         resumeData.projects.forEach(proj => {
+             checkAddPage(subHeadingFontSize + bodyFontSize * 3);
+             pdf.setFontSize(subHeadingFontSize);
+             pdf.setFont(standardFont, 'bold');
+             pdf.text(proj.projectName || 'Project Name', margin, currentY);
+              pdf.setFont(standardFont, 'normal');
+             if(proj.date) pdf.text(proj.date, pageWidth - margin, currentY, { align: 'right' });
+             currentY += subHeadingFontSize * 1.1;
+
+              if (proj.link) {
+                   checkAddPage(bodyFontSize * 1.2);
+                   // pdf.setTextColor(0, 0, 255); // Blue for link
+                   pdf.setFontSize(bodyFontSize - 1);
+                   currentY = addWrappedText(proj.link, margin, currentY, contentWidth, { style: 'italic'});
+                  // pdf.setTextColor(0, 0, 0); // Reset color
+             }
+
+
+             if (proj.description) {
+                 const descLines = proj.description.split('\n').map(line => line.trim()).filter(line => line);
+                  descLines.forEach(line => {
+                      checkAddPage(bodyFontSize * 1.2);
+                      pdf.setFontSize(bodyFontSize);
+                      pdf.setFont(standardFont, 'normal');
+                      pdf.text('•', margin + 5, currentY);
+                      currentY = addWrappedText(line, margin + 15, currentY, contentWidth - 15);
+                  });
+             }
+             currentY += bodyFontSize * 0.7;
+         });
+    }
+
+    // --- Skills ---
+     if (resumeData.skills) {
+         addSectionHeading('Skills');
+         checkAddPage(bodyFontSize * 3); // Estimate space
+         // Format skills better - maybe comma-separated list
+         const skillsList = resumeData.skills.split(/[\n,]+/).map(s => s.trim()).filter(s => s);
+          currentY = addWrappedText(skillsList.join(', '), margin, currentY, contentWidth);
+          currentY += bodyFontSize * 0.7;
+     }
+
+
+    // --- Save PDF ---
+    const filename = `Resume_${(resumeData.personal.name || 'User').replace(/ /g, '_')}.pdf`;
+    pdf.save(filename);
+    showToast(`📄 Resume downloaded as ${filename}`, 'success');
 }

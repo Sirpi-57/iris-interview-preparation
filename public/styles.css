@@ -1580,3 +1580,97 @@ h2:after {
 .past-interviews-list {
     width: 100%;
 }
+
+/* --- Resume Builder Styles --- */
+#resume-builder .resume-form-container,
+#resume-builder .resume-settings-container {
+    background-color: #fff; /* White background for form areas */
+    border: none; /* Remove default card border if needed */
+}
+
+.resume-section {
+    border-bottom: 1px solid #eee;
+    padding-bottom: 1.5rem;
+    margin-bottom: 1.5rem;
+}
+.resume-section:last-child {
+    border-bottom: none;
+    padding-bottom: 0;
+    margin-bottom: 0;
+}
+
+.resume-section h5 {
+    color: var(--primary-color);
+    margin-bottom: 1rem;
+}
+
+.resume-item {
+    border: 1px dashed #ddd;
+    transition: all var(--transition-speed) ease;
+}
+
+.resume-item:hover {
+    border-color: var(--accent-color);
+    box-shadow: 0 0 10px rgba(0,0,0,0.05);
+}
+
+.resume-item .item-controls button {
+    visibility: hidden;
+    opacity: 0;
+    transition: all var(--transition-speed) ease;
+}
+
+.resume-item:hover .item-controls button {
+    visibility: visible;
+    opacity: 1;
+}
+
+.ai-generate-btn i {
+    margin-right: 4px;
+     /* Optional: Add slight glow/animation on hover */
+    transition: color var(--transition-speed) ease;
+}
+ .ai-generate-btn:hover i {
+    color: var(--accent-color); /* Accent color on hover */
+}
+.ai-generate-btn[disabled] {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+
+.section-controls .hide-section-btn {
+    padding: 0.1rem 0.4rem;
+    font-size: 0.75rem;
+}
+.section-controls .hide-section-btn.show-section-btn {
+    background-color: var(--warning-color);
+    color: var(--dark-color);
+    border-color: var(--warning-color);
+}
+
+/* Settings Panel Specifics */
+.resume-settings-container h5 {
+     color: var(--primary-color);
+}
+
+/* Style for hidden sections */
+.resume-section.hidden > *:not(.d-flex):not(.section-controls) {
+    display: none;
+}
+.resume-section.hidden {
+    padding-bottom: 0.5rem;
+    border-bottom: 1px dashed #eee;
+}
+.resume-section.hidden .d-flex h5 {
+    opacity: 0.6;
+}
+
+/* PDF Preview Placeholder Style */
+.pdf-preview-container {
+    border: 1px solid #ccc;
+    height: 500px; /* Adjust as needed */
+    overflow: auto;
+    background-color: #f8f9fa; /* Light background */
+    padding: 1rem;
+}
