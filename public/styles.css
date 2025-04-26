@@ -1706,103 +1706,156 @@ h2:after {
 }
 
 
-/* Preview Area Styling */
+/* --- Preview Area Styling (Updated to better match PDF output) --- */
 .resume-preview-area {
-    background-color: #fff;
-    /* Mimic paper aspect ratio (e.g., Letter size 8.5 x 11) */
-    /* Aspect ratio requires careful handling - this is a basic setup */
-    /* Consider setting width and using padding-top for aspect ratio */
-    padding: 40pt; /* Use points like in PDF */
-    font-family: 'Helvetica', 'Arial', sans-serif; /* Default font, will be overridden by JS */
+    background-color: #fff; /* White background */
+    padding: 40pt; /* Match PDF margin */
+    font-family: 'Helvetica', 'Arial', sans-serif; /* Match PDF standard font */
     min-height: 500px; /* Ensure it has some height */
-    color: #333;
-    line-height: 1.4;
-    transition: font-family 0.3s ease, font-size 0.3s ease; /* Smooth transitions for settings */
-}
- .resume-preview-area .initial-preview-message {
-    margin-top: 50px; /* Center placeholder text vertically */
+    color: #000; /* Black text */
+    line-height: 1.15; /* Closer to jsPDF default line height */
+    border: 1px solid #ccc; /* Add a border to delineate preview area */
+    transition: font-size 0.3s ease; /* Keep transition for font size change */
+    box-sizing: border-box; /* Include padding in width/height calculations */
+    max-width: 816px; /* Approximate width of Letter paper in points for better preview */
+    margin: 0 auto; /* Center in container */
 }
 
-/* Font size classes for Preview */
+.resume-preview-area .initial-preview-message {
+    margin-top: 50px;
+    color: #999; /* Keep placeholder text grey */
+}
+
+/* Font size classes for Preview (using pt to match PDF) */
 .resume-preview-area.font-compact { font-size: 9pt; }
 .resume-preview-area.font-standard { font-size: 10pt; } /* Default */
 .resume-preview-area.font-large { font-size: 11pt; }
 
- /* Example Preview Element Styles (make these match your desired PDF look) */
+/* Basic Preview Element Styles (updated to match enhanced PDF) */
 .preview-header .name {
-    font-size: 20pt; /* Example: Larger name */
+    font-size: 18pt; /* Match jsPDF headingFontSize + 4 */
     font-weight: bold;
-    color: var(--primary-color); /* Use theme color */
     text-align: center;
-    margin-bottom: 8pt;
+    margin-bottom: 8pt; /* Reduced from 10pt to match PDF */
+    color: #000; /* Black */
+    line-height: 1.05; /* Tighter line height for headings */
 }
+
 .preview-header .contact-info {
-    font-size: 9pt;
+    font-size: 10pt; /* Match jsPDF bodyFontSize */
     text-align: center;
-    color: #555;
-    margin-bottom: 15pt;
+    color: #000;
+    margin-bottom: 12pt; /* Reduced from 15pt to match PDF */
 }
+
 .preview-objective p {
-    font-style: italic;
-    margin-bottom: 15pt;
-    text-align: justify;
+    font-style: italic; /* Match jsPDF style */
+    margin-bottom: 8pt; /* Reduced from 10pt */
+    text-align: left; /* jsPDF default */
+    color: #000;
+    line-height: 1.15; /* Match PDF line height */
 }
+
 .preview-section h2 {
-    font-size: 14pt;
+    font-size: 14pt; /* Match jsPDF headingFontSize */
     font-weight: bold;
-    color: var(--primary-color);
-    border-bottom: 1px solid var(--primary-color);
-    padding-bottom: 3pt;
-    margin-top: 5pt;
-    margin-bottom: 10pt;
-    text-transform: uppercase;
-    letter-spacing: 1px;
+    color: #000; /* Black */
+    border-bottom: 0.5pt solid #000; /* Match jsPDF line */
+    padding-bottom: 3pt; /* Reduced from 4pt */
+    margin-top: 8pt; /* Reduced from 10pt */
+    margin-bottom: 8pt; /* Reduced from 10pt */
+    text-transform: uppercase; /* Match jsPDF */
+    letter-spacing: normal; /* Reset letter spacing */
+    line-height: 1.1; /* Tighter line height for headings */
 }
+
 .preview-item {
-    margin-bottom: 12pt;
+    margin-bottom: 5pt; /* Reduced from 10pt for tighter spacing */
 }
+
+/* Add spacing before non-first items */
+.preview-item:not(:first-child) {
+    margin-top: 5pt; /* Add space between items */
+}
+
 .preview-item .item-header {
     display: flex;
     justify-content: space-between;
-    margin-bottom: 2pt;
+    margin-bottom: 2pt; /* Reduced from 3pt */
 }
-.preview-item .item-title {
-    font-size: 11pt;
-    font-weight: bold;
-}
- .preview-item .item-date {
-    font-size: 10pt;
-    font-style: italic;
-    color: #666;
-}
-.preview-item .item-subtitle {
-    font-size: 10pt;
-    font-style: italic;
-    margin-bottom: 4pt;
-}
-.preview-item ul {
-    list-style: disc;
-    margin-left: 15pt;
-    padding-left: 5pt;
-    margin-top: 3pt;
-}
- .preview-item ul li {
-     margin-bottom: 3pt;
-     text-align: justify; /* Justify bullet points */
- }
- .preview-skills p {
-     font-size: 10pt;
-     line-height: 1.5;
- }
-  .preview-certifications .item-title {
-     font-size: 10pt; /* Slightly smaller for certs */
-     font-weight: normal;
- }
-  .preview-certifications .item-title strong {
-     font-weight: bold;
- }
 
- /* Styles for hidden sections in PREVIEW */
- .resume-preview-area .preview-section.hidden {
-     display: none;
- }
+.preview-item .item-title {
+    font-size: 11pt; /* Match jsPDF subHeadingFontSize */
+    font-weight: bold;
+    color: #000;
+    line-height: 1.05; /* Tighter line height */
+}
+
+.preview-item .item-date {
+    font-size: 10pt; /* Match jsPDF bodyFontSize */
+    font-style: normal; /* Match jsPDF style */
+    color: #000;
+}
+
+.preview-item .item-subtitle {
+    font-size: 10pt; /* Match jsPDF bodyFontSize */
+    font-style: italic; /* Match jsPDF style */
+    margin-bottom: 4pt; /* Reduced from 5pt */
+    color: #000;
+    line-height: 1.1; /* Slightly tighter */
+}
+
+/* Use pseudo-element for bullets to mimic PDF */
+.preview-item ul {
+    list-style: none; /* Remove default browser bullets */
+    margin-left: 12pt; /* Reduced indent from 15pt to match PDF */
+    padding-left: 0;
+    margin-top: 2pt; /* Reduced from 3pt */
+    margin-bottom: 2pt; /* Add bottom margin */
+}
+
+.preview-item ul li::before {
+    content: '•'; /* Add bullet */
+    display: inline-block;
+    width: 8pt; /* Reduced width for bullet */
+    margin-left: -8pt; /* Position bullet correctly */
+}
+
+.preview-item ul li {
+    margin-bottom: 2pt; /* Reduced from 3pt */
+    text-align: left; /* jsPDF default text align */
+    color: #000;
+    line-height: 1.15; /* Match PDF line spacing */
+    padding-left: 8pt; /* Indent text after bullet */
+}
+
+.preview-skills p {
+    font-size: 10pt; /* Match jsPDF bodyFontSize */
+    line-height: 1.15;
+    color: #000;
+    margin-bottom: 5pt; /* Add bottom margin */
+}
+
+/* Certifications styling */
+.preview-certifications .item-title {
+    font-size: 10pt; /* Match jsPDF bodyFontSize */
+    font-weight: bold; /* Match PDF */
+    color: #000;
+    line-height: 1.15; /* Match PDF */
+}
+
+/* Styles for hidden sections in PREVIEW */
+.resume-preview-area .preview-section.hidden {
+    display: none;
+}
+
+/* Specific page size adjustments */
+.resume-preview-area[data-doc-size="letter"] {
+    /* Letter dimensions approximately in points: 612 x 792 */
+    aspect-ratio: 612 / 792; /* Maintain letter paper ratio */
+}
+
+.resume-preview-area[data-doc-size="a4"] {
+    /* A4 dimensions approximately in points: 595 x 842 */
+    aspect-ratio: 595 / 842; /* Maintain A4 paper ratio */
+}
