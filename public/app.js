@@ -3944,12 +3944,17 @@ function initResumeBuilder() {
         console.log("Section toggle listener attached.");
      }
 
-    // Settings Controls (now trigger preview update via applyResumeStyles)
+    // Settings Controls (Listen for changes)
     const settingsContainer = editorPane.querySelector('.resume-settings-container');
     if (settingsContainer) {
          settingsContainer.querySelectorAll('select, input[type="radio"]').forEach(control => {
               if (!control.dataset.listenerAttached) {
-                 control.addEventListener('change', applyResumeStyles); // applyResumeStyles will call updateResumePreview
+                 // *** CHANGE HERE ***
+                 control.addEventListener('change', () => {
+                     applyResumeStyles();   // Apply the style to the container
+                     updateResumePreview(); // Re-render the content
+                 });
+                 // *** END CHANGE ***
                  control.dataset.listenerAttached = 'true';
               }
          });
@@ -4085,33 +4090,22 @@ function handleToggleSection(button) {
 }
 
 
-// Apply Font and Size Styles AND Update Preview
+// Apply Font and Size Styles to Preview Container ONLY
 function applyResumeStyles() {
-    const fontFamily = document.getElementById('resumeFontFamily')?.value || "'Roboto', sans-serif";
+    const fontFamily = document.getElementById('resumeFontFamily')?.value || "'Helvetica', 'Arial', sans-serif"; // Use standard fallback
     const fontSizeOption = document.querySelector('input[name="resumeFontSize"]:checked')?.value || 'standard';
 
-    // Apply styles to the PREVIEW AREA
     const previewArea = document.getElementById('resumePreviewArea');
     if(previewArea) {
         // Apply font family via style attribute for dynamic change
         previewArea.style.fontFamily = fontFamily;
-        console.log(`Applying preview font family: ${fontFamily}`); // Debug log
 
         // Apply font size class
         previewArea.classList.remove('font-compact', 'font-standard', 'font-large');
         previewArea.classList.add(`font-${fontSizeOption}`);
-         console.log(`Applying preview font size class: font-${fontSizeOption}`); // Debug log
+        console.log(`Applied styles to preview container: Font=${fontFamily}, Size Class=font-${fontSizeOption}`);
     }
-
-    // Apply styles to EDITOR AREA if desired (optional)
-    // const editorContainer = document.querySelector('.resume-editor-pane');
-    // if(editorContainer) {
-    //     editorContainer.style.fontFamily = fontFamily;
-    //     editorContainer.classList.remove('font-compact', 'font-standard', 'font-large');
-    //     editorContainer.classList.add(`font-${fontSizeOption}`);
-    // }
-    console.log(`Styles applied: Font=<span class="math-inline">\{fontFamily\}, Size\=</span>{fontSizeOption}. Triggering preview update.`);
-    updateResumePreview(); // Trigger preview update whenever styles change
+    // DO NOT call updateResumePreview() here
 }
 
 // AI Content Enhancement
@@ -4487,25 +4481,25 @@ function debounce(func, wait) {
 
 // --- Live Preview Update Function ---
 function updateResumePreview() {
-    console.log("Updating resume preview...");
-    const resumeData = getResumeData();
+    // DO NOT call applyResumeStyles() here
+
+    console.log("Updating resume preview content...");
+    const resumeData = getResumeData(); // Calls the function you already have
     const previewArea = document.getElementById('resumePreviewArea');
     if (!previewArea) return;
 
-    // Clear previous preview content (except the initial message if empty)
+    // Clear previous preview content
     previewArea.innerHTML = '';
 
+    // Check if there's any data to render
     if (Object.values(resumeData.personal).every(val => !val) && !resumeData.objective && !resumeData.experience.length && !resumeData.education.length && !resumeData.projects.length && !resumeData.skills && !resumeData.certifications.length) {
          previewArea.innerHTML = '<p class="text-center text-muted initial-preview-message">Resume preview will appear here as you enter details.</p>';
          return; // Show placeholder if no data
     }
 
-
-    // Re-apply font size class and font family (in case it was cleared)
-    applyResumeStyles(); // Ensures preview area has correct classes/style attribute
-
-    // --- Helper function to safely create HTML ---
+    // --- Helper function to safely create HTML (Keep this helper) ---
     const createHtml = (tag, className = '', content = '', attributes = {}) => {
+        // ... (keep the existing createHtml helper function as provided before) ...
         const el = document.createElement(tag);
         if (className) el.className = className;
         // Use textContent for safety unless HTML is intended (like lists)
@@ -4524,8 +4518,8 @@ function updateResumePreview() {
         return el;
     };
 
-     // --- Build Preview HTML ---
-     const fragment = document.createDocumentFragment(); // More efficient updates
+     // --- Build Preview HTML (Keep the logic as provided before) ---
+     const fragment = document.createDocumentFragment();
 
     // Header
     if (resumeData.personal && Object.values(resumeData.personal).some(val => val)) {
@@ -4538,7 +4532,7 @@ function updateResumePreview() {
             resumeData.personal.phone,
             resumeData.personal.email,
             resumeData.personal.website
-        ].filter(Boolean).join(' | '); // Filter out empty strings
+        ].filter(Boolean).join(' | ');
         if (contactInfo) {
              headerDiv.appendChild(createHtml('div', 'contact-info', contactInfo));
         }
@@ -4548,21 +4542,21 @@ function updateResumePreview() {
 
     // Objective
     if (resumeData.objective) {
-         const objectiveDiv = createHtml('div', 'preview-objective preview-section'); // Added preview-section
-         // Skip heading for objective
+         const objectiveDiv = createHtml('div', 'preview-objective preview-section');
          objectiveDiv.appendChild(createHtml('p', '', resumeData.objective));
          fragment.appendChild(objectiveDiv);
     }
 
-    // Function to render section items (Experience, Education, Projects)
+    // Function to render section items (Keep this helper)
     const renderSectionItems = (title, sectionKey, items) => {
-         // Check if section should be hidden (based on editor section class)
+        // ... (keep the existing renderSectionItems helper function as provided before) ...
+         // Check if section should be hidden
          const editorSection = document.querySelector(`.resume-section[data-section="${sectionKey}"]`);
          const isHidden = editorSection?.classList.contains('hidden');
 
-         if (!items || items.length === 0) return null; // Skip empty sections
+         if (!items || items.length === 0) return null;
 
-         const sectionDiv = createHtml('div', `preview-section preview-${sectionKey} ${isHidden ? 'hidden' : ''}`); // Add hidden class if needed
+         const sectionDiv = createHtml('div', `preview-section preview-${sectionKey} ${isHidden ? 'hidden' : ''}`);
          sectionDiv.appendChild(createHtml('h2', '', title));
 
          items.forEach(item => {
@@ -4584,14 +4578,14 @@ function updateResumePreview() {
              } else if (sectionKey === 'projects') {
                  titleText = item.projectName || 'Project Name';
                  dateText = item.date || '';
-                 subtitleText = item.link ? `<a href="<span class="math-inline">\{item\.link\}" target\="\_blank"\></span>{item.link}</a>` : ''; // Add link if present
+                 subtitleText = item.link ? `<a href="${item.link}" target="_blank">${item.link}</a>` : '';
              } else if (sectionKey === 'certifications') {
                   titleText = `<strong>${item.certificationName || 'Certification'}</strong> - ${item.issuingBody || 'Issuing Body'}`;
                   dateText = item.date || '';
              }
 
 
-             itemHeader.appendChild(createHtml('span', 'item-title', titleText));
+             itemHeader.appendChild(createHtml('span', 'item-title', titleText)); // Use innerHTML for cert title bolding
               if (dateText) {
                   itemHeader.appendChild(createHtml('span', 'item-date', dateText));
               }
@@ -4601,13 +4595,12 @@ function updateResumePreview() {
                  itemDiv.appendChild(createHtml('div', 'item-subtitle', subtitleText)); // Use innerHTML for potential link
              }
 
-             // Handle descriptions (common for experience/projects)
+             // Handle descriptions
              if (item.description) {
                  const descLines = item.description.split('\n').map(line => line.trim()).filter(line => line);
                  if (descLines.length > 0) {
                      const ul = createHtml('ul');
                      descLines.forEach(line => {
-                          // Remove potential leading bullet characters before adding text content
                           const cleanLine = line.replace(/^[\*\-\•]\s*/, '');
                           ul.appendChild(createHtml('li', '', cleanLine));
                      });
@@ -4640,7 +4633,6 @@ function updateResumePreview() {
      if (resumeData.skills) {
          const skillsSection = createHtml('div', `preview-section preview-skills ${skillsHidden ? 'hidden' : ''}`);
          skillsSection.appendChild(createHtml('h2', '', 'Skills'));
-         // Format skills as a simple paragraph for preview
          const skillsList = resumeData.skills.split(/[\n,]+/).map(s => s.trim()).filter(s => s);
          skillsSection.appendChild(createHtml('p', '', skillsList.join(', ')));
          fragment.appendChild(skillsSection);
@@ -4653,5 +4645,5 @@ function updateResumePreview() {
 
      // Append the built fragment to the preview area
     previewArea.appendChild(fragment);
-    console.log("Preview updated.");
+    console.log("Preview content updated.");
 }
