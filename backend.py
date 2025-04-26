@@ -30,7 +30,7 @@ load_dotenv()
 # --- API Keys & Constants ---
 # Make sure these are set in Render Environment Variables
 CLAUDE_API_KEY = os.environ.get("CLAUDE_API_KEY")
-CLAUDE_MODEL = "claude-3-5-sonnet-20240620"
+CLAUDE_MODEL = "claude-3-haiku-20240307"
 CLAUDE_HAIKU_MODEL = "claude-3-haiku-20240307"
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 GEMINI_MODEL = "gemini-1.5-flash-latest"
