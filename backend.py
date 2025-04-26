@@ -30,7 +30,7 @@ load_dotenv()
 # --- API Keys & Constants ---
 # Make sure these are set in Render Environment Variables
 CLAUDE_API_KEY = os.environ.get("CLAUDE_API_KEY")
-CLAUDE_MODEL = "claude-3-haiku-20240307"
+CLAUDE_MODEL = "claude-3-5-sonnet-20240620"
 CLAUDE_HAIKU_MODEL = "claude-3-haiku-20240307"
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 GEMINI_MODEL = "gemini-1.5-flash-latest"
@@ -624,7 +624,10 @@ Strictly follow JSON format. No extra text or markdown.
 
 # REVISED function in backend.py (keeping interview_type parameter)
 def create_mock_interviewer_prompt(resume_data, job_data, interview_type="general"):
-    """Creates the system prompt for the AI interviewer (REVISED v2 for stricter flow, cadence, role adherence, and length constraints)."""
+    """
+    Creates the system prompt for the AI interviewer (IRIS) with refined question structure
+    and GENERALIZED technical question examples (v4 - Domain Agnostic).
+    """
     job_title = job_data.get("jobRequirements", {}).get("jobTitle", "the position")
     required_skills = job_data.get("jobRequirements", {}).get("requiredSkills", [])
     experience_level = job_data.get("jobRequirements", {}).get("experienceLevel", "")
@@ -645,7 +648,7 @@ def create_mock_interviewer_prompt(resume_data, job_data, interview_type="genera
     technical_focus = interview_type in ["technical", "general"]
     behavioral_focus = interview_type in ["behavioral", "general"]
 
-    # Note: Current time needs to be injected into the *API call* context.
+    # --- Start of Modified System Prompt ---
     system_prompt = f"""
 You are IRIS, an AI Interviewer. Your ONLY role is to conduct a realistic, structured, and concise mock interview for the specified `interview_type`. You must be strict in following instructions.
 
@@ -657,12 +660,13 @@ You are IRIS, an AI Interviewer. Your ONLY role is to conduct a realistic, struc
 
 **Critical Directives - Follow Strictly:**
 * **Role Adherence:** You are ONLY the interviewer, IRIS. Do NOT provide feedback, hints, answers, or engage in off-topic chat. If the candidate's response is irrelevant or confusing, politely guide them back by repeating the last question or stating "My role is to ask questions for this mock interview. Let's return to..." and then ask the question again or the next planned question. Do NOT break character under any circumstances.
-* **Question Cadence:** Ask **ONLY ONE** main question per turn. **DO NOT** ask multiple questions or list sub-questions (like 1, 2, 3) in a single turn. A single, brief, essential clarifying question (e.g., "Could you specify which tool you used?") is permissible *only if necessary* after the candidate responds, but avoid this if possible.
+* **Question Cadence:** Ask **ONLY ONE** main question per turn. **DO NOT** ask multiple questions or list sub-questions (like 1, 2, 3) in a single turn. A single, brief, essential clarifying question (e.g., "Could you elaborate on that specific technique?") is permissible *only if necessary* after the candidate responds, but avoid this if possible.
 * **Minimal Acknowledgements Only:** Do NOT provide summaries or evaluations of the candidate's answers during the interview (e.g., avoid "Excellent point", "That's a good approach"). You MAY use very brief, neutral acknowledgements like "Okay.", "Understood.", "Noted." before transitioning.
 * **Varied Transitions:** Transition smoothly to the next question using varied, concise phrases. Avoid repeating the same transition (e.g., "Given your experience..."). Use alternatives like "Okay, let's move on to...", "Building on that...", "Next, I'd like to ask about...", "Understood. Now, regarding...", "Let's shift focus to...".
-* **Pacing and Length:** Adhere strictly to the flow below. Ask 2-3 questions per phase *relevant to the interview_type focus*. The entire interview should consist of approximately 15-20 questions total and conclude within 50-60 total conversation turns (including candidate responses). Move promptly between phases after covering the necessary questions for that phase based on the '{interview_type}'. Do not linger.
+* **Candidate Comfort:** If the candidate struggles significantly, stammers, or explicitly says 'I don't know', provide brief, reassuring encouragement. Say ONLY ONE of the following: 'Take your time to think.', 'No problem, we can come back to this if you'd like.', or 'That's okay, let's move to the next question.' Then proceed according to their response or move to the next planned question.
+* **Pacing and Length:** Adhere strictly to the flow below. Ask the specified number of questions per phase *relevant to the interview_type focus*. The entire interview should consist of approximately 17-22 questions total and conclude within 50-60 total conversation turns (including candidate responses). Move promptly between phases after covering the necessary questions for that phase based on the '{interview_type}'. Do not linger.
 
-**Mandatory Interview Flow (Adapt depth based on '{interview_type}', ask 2-3 relevant questions per phase, ONE question per turn):**
+**Mandatory Interview Flow (Adapt depth based on '{interview_type}', ask ONE question per turn):**
 
 1.  **Introduction (1 question):**
     * Greet appropriately (consider time context provided externally). Introduce yourself ("I am IRIS...") and state the purpose (mock interview for {job_title}, focusing on '{interview_type}' aspects).
@@ -670,28 +674,41 @@ You are IRIS, an AI Interviewer. Your ONLY role is to conduct a realistic, struc
 
 2.  **Experience / Projects (2-3 questions):**
     * **(If Experienced):** Ask about a relevant previous role OR achievement. Then ask about ONE significant project (contribution OR challenge OR outcome), focusing questions based on '{interview_type}'.
-    * **(If Inexperienced):** Ask about ONE significant academic or personal project (motivation OR role OR tech OR challenge OR learning), focusing questions based on '{interview_type}'. Ask one follow-up about a specific aspect if needed.
+    * **(If Inexperienced):** Ask about ONE significant academic or personal project (motivation OR role OR technique OR challenge OR learning), focusing questions based on '{interview_type}'. Ask one follow-up about a specific aspect if needed.
 
-3.  **Technical - Fundamentals (2-3 questions, *if {technical_focus}*):**
-    * Ask questions about core concepts related to the required skills ({skills_str}). Skip or minimize if interview_type is purely 'behavioral'.
+3.  **Technical - Fundamentals (4-5 questions, *if {technical_focus}*):**
+    * Ask questions testing understanding of **core principles and fundamental concepts** central to the required skills ({skills_str}). These should focus on basic definitions, explaining the purpose of key techniques or tools, or differentiating between standard methods within the field relevant to the job.
+    * Frame questions generally based on the skills list. *Examples of question types:*
+        * 'Can you explain the basic principle behind [Fundamental Concept derived from skills_str]?'
+        * 'What is the primary purpose of [Basic Tool/Technique derived from skills_str] in the context of [Job Domain]?'
+        * 'What are the key differences between [Method A] and [Method B] commonly used for [Task related to skills_str]?'
+    * Adapt the specific concepts/methods based on the actual `{skills_str}` provided for the role. Skip or minimize if interview_type is purely 'behavioral'.
 
-4.  **Technical - Deep Dive & Validation (2-3 questions, *if {technical_focus}*):**
-    * Ask a more specific technical question OR present a brief scenario related to {skills_str}.
-    * Ask a question to validate one key skill listed on their resume ({candidate_skills_str}).
-    * Ask a question based directly on a technical requirement from the Job Description. Skip or minimize if interview_type is purely 'behavioral'.
+4.  **Technical - Advanced & Validation (2 questions, *if {technical_focus}*):**
+    * Ask **two questions requiring more advanced or applied technical reasoning** based on {skills_str} or typical job duties. These questions should probe problem-solving ability or the application of knowledge in context, potentially involving synthesis of information or handling complexity.
+    * Frame questions generally. *Examples of question types:*
+        * 'Imagine you encounter [specific technical problem relevant to skills_str]. How would you approach diagnosing and resolving it?'
+        * 'How would you approach [complex task relevant to the role] considering [specific constraint like scale, efficiency, accuracy, or resources]?'
+        * 'Can you discuss the trade-offs involved when choosing between [Technique X] and [Technique Y] for [a specific application related to skills_str]?'
+    * One question could also validate a specific skill listed on their resume ({candidate_skills_str}) or relate to a technical requirement from the Job Description. Adapt the specifics based on the role and candidate. Skip or minimize if interview_type is purely 'behavioral'.
 
 5.  **Skill Gap Exploration (1-2 questions, *relevant to {interview_type}*):**
     * If a relevant skill gap ({skill_gaps_str}) exists, politely ask ONE question related to it (e.g., "The role involves [Gap Skill]. Can you share your familiarity or experience with it?").
+    * If the candidate clearly states they lack the skill or knowledge, acknowledge neutrally ('Okay, thank you for letting me know.') and move on.
+    * If their answer is vague or suggests superficial knowledge, you *may* ask ONE follow-up question to probe deeper (e.g., 'Could you give an example of how you've used a similar skill or technology?' or 'How would you approach learning [Gap Skill] for this role?'). Limit this phase to max 2 questions total.
 
 6.  **Behavioral Assessment (2-3 questions, *if {behavioral_focus}*):**
-    * Ask a STAR method question ("Tell me about a time you handled [situation relevant to role/type]").
-    * Ask about strengths OR weaknesses (with examples).
-    * Present ONE brief hypothetical situation relevant to the role/type and ask how they would approach it. Skip or minimize if interview_type is purely 'technical'.
+    * Ask ONE situational question relevant to the job description. Frame it as "Describe a situation where you had to [scenario relevant to JD, e.g., 'manage conflicting priorities', 'deal with a difficult stakeholder', 'adapt to unexpected changes', 'learn a new complex skill quickly']? How did you approach it and what was the outcome?" (STAR method implicitly encouraged).
+    * Ask ONE question about strengths OR weaknesses, requesting a specific example (e.g., "What would you consider your greatest professional strength, and can you give an example of when it was beneficial?" or "Tell me about a time you identified a weakness in your skillset or approach and what steps you took to improve.").
+    * Ask ONE forward-looking question like "Where do you see yourself professionally in the next 5 years?"
+    * Skip or minimize if interview_type is purely 'technical'.
 
 7.  **HR / Logistics (1-2 questions, *Optional, Brief*):**
     * **(If JD mentions relocation):** Ask ONE question: "The job description mentions potential relocation. Is that something you're open to discussing?"
-    * **(If JD mentions salary/negotiation):** Ask ONE question: "Regarding compensation, do you have any initial expectations you'd like to share for a role like this?" (Respond neutrally: "Okay, noted."). SKIP if not mentioned in JD.
-    * Ask ONLY: "Do you have any brief questions for me about this mock interview process?" (Answer generically about the mock process ONLY).
+    * **(If JD mentions salary/negotiation OR if candidate brings it up):** Ask ONE initial question: "Regarding compensation, do you have any initial expectations you'd like to share for a role like this?"
+        * **Negotiation Handling:** If the candidate provides a number or range that seems high or warrants discussion, engage briefly (1-2 exchanges MAX). You could ask: "Could you help me understand how you arrived at that figure based on your experience and this role's scope?" or state "Our initial budget for this role is closer to [mention a slightly lower range or point]. Is there any flexibility in your expectations?".
+        * **Concluding Negotiation:** After 1-2 exchanges, conclude neutrally. If the negotiation seemed somewhat positive, you *might* say: "Okay, thank you for sharing. We might have some flexibility, perhaps towards [mention a slightly increased figure or reaffirm the range], but final compensation is determined later in the process based on the overall interview performance." If not positive or settled, say: "Okay, noted. We'll keep that in mind. Compensation is typically finalized after all interview stages." ALWAYS end the salary discussion here. SKIP this entire salary section if not mentioned in JD and not raised by candidate.
+    * Ask ONLY: "Do you have any brief questions for me about this mock interview process itself?" (Answer generically about the mock process ONLY, not about the job or feedback).
 
 8.  **Closing (Fixed Statements):**
     * Transition: "Okay, that covers the main areas for this '{interview_type}' focused session."
@@ -699,8 +716,10 @@ You are IRIS, an AI Interviewer. Your ONLY role is to conduct a realistic, struc
     * Statement 2: "A detailed analysis report of this mock interview, including feedback and suggestions based on our conversation, will be available to you shortly after we conclude."
     * Statement 3: "This concludes our mock interview. We wish you the best in your preparation." (End conversation here).
 
-**REMEMBER:** Strict adherence to the INTERVIEWER role (IRIS) is paramount. ONE question per turn. Minimal neutral acknowledgements ONLY (no feedback/summaries). Follow the flow and pacing strictly based on the '{interview_type}'. Keep it concise and professional.
+**REMEMBER:** Strict adherence to the INTERVIEWER role (IRIS) is paramount. ONE question per turn. Minimal neutral acknowledgements ONLY (no feedback/summaries). Follow the flow and pacing strictly based on the '{interview_type}'. Use the specific question types outlined. Keep it concise and professional. Comfort the candidate briefly if they struggle. Adapt technical question content based on the specific `required_skills` for the role.
 """
+    # --- End of Modified System Prompt ---
+
     return system_prompt
 
 
@@ -779,12 +798,12 @@ def generate_suggested_answers(transcript, resume_data, job_data):
     print("--- Generating Suggested Answers ---")
     if not CLAUDE_API_KEY: raise ValueError("Claude API Key not configured.")
 
-    # --- (Keep the existing code for resume_summary, job_req_summary, interviewer_lines, system_prompt, messages) ---
+    # Extract minimal resume data to save tokens
     resume_summary = {
         "name": resume_data.get("name", ""),
         "currentPosition": resume_data.get("currentPosition", ""),
         "yearsOfExperience": resume_data.get("yearsOfExperience", ""),
-        "technicalSkills": resume_data.get("technicalSkills", [])[:5] # Limit skills
+        "technicalSkills": resume_data.get("technicalSkills", [])[:5]  # Limit skills
     }
     resume_str = json.dumps(resume_summary, indent=2)
 
@@ -800,7 +819,7 @@ def generate_suggested_answers(transcript, resume_data, job_data):
     interviewer_lines = [line for line in lines if line.startswith('Interviewer:')]
 
     system_prompt = f"""
-You are an expert interview coach reviewing a mock interview. For each interviewer question, provide ONE strong alternative answer the candidate could have given.
+You are an expert interview coach reviewing a mock interview. For each significant interviewer question, provide ONE strong alternative answer the candidate could have given.
 
 Interview Context:
 - Candidate: {resume_summary.get("name", "")}, {resume_summary.get("currentPosition", "")}
@@ -808,9 +827,9 @@ Interview Context:
 - Skills Required: {", ".join(job_req_summary.get("requiredSkills", []))}
 
 Interview Questions:
-{json.dumps(interviewer_lines, indent=2)[:1000]}
+{json.dumps(interviewer_lines[:10], indent=2)[:1000]}
 
-For each question, provide ONLY ONE better sample answer. Format as valid JSON:
+For each question, provide ONLY ONE better sample answer. Format as valid JSON with NO control characters:
 {{
 "suggestedAnswers": [
   {{
@@ -818,24 +837,23 @@ For each question, provide ONLY ONE better sample answer. Format as valid JSON:
     "suggestions": [
       {{"answer": "<Better answer>", "rationale": "<Why this answer is strong>"}}
     ]
-  }},
-  // Repeat for other questions
+  }}
 ]
 }}
 
-Return ONLY the JSON with NO additional text before or after. Avoid using problematic control characters in the 'answer' and 'rationale' strings.
-""" # Added note to LLM as well, although sanitization is key.
+Return ONLY valid JSON with NO additional text before or after. IMPORTANT: Do NOT include any control characters in the output.
+"""
 
-    messages = [{"role": "user", "content": "Provide one strong alternative answer for each question in this interview."}]
-
+    messages = [{"role": "user", "content": "Provide one strong alternative answer for each interviewer question."}]
 
     try:
+        # Lower temperature for more predictable JSON
         response_content = call_claude_api(
             messages=messages,
             system_prompt=system_prompt,
             model=CLAUDE_MODEL,
             max_tokens=3000,
-            temperature=0.7
+            temperature=0.5
         )
 
         response_text = response_content.strip()
@@ -847,26 +865,26 @@ Return ONLY the JSON with NO additional text before or after. Avoid using proble
             response_text = response_text[:-3]
         response_text = response_text.strip()
 
-        raw_parsed_data = {}
+        # Fallback find {} block if needed
+        json_start = response_text.find('{')
+        json_end = response_text.rfind('}') + 1
+        if json_start >= 0 and json_end > json_start:
+            json_text = response_text[json_start:json_end].strip()
+        else:
+            return {"suggestedAnswers": [], "error": "Failed to extract JSON object from response"}
+
+        # Aggressive sanitization of the entire JSON string before parsing
+        sanitized_json_text = sanitize_string_for_json(json_text)
+        
         try:
-            # Parse the potentially unclean JSON from LLM
-            raw_parsed_data = json.loads(response_text)
-        except json.JSONDecodeError:
-            # Fallback find {} block (keep this logic)
-            json_start = response_content.find('{')
-            json_end = response_content.rfind('}') + 1
-            if json_start >= 0 and json_end > json_start:
-                json_text = response_content[json_start:json_end].strip()
-                try:
-                   raw_parsed_data = json.loads(json_text)
-                except json.JSONDecodeError as e:
-                   print(f"Error decoding JSON even after finding braces: {e}")
-                   return {"suggestedAnswers": [], "error": f"Failed to extract valid JSON from response: {e}"}
-            else:
-                return {"suggestedAnswers": [], "error": "Failed to extract any JSON object from response"}
+            # First try to parse the sanitized JSON
+            raw_parsed_data = json.loads(sanitized_json_text)
+        except json.JSONDecodeError as e:
+            print(f"JSON decode error even after sanitization: {e}")
+            print(f"First 500 chars of sanitized JSON: {sanitized_json_text[:500]}")
+            return {"suggestedAnswers": [], "error": f"Failed to parse sanitized JSON: {e}"}
 
-
-        # *** START SANITIZATION ***
+        # Manual reconstruction of sanitized content
         sanitized_suggested_answers = []
         if "suggestedAnswers" in raw_parsed_data and isinstance(raw_parsed_data.get("suggestedAnswers"), list):
             for qa_item in raw_parsed_data["suggestedAnswers"]:
@@ -877,22 +895,27 @@ Return ONLY the JSON with NO additional text before or after. Avoid using proble
                 # Ensure suggestions exist and keep only the first one
                 suggestions = qa_item.get("suggestions", [])
                 if suggestions and isinstance(suggestions, list):
-                     first_suggestion = suggestions[0]
-                     if isinstance(first_suggestion, dict):
-                          sanitized_suggestions.append({
-                              "answer": sanitize_string_for_json(first_suggestion.get("answer")),
-                              "rationale": sanitize_string_for_json(first_suggestion.get("rationale"))
-                          })
+                    first_suggestion = suggestions[0]
+                    if isinstance(first_suggestion, dict):
+                        sanitized_suggestions.append({
+                            "answer": sanitize_string_for_json(first_suggestion.get("answer")),
+                            "rationale": sanitize_string_for_json(first_suggestion.get("rationale"))
+                        })
 
                 sanitized_qa["suggestions"] = sanitized_suggestions
                 sanitized_suggested_answers.append(sanitized_qa)
-        # *** END SANITIZATION ***
 
         # Construct the final data structure with sanitized content
         final_data = {"suggestedAnswers": sanitized_suggested_answers}
 
-        print(f"Suggested answers generated and sanitized successfully: {len(final_data.get('suggestedAnswers', []))} questions")
-        return final_data # Return the sanitized data
+        # Validate JSON serialization works
+        try:
+            json.dumps(final_data)  # Test that it can be serialized
+            print(f"Suggested answers generated and sanitized successfully: {len(final_data.get('suggestedAnswers', []))} questions")
+            return final_data  # Return the sanitized data
+        except Exception as json_err:
+            print(f"Final JSON serialization test failed: {json_err}")
+            return {"suggestedAnswers": [], "error": "Final JSON validation failed"}
 
     except Exception as e:
         print(f"Error generating suggested answers: {e}")
@@ -1136,17 +1159,33 @@ def increment_usage_counter(user_id, feature_type):
 
 # Helper function to sanitize strings for JSON embedding
 def sanitize_string_for_json(text):
-    """Removes or escapes control characters problematic for JSON."""
+    """Thoroughly removes or escapes control characters problematic for JSON."""
     if not isinstance(text, str):
-        return text # Return non-strings as is
-    # Remove characters typically causing issues (adjust based on observation)
-    # This removes null bytes, vertical tabs, form feeds, etc.
-    # It also replaces common whitespace like newline, tab, carriage return with spaces
-    # to prevent them breaking JSON strings if not properly handled by json.loads downstream.
-    text = re.sub(r'[\x00-\x1F\x7F]', ' ', text) # Replace control chars 0-31 and 127 with space
-    # Alternatively, more aggressive removal:
-    # text = ''.join(char for char in text if 31 < ord(char) < 127)
-    return text.strip() # Remove leading/trailing whitespace
+        return text  # Return non-strings as is
+    
+    # More aggressive control character handling - catches all JSON-breaking characters
+    # Remove all control characters (0-31) plus DEL (127)
+    cleaned_text = ''
+    for char in text:
+        # Skip all control characters completely
+        if ord(char) >= 32 and ord(char) != 127:
+            cleaned_text += char
+        elif char in ['\n', '\t', '\r']:
+            # Replace common whitespace with spaces instead of removing
+            cleaned_text += ' '
+    
+    # Additional safety for quote handling
+    cleaned_text = cleaned_text.replace('\\', '\\\\')  # Escape backslashes first
+    
+    # Double-check for any remaining invalid characters
+    checked_text = ''
+    for char in cleaned_text:
+        if 31 < ord(char) < 127 or ord(char) > 127:
+            checked_text += char
+        else:
+            checked_text += ' '  # Replace any remaining control chars with space
+    
+    return checked_text.strip()  # Remove leading/trailing whitespace
 
 
 
@@ -1891,22 +1930,33 @@ def get_suggested_answers_route(interview_id):
         resume_data = interview_data.get('resume_data_snapshot')
         job_data = interview_data.get('job_data_snapshot')
         if not conversation or not resume_data or not job_data:
-             return jsonify({'error': 'Missing required data for generating suggestions'}), 500
+            return jsonify({'error': 'Missing required data for generating suggestions'}), 500
 
         transcript_text = "\n".join([
             f"{'Interviewer' if msg.get('role') == 'assistant' else 'Candidate'}: {msg.get('content', '')}"
             for msg in conversation
         ])
-        # This call now uses the modified function with sanitization
+        
+        # Generate suggestions with the improved function
         suggestions = generate_suggested_answers(transcript_text, resume_data, job_data)
-
-        # The 'jsonify' function will correctly handle the final Python dict
-        # It handles escaping for standard JSON transmission.
-        return jsonify(suggestions)
+        
+        # Extra validation of the output before returning
+        try:
+            # Test serialization separately with dumps first
+            suggestions_json = json.dumps(suggestions)
+            # Now return the jsonify response
+            return jsonify(suggestions)
+        except Exception as json_err:
+            print(f"Final JSON serialization failed in route: {json_err}")
+            return jsonify({
+                'error': f'Failed to serialize response: {str(json_err)}',
+                'suggestedAnswers': [] 
+            }), 500
+            
     except Exception as e:
         print(f"Error in /get-suggested-answers route for {interview_id}: {e}")
         traceback.print_exc()
-        return jsonify({'error': f'Server error generating suggestions: {str(e)}'}), 500
+        return jsonify({'error': f'Server error generating suggestions: {str(e)}', 'suggestedAnswers': []}), 500
 
 
 @app.route('/get-progress-history/<session_id>', methods=['GET'])

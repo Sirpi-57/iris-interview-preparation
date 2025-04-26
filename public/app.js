@@ -3022,7 +3022,7 @@ function loadSuggestedAnswers(interviewId) {
     const container = document.getElementById('suggestedAnswersAccordion');
     if (!container) return;
 
-    // Show loading state specifically for this section
+    // Show loading state
     container.innerHTML = `
         <div class="text-center p-3">
             <div class="spinner-border spinner-border-sm text-primary" role="status">
@@ -3035,14 +3035,24 @@ function loadSuggestedAnswers(interviewId) {
     .then(response => {
         if (!response.ok) {
             // Try to get error message from backend JSON
-             return response.json().then(errData => {
-                 throw new Error(errData.error || `Network response was not ok (${response.status})`);
+            return response.json().then(errData => {
+                throw new Error(errData.error || `Network response was not ok (${response.status})`);
             }).catch(() => {
-                 // If backend didn't send JSON error
-                 throw new Error(`Network response was not ok (${response.status})`);
-             });
+                // If backend didn't send JSON error
+                throw new Error(`Network response was not ok (${response.status})`);
+            });
         }
-        return response.json();
+        return response.text()  // Get raw text first instead of json()
+        .then(text => {
+            // Safely parse JSON with error handling
+            try {
+                return JSON.parse(text);
+            } catch(e) {
+                console.error("JSON parse error:", e);
+                console.error("Raw response text:", text.slice(0, 500) + "...");
+                throw new Error(`Failed to parse JSON response: ${e.message}`);
+            }
+        });
     })
     .then(data => {
         console.log('Suggested answers data received:', data);
@@ -3051,7 +3061,7 @@ function loadSuggestedAnswers(interviewId) {
     .catch(error => {
         console.error('Error loading suggested answers:', error);
         if (container) {
-             container.innerHTML = `<div class="alert alert-warning">Could not load suggested answers: ${error.message}</div>`;
+            container.innerHTML = `<div class="alert alert-warning">Could not load suggested answers: ${error.message}</div>`;
         }
     });
 }
