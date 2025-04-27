@@ -717,6 +717,58 @@ function showErrorMessage(message, duration = 5000) {
   }
 }
 
+/// --- New function to purchase an addon ---
+function purchaseAddon(featureType, quantity = 1) {
+  const user = firebase.auth().currentUser;
+  if (!user) {
+    showMessage('Please sign in to purchase add-ons', 'warning');
+    return Promise.reject(new Error("Authentication error"));
+  }
+  
+  // Define API_BASE_URL if not already defined
+  const API_BASE_URL = 'https://iris-ai-backend.onrender.com'; // Update this URL to match your backend
+  
+  return fetch(`${API_BASE_URL}/purchase-addon`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      userId: user.uid,
+      feature: featureType,
+      quantity: quantity
+      // In a real implementation, you would add payment token here
+    })
+  })
+  .then(response => {
+    // Check if the response is JSON
+    const contentType = response.headers.get('content-type');
+    if (!contentType || !contentType.includes('application/json')) {
+      // Handle non-JSON response (like HTML error page)
+      return response.text().then(text => {
+        console.error("Received non-JSON response:", text.substring(0, 200) + "...");
+        throw new Error("The server returned an invalid response. Please try again later.");
+      });
+    }
+    
+    // For JSON responses, check if it's successful
+    if (!response.ok) {
+      return response.json().then(errData => {
+        throw new Error(errData.error || `Request failed (${response.status})`);
+      });
+    }
+    
+    return response.json();
+  })
+  .then(data => {
+    // Update local state to reflect new limits
+    if (authState && authState.userProfile && authState.userProfile.usage && authState.userProfile.usage[featureType]) {
+      authState.userProfile.usage[featureType].limit = data.newLimit;
+    }
+    
+    // Return purchase data
+    return data;
+  });
+}
+
 // Event listeners
 function attachAuthEventListeners() {
   // Sign in form submission
@@ -783,5 +835,6 @@ window.irisAuth = {
   canUseFeature,
   incrementUsageCounter,
   updateUserPlan,
-  getPackageLimit
+  getPackageLimit,
+  purchaseAddon
 };

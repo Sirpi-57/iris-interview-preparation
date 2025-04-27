@@ -53,6 +53,9 @@ document.addEventListener('DOMContentLoaded', function() {
     initButtons();
     initForms();
     initProfilePage();
+    initAddonPurchaseModal();
+    enhanceModalCloseHandlers();
+
 
     // Load available browser voices (for fallback TTS)
     loadVoices();
@@ -185,6 +188,14 @@ function initProfilePage() {
                     submitBtn.innerHTML = originalText;
                 });
         }
+    });
+
+    // Add "Buy Add-ons" button initialization
+    document.querySelectorAll('.buy-addon-btn').forEach(button => {
+        button.addEventListener('click', function() {
+            const featureType = this.getAttribute('data-feature');
+            showAddonPurchaseModal(featureType);
+        });
     });
 
     // --- The rest of the function remains unchanged ---
@@ -3533,10 +3544,33 @@ function checkFeatureAccess(featureType) {
     return true;
 }
 
+// Helper function to get user-friendly feature name
+function getFeatureDisplayName(featureType) {
+    const displayNames = {
+        'resumeAnalyses': 'resume analysis',
+        'mockInterviews': 'mock interview',
+        'pdfDownloads': 'PDF download',
+        'aiEnhance': 'AI enhancement'
+    };
+    return displayNames[featureType] || featureType;
+}
+
 // --- New function to update usage display ---
 function updateUsageDisplay() {
     const userProfile = irisAuth?.getUserProfile();
     if (!userProfile || !userProfile.usage) return;
+
+    // Resume analyses usage
+    updateFeatureUsageDisplay('resumeAnalyses', userProfile.usage.resumeAnalyses);
+    
+    // Mock interviews usage
+    updateFeatureUsageDisplay('mockInterviews', userProfile.usage.mockInterviews);
+    
+    // PDF downloads usage (new)
+    updateFeatureUsageDisplay('pdfDownloads', userProfile.usage.pdfDownloads);
+    
+    // AI enhance usage (new)
+    updateFeatureUsageDisplay('aiEnhance', userProfile.usage.aiEnhance);
     
     // Update resume analyses counter
     const resumeUsage = userProfile.usage.resumeAnalyses || { used: 0, limit: 0 };
@@ -5350,5 +5384,425 @@ function showUpgradeModal(featureType) {
     } else {
         // Use the existing modal for other features
         showExistingUpgradeModal(featureType);
+    }
+}
+
+// Updated showAddonPurchaseModal function
+function showAddonPurchaseModal(featureType = null) {
+    // First clean up any existing modals
+    safelyCloseModal('paymentProcessingModal');
+    safelyCloseModal('paymentSuccessModal');
+    safelyCloseModal('limitReachedModal');
+    
+    const modal = document.getElementById('addonPurchaseModal');
+    if (!modal) return;
+    
+    // If a specific feature was requested, focus on that card
+    if (featureType) {
+        // Scroll to and highlight that specific add-on card
+        const featureCard = modal.querySelector(`.addon-purchase-btn[data-feature="${featureType}"]`)?.closest('.card');
+        if (featureCard) {
+            // Clear any existing highlights
+            modal.querySelectorAll('.card').forEach(card => {
+                card.classList.remove('border-primary');
+            });
+            
+            featureCard.classList.add('border-primary');
+            setTimeout(() => {
+                featureCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }, 300);
+        }
+    }
+    
+    // Show the modal
+    const modalInstance = new bootstrap.Modal(modal);
+    modalInstance.show();
+}
+
+// Initialize add-on modal interaction
+function initAddonPurchaseModal() {
+    // Quantity increase/decrease buttons
+    document.querySelectorAll('.addon-quantity-decrease').forEach(button => {
+        button.addEventListener('click', function() {
+            const featureType = this.getAttribute('data-feature');
+            const input = document.querySelector(`.addon-quantity-input[data-feature="${featureType}"]`);
+            const priceElement = this.closest('.card-body').querySelector('.addon-price');
+            
+            if (input && priceElement) {
+                const currentValue = parseInt(input.value) || 1;
+                if (currentValue > 1) {
+                    input.value = currentValue - 1;
+                    updateAddonPrice(featureType, currentValue - 1);
+                }
+            }
+        });
+    });
+    
+    document.querySelectorAll('.addon-quantity-increase').forEach(button => {
+        button.addEventListener('click', function() {
+            const featureType = this.getAttribute('data-feature');
+            const input = document.querySelector(`.addon-quantity-input[data-feature="${featureType}"]`);
+            const priceElement = this.closest('.card-body').querySelector('.addon-price');
+            
+            if (input && priceElement) {
+                const currentValue = parseInt(input.value) || 1;
+                const maxValue = parseInt(input.getAttribute('max')) || 10;
+                if (currentValue < maxValue) {
+                    input.value = currentValue + 1;
+                    updateAddonPrice(featureType, currentValue + 1);
+                }
+            }
+        });
+    });
+    
+    // Manual input changes
+    document.querySelectorAll('.addon-quantity-input').forEach(input => {
+        input.addEventListener('change', function() {
+            const featureType = this.getAttribute('data-feature');
+            const value = parseInt(this.value) || 1;
+            const maxValue = parseInt(this.getAttribute('max')) || 10;
+            const minValue = parseInt(this.getAttribute('min')) || 1;
+            
+            // Enforce min/max values
+            if (value < minValue) this.value = minValue;
+            if (value > maxValue) this.value = maxValue;
+            
+            updateAddonPrice(featureType, parseInt(this.value));
+        });
+    });
+    
+    // Purchase buttons
+    document.querySelectorAll('.addon-purchase-btn').forEach(button => {
+        button.addEventListener('click', function() {
+            const featureType = this.getAttribute('data-feature');
+            const quantityInput = document.querySelector(`.addon-quantity-input[data-feature="${featureType}"]`);
+            const quantity = parseInt(quantityInput?.value) || 1;
+            
+            purchaseAddonItem(featureType, quantity);
+        });
+    });
+    
+    // "Buy" buttons on user profile
+    document.querySelectorAll('.buy-addon-btn').forEach(button => {
+        button.addEventListener('click', function() {
+            const featureType = this.getAttribute('data-feature');
+            showAddonPurchaseModal(featureType);
+        });
+    });
+}
+
+// Update price display based on quantity
+function updateAddonPrice(featureType, quantity) {
+    const priceElement = document.querySelector(`.addon-price[data-base-price][data-feature="${featureType}"]`) || 
+                         document.querySelector(`.card:has(.addon-purchase-btn[data-feature="${featureType}"]) .addon-price[data-base-price]`);
+    
+    if (priceElement) {
+        const basePrice = parseInt(priceElement.getAttribute('data-base-price')) || 0;
+        const totalPrice = basePrice * quantity;
+        priceElement.textContent = totalPrice;
+    }
+}
+
+// Function to purchase an add-on
+function purchaseAddonItem(featureType, quantity) {
+    if (!firebase.auth().currentUser) {
+        showMessage('Please sign in to purchase add-ons', 'warning');
+        safelyCloseModal('addonPurchaseModal');
+        return;
+    }
+    
+    // Check if irisAuth is available
+    if (!window.irisAuth || typeof window.irisAuth.purchaseAddon !== 'function') {
+        showMessage('Payment system is not available. Please refresh the page and try again.', 'danger');
+        safelyCloseModal('addonPurchaseModal');
+        return;
+    }
+    
+    // Show processing payment modal
+    const processingModal = new bootstrap.Modal(document.getElementById('paymentProcessingModal'));
+    const progressBar = document.getElementById('payment-progress-bar');
+    const processingMessage = document.getElementById('paymentProcessingMessage');
+    
+    // First close the addon purchase modal safely
+    safelyCloseModal('addonPurchaseModal');
+    
+    // Show processing modal
+    processingMessage.textContent = `Processing your purchase of ${quantity} ${getFeatureDisplayName(featureType)} add-on(s)...`;
+    progressBar.style.width = '0%';
+    processingModal.show();
+    
+    // Simulate progress
+    let progress = 0;
+    const progressInterval = setInterval(() => {
+        progress += 5;
+        progressBar.style.width = `${progress}%`;
+        
+        if (progress >= 90) {
+            clearInterval(progressInterval);
+        }
+    }, 100);
+    
+    // Define constants with default values in case not defined elsewhere
+    const API_BASE_URL = window.API_BASE_URL || 'https://iris-ai-backend.onrender.com'; // Update with your backend URL
+    
+    // Call the actual purchase function
+    window.irisAuth.purchaseAddon(featureType, quantity)
+        .then(result => {
+            console.log('Add-on purchase successful:', result);
+            
+            // Complete progress
+            clearInterval(progressInterval);
+            progressBar.style.width = '100%';
+            
+            setTimeout(() => {
+                // Close processing modal safely
+                safelyCloseModal('paymentProcessingModal');
+                
+                // Show success modal with updated limits
+                const successModal = new bootstrap.Modal(document.getElementById('paymentSuccessModal'));
+                document.getElementById('paymentSuccessMessage').textContent = 
+                    `You've successfully purchased ${quantity} ${getFeatureDisplayName(featureType)} add-on(s). Your limit has been increased.`;
+                
+                // Set new limits in success modal using the more flexible function
+                setSuccessModalLimits(featureType, result.newLimit);
+                
+                successModal.show();
+                
+                // Update local profile data to reflect new limits
+                if (authState && authState.userProfile && authState.userProfile.usage && authState.userProfile.usage[featureType]) {
+                    authState.userProfile.usage[featureType].limit = result.newLimit;
+                }
+                
+                // Update UI to show new limits
+                updateUsageDisplay();
+            }, 500);
+        })
+        .catch(error => {
+            console.error('Error purchasing add-on:', error);
+            
+            // Stop progress animation
+            clearInterval(progressInterval);
+            
+            // Hide processing modal safely
+            safelyCloseModal('paymentProcessingModal');
+            
+            // Show error message with more user-friendly text
+            let errorMessage = error.message;
+            if (errorMessage.includes('JSON') || errorMessage.includes('Unexpected token')) {
+                errorMessage = "The server returned an invalid response. Please try again later.";
+            }
+            
+            showMessage(`Add-on purchase failed: ${errorMessage}`, 'danger');
+        });
+}
+
+// Helper function to update usage display for a specific feature
+function updateFeatureUsageDisplay(featureType, usageData = { used: 0, limit: 0 }) {
+    const countElement = document.getElementById(`${featureType}Count`);
+    const progressBar = document.querySelector(`#${featureType}Count + .progress .progress-bar`);
+    
+    if (countElement) {
+        countElement.textContent = `${usageData.used}/${usageData.limit}`;
+    }
+    
+    if (progressBar) {
+        const percentUsed = usageData.limit > 0 ? (usageData.used / usageData.limit) * 100 : 0;
+        progressBar.style.width = `${Math.min(100, percentUsed)}%`;
+        
+        // Add warning color if close to limit
+        if (percentUsed >= 85) {
+            progressBar.classList.add('bg-warning');
+            if (percentUsed >= 100) {
+                progressBar.classList.add('bg-danger');
+                progressBar.classList.remove('bg-warning');
+            }
+        } else {
+            progressBar.classList.remove('bg-warning', 'bg-danger');
+        }
+    }
+}
+
+function showLimitReachedModal(featureType) {
+    // Get the modal element
+    const modal = document.getElementById('limitReachedModal');
+    if (!modal) return;
+    
+    // Set the message based on feature type
+    const messageElement = document.getElementById('limitReachedMessage');
+    if (messageElement) {
+        const featureDisplayName = getFeatureDisplayName(featureType);
+        messageElement.innerHTML = `
+            You've reached your ${featureDisplayName} limit on your current plan. 
+            You can <strong>upgrade your plan</strong> for more features or 
+            <strong>purchase individual add-ons</strong> for this specific feature.
+        `;
+    }
+    
+    // Modify the buttons in the modal
+    const upgradeBtn = document.getElementById('limitReachedUpgradeBtn');
+    const closeBtn = modal.querySelector('button[data-bs-dismiss="modal"]');
+    
+    // Create or update the Buy Add-ons button
+    let addonBtn = document.getElementById('limitReachedAddonBtn');
+    if (!addonBtn) {
+        addonBtn = document.createElement('button');
+        addonBtn.id = 'limitReachedAddonBtn';
+        addonBtn.className = 'btn btn-success';
+        addonBtn.innerHTML = `<i class="fas fa-plus-circle me-2"></i> Buy Add-ons`;
+        
+        // Insert before the upgrade button
+        if (upgradeBtn) {
+            upgradeBtn.parentNode.insertBefore(addonBtn, upgradeBtn);
+        }
+    }
+    
+    // Clear existing event listeners
+    const newAddonBtn = addonBtn.cloneNode(true);
+    if (addonBtn.parentNode) {
+        addonBtn.parentNode.replaceChild(newAddonBtn, addonBtn);
+    }
+    
+    // Add event listener for add-on button
+    newAddonBtn.addEventListener('click', function() {
+        // Hide the limit reached modal
+        const limitModal = bootstrap.Modal.getInstance(modal);
+        if (limitModal) limitModal.hide();
+        
+        // Show the add-on purchase modal
+        setTimeout(() => showAddonPurchaseModal(featureType), 400);
+    });
+    
+    // Update the upgrade button to close the modal and show the upgrade modal
+    if (upgradeBtn) {
+        const newUpgradeBtn = upgradeBtn.cloneNode(true);
+        upgradeBtn.parentNode.replaceChild(newUpgradeBtn, upgradeBtn);
+        
+        newUpgradeBtn.addEventListener('click', function() {
+            // Hide the limit reached modal
+            const limitModal = bootstrap.Modal.getInstance(modal);
+            if (limitModal) limitModal.hide();
+            
+            // Show the plan upgrade modal
+            setTimeout(() => showUpgradeModal(featureType), 400);
+        });
+    }
+    
+    // Show the modal
+    const modalInstance = new bootstrap.Modal(modal);
+    modalInstance.show();
+}
+
+// Function to safely close modal and clean up backdrop
+function safelyCloseModal(modalId) {
+    try {
+        // Get the modal element
+        const modalElement = document.getElementById(modalId);
+        if (!modalElement) return;
+        
+        // Get the Bootstrap modal instance
+        const modalInstance = bootstrap.Modal.getInstance(modalElement);
+        if (modalInstance) {
+            // Close the modal properly
+            modalInstance.hide();
+        }
+        
+        // Remove any lingering backdrops
+        const backdrops = document.querySelectorAll('.modal-backdrop');
+        backdrops.forEach(backdrop => {
+            backdrop.classList.remove('show');
+            setTimeout(() => backdrop.remove(), 300);
+        });
+        
+        // In case body still has modal classes
+        document.body.classList.remove('modal-open');
+        document.body.style.paddingRight = '';
+        document.body.style.overflow = '';
+        
+    } catch (error) {
+        console.error(`Error safely closing modal ${modalId}:`, error);
+        // Forcibly cleanup as last resort
+        document.querySelectorAll('.modal-backdrop').forEach(el => el.remove());
+        document.body.classList.remove('modal-open');
+        document.body.style.paddingRight = '';
+        document.body.style.overflow = '';
+    }
+}
+
+// Add enhanced close handlers to all modals
+function enhanceModalCloseHandlers() {
+    const modals = [
+        'addonPurchaseModal',
+        'paymentProcessingModal',
+        'paymentSuccessModal',
+        'limitReachedModal'
+    ];
+    
+    modals.forEach(modalId => {
+        const modalElement = document.getElementById(modalId);
+        if (!modalElement) return;
+        
+        // Add hidden.bs.modal event listener
+        modalElement.addEventListener('hidden.bs.modal', function(event) {
+            // Handle any necessary cleanup specific to this modal
+            console.log(`Modal ${modalId} closed properly`);
+            
+            // Extra safety - remove any lingering backdrops after a short delay
+            setTimeout(() => {
+                if (document.querySelectorAll('.modal-backdrop').length > 0) {
+                    safelyCloseModal(modalId);
+                }
+            }, 300);
+        });
+        
+        // Make sure close buttons work properly
+        const closeButtons = modalElement.querySelectorAll('[data-bs-dismiss="modal"]');
+        closeButtons.forEach(button => {
+            // Clone and replace to remove old listeners
+            const newButton = button.cloneNode(true);
+            if (button.parentNode) {
+                button.parentNode.replaceChild(newButton, button);
+            }
+            
+            // Add enhanced close handler
+            newButton.addEventListener('click', function(event) {
+                safelyCloseModal(modalId);
+            });
+        });
+    });
+    
+    // Also handle ESC key globally
+    document.addEventListener('keydown', function(event) {
+        if (event.key === 'Escape') {
+            // Check if any modal is visible
+            const visibleModals = document.querySelectorAll('.modal.show');
+            if (visibleModals.length > 0) {
+                visibleModals.forEach(modal => {
+                    safelyCloseModal(modal.id);
+                });
+            }
+        }
+    });
+}
+
+// Helper function to set limit values in success modal
+function setSuccessModalLimits(featureType, newLimit) {
+    const limitElements = {
+        'resumeAnalyses': document.getElementById('newResumeLimit'),
+        'mockInterviews': document.getElementById('newInterviewLimit'),
+        'pdfDownloads': document.getElementById('newPdfLimit'),
+        'aiEnhance': document.getElementById('newAiLimit')
+    };
+    
+    // Set the value for the updated feature
+    if (limitElements[featureType]) {
+        limitElements[featureType].textContent = newLimit;
+    }
+    
+    // Set current values for other features
+    for (const [key, element] of Object.entries(limitElements)) {
+        if (key !== featureType && element) {
+            const currentLimit = authState?.userProfile?.usage?.[key]?.limit || 0;
+            element.textContent = currentLimit;
+        }
     }
 }

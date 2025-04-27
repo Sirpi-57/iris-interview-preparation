@@ -643,7 +643,7 @@
                 <!-- Landing Page -->
                 <section id="landing" class="content-section active">
                     <div class="hero-section">
-                        <div class="container text-center">
+                        <div class="container-fluid">
                             <div class="logo-container">
                                 <i class="fas fa-comments iris-logo"></i>
                             </div>
@@ -1161,6 +1161,9 @@
                                                     <div class="d-flex justify-content-between mb-1">
                                                         <span>Resume Analyses</span>
                                                         <span id="resumeAnalysesCount">0/2</span>
+                                                        <button class="btn btn-sm btn-primary buy-addon-btn" data-feature="resumeAnalyses">
+                                                            <i class="fas fa-plus-circle"></i> Buy
+                                                        </button>
                                                     </div>
                                                     <div class="progress" style="height: 8px;">
                                                         <div class="progress-bar" role="progressbar" style="width: 0%"></div>
@@ -1170,6 +1173,33 @@
                                                     <div class="d-flex justify-content-between mb-1">
                                                         <span>Mock Interviews</span>
                                                         <span id="mockInterviewsCount">0/0</span>
+                                                        <button class="btn btn-sm btn-primary buy-addon-btn" data-feature="mockInterviews">
+                                                            <i class="fas fa-plus-circle"></i> Buy
+                                                        </button>
+                                                    </div>
+                                                    <div class="progress" style="height: 8px;">
+                                                        <div class="progress-bar" role="progressbar" style="width: 0%"></div>
+                                                    </div>
+                                                </div>
+                                                <div class="mb-3">
+                                                    <div class="d-flex justify-content-between mb-1">
+                                                        <span>AI Enhancements</span>
+                                                        <span id="aiEnhanceCount">0/0</span>
+                                                        <button class="btn btn-sm btn-primary buy-addon-btn" data-feature="aiEnhance">
+                                                            <i class="fas fa-plus-circle"></i> Buy
+                                                        </button>
+                                                    </div>
+                                                    <div class="progress" style="height: 8px;">
+                                                        <div class="progress-bar" role="progressbar" style="width: 0%"></div>
+                                                    </div>
+                                                </div>
+                                                <div class="mb-3">
+                                                    <div class="d-flex justify-content-between mb-1">
+                                                        <span>PDF Downloads</span>
+                                                        <span id="pdfDownloadsCount">0/0</span>
+                                                        <button class="btn btn-sm btn-primary buy-addon-btn" data-feature="pdfDownloads">
+                                                            <i class="fas fa-plus-circle"></i> Buy
+                                                        </button>
                                                     </div>
                                                     <div class="progress" style="height: 8px;">
                                                         <div class="progress-bar" role="progressbar" style="width: 0%"></div>
@@ -1877,12 +1907,19 @@
                 <div class="modal-body">
                     <p id="limitReachedMessage">You've reached the limit for this feature on your current plan.</p>
                     <div class="alert alert-info">
-                        <strong>Upgrade your plan to continue using this feature.</strong>
+                        <strong>You have two options:</strong>
+                        <ul class="mb-0 mt-2">
+                            <li>Upgrade your plan for increased limits on all features</li>
+                            <li>Purchase individual add-ons for just this feature</li>
+                        </ul>
                     </div>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                    <button type="button" class="btn btn-primary" id="limitReachedUpgradeBtn">Upgrade Now</button>
+                    <button type="button" class="btn btn-success" id="limitReachedAddonBtn">
+                        <i class="fas fa-plus-circle me-2"></i> Buy Add-ons
+                    </button>
+                    <button type="button" class="btn btn-primary" id="limitReachedUpgradeBtn">Upgrade Plan</button>
                 </div>
             </div>
         </div>
@@ -1921,12 +1958,14 @@
                         <i class="fas fa-check"></i>
                     </div>
                     <h4 class="mt-4">Thank You!</h4>
-                    <p id="paymentSuccessMessage">Your plan has been upgraded successfully.</p>
+                    <p id="paymentSuccessMessage">Your purchase was successful.</p>
                     <div class="alert alert-info">
                         <strong>New limits:</strong>
                         <ul class="mb-0 mt-2 text-start">
                             <li>Resume Analyses: <span id="newResumeLimit">0</span></li>
                             <li>Mock Interviews: <span id="newInterviewLimit">0</span></li>
+                            <li>PDF Downloads: <span id="newPdfLimit">0</span></li>
+                            <li>AI Enhancements: <span id="newAiLimit">0</span></li>
                         </ul>
                     </div>
                 </div>
@@ -1934,6 +1973,130 @@
                     <button type="button" class="btn btn-primary" data-bs-dismiss="modal">Continue</button>
                 </div>
             </div>
+        </div>
+    </div>
+
+    <!-- Add-on Purchase Modal -->
+    <div class="modal fade" id="addonPurchaseModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+            <h5 class="modal-title">Purchase Add-ons</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+            <div class="alert alert-info">
+                <i class="fas fa-info-circle me-2"></i>
+                <strong>Add-ons allow you to increase your usage limits without changing your subscription plan.</strong>
+                <p class="mb-0">Select the add-on you need and the quantity. Charges will be applied immediately.</p>
+            </div>
+            
+            <div class="row mt-4">
+                <!-- Resume Analysis Add-on -->
+                <div class="col-md-6 mb-4">
+                <div class="card">
+                    <div class="card-header bg-light">
+                    <h5 class="mb-0">Resume Analysis</h5>
+                    </div>
+                    <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <div>
+                        <h6 class="mb-0">₹19 per analysis</h6>
+                        <p class="text-muted small mb-0">Get detailed feedback on your resume</p>
+                        </div>
+                        <div class="input-group" style="width: 120px;">
+                        <button class="btn btn-outline-secondary addon-quantity-decrease" data-feature="resumeAnalyses" type="button">-</button>
+                        <input type="number" class="form-control text-center addon-quantity-input" data-feature="resumeAnalyses" value="1" min="1" max="10">
+                        <button class="btn btn-outline-secondary addon-quantity-increase" data-feature="resumeAnalyses" type="button">+</button>
+                        </div>
+                    </div>
+                    <button class="btn btn-primary w-100 addon-purchase-btn" data-feature="resumeAnalyses">
+                        Purchase for ₹<span class="addon-price" data-base-price="19">19</span>
+                    </button>
+                    </div>
+                </div>
+                </div>
+                
+                <!-- Mock Interview Add-on -->
+                <div class="col-md-6 mb-4">
+                <div class="card">
+                    <div class="card-header bg-light">
+                    <h5 class="mb-0">Mock Interview</h5>
+                    </div>
+                    <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <div>
+                        <h6 class="mb-0">₹49 per interview</h6>
+                        <p class="text-muted small mb-0">Practice with our AI interviewer</p>
+                        </div>
+                        <div class="input-group" style="width: 120px;">
+                        <button class="btn btn-outline-secondary addon-quantity-decrease" data-feature="mockInterviews" type="button">-</button>
+                        <input type="number" class="form-control text-center addon-quantity-input" data-feature="mockInterviews" value="1" min="1" max="10">
+                        <button class="btn btn-outline-secondary addon-quantity-increase" data-feature="mockInterviews" type="button">+</button>
+                        </div>
+                    </div>
+                    <button class="btn btn-primary w-100 addon-purchase-btn" data-feature="mockInterviews">
+                        Purchase for ₹<span class="addon-price" data-base-price="49">49</span>
+                    </button>
+                    </div>
+                </div>
+                </div>
+                
+                <!-- AI Enhance Add-on -->
+                <div class="col-md-6 mb-4">
+                <div class="card">
+                    <div class="card-header bg-light">
+                    <h5 class="mb-0">AI Enhancement Pack</h5>
+                    </div>
+                    <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <div>
+                        <h6 class="mb-0">₹9 for 5 enhancements</h6>
+                        <p class="text-muted small mb-0">Improve your resume content with AI</p>
+                        </div>
+                        <div class="input-group" style="width: 120px;">
+                        <button class="btn btn-outline-secondary addon-quantity-decrease" data-feature="aiEnhance" type="button">-</button>
+                        <input type="number" class="form-control text-center addon-quantity-input" data-feature="aiEnhance" value="1" min="1" max="10">
+                        <button class="btn btn-outline-secondary addon-quantity-increase" data-feature="aiEnhance" type="button">+</button>
+                        </div>
+                    </div>
+                    <button class="btn btn-primary w-100 addon-purchase-btn" data-feature="aiEnhance">
+                        Purchase for ₹<span class="addon-price" data-base-price="9">9</span>
+                    </button>
+                    </div>
+                </div>
+                </div>
+                
+                <!-- PDF Downloads Add-on -->
+                <div class="col-md-6 mb-4">
+                <div class="card">
+                    <div class="card-header bg-light">
+                    <h5 class="mb-0">PDF Download Pack</h5>
+                    </div>
+                    <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <div>
+                        <h6 class="mb-0">₹9 for 10 downloads</h6>
+                        <p class="text-muted small mb-0">Download your resume as PDF</p>
+                        </div>
+                        <div class="input-group" style="width: 120px;">
+                        <button class="btn btn-outline-secondary addon-quantity-decrease" data-feature="pdfDownloads" type="button">-</button>
+                        <input type="number" class="form-control text-center addon-quantity-input" data-feature="pdfDownloads" value="1" min="1" max="10">
+                        <button class="btn btn-outline-secondary addon-quantity-increase" data-feature="pdfDownloads" type="button">+</button>
+                        </div>
+                    </div>
+                    <button class="btn btn-primary w-100 addon-purchase-btn" data-feature="pdfDownloads">
+                        Purchase for ₹<span class="addon-price" data-base-price="9">9</span>
+                    </button>
+                    </div>
+                </div>
+                </div>
+            </div>
+            </div>
+            <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
         </div>
     </div>
 

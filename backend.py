@@ -1233,6 +1233,42 @@ def call_haiku_for_enhancement(section_type, original_content):
     )
     return enhanced_content
 
+def get_package_limit(package_name, feature_type):
+    """Returns the limit for a specific feature based on package type."""
+    limits = {
+        'free': {
+            'resumeAnalyses': 2,
+            'mockInterviews': 0,
+            'pdfDownloads': 5,
+            'aiEnhance': 5
+        },
+        'starter': {
+            'resumeAnalyses': 5,
+            'mockInterviews': 1,
+            'pdfDownloads': 20,
+            'aiEnhance': 20
+        },
+        'standard': {
+            'resumeAnalyses': 10,
+            'mockInterviews': 3,
+            'pdfDownloads': 50,
+            'aiEnhance': 50
+        },
+        'pro': {
+            'resumeAnalyses': 10,
+            'mockInterviews': 5,
+            'pdfDownloads': 9999,
+            'aiEnhance': 9999
+        }
+    }
+    
+    # Default to free package if not found
+    if not package_name or package_name not in limits:
+        print(f"Warning: Unknown package '{package_name}', defaulting to free")
+        package_name = 'free'
+    
+    # Return the limit for the feature, or 0 if feature not found
+    return limits[package_name].get(feature_type, 0)
 
 
 # === Flask Routes ===
@@ -2177,6 +2213,191 @@ def enhance_resume_content_route():
              return jsonify({'error': f'AI Enhancement Error: {str(e)}'}), 502 # Bad Gateway
         else:
             return jsonify({'error': f'Server error enhancing content: {str(e)}'}), 500
+
+@app.route('/purchase-addon', methods=['POST'])
+def purchase_addon():
+    """Purchases an addon for a specific feature, increasing the user's limit."""
+    try:
+        data = request.get_json()
+        if not data: return jsonify({'error': 'Invalid JSON payload'}), 400
+        
+        user_id = data.get('userId')
+        feature_type = data.get('feature')
+        quantity = data.get('quantity', 1)  # Default to 1 if not specified
+        payment_info = data.get('paymentInfo', {})  # Payment token or confirmation details
+        
+        if not user_id: return jsonify({'error': 'User ID required'}), 400
+        if not feature_type: return jsonify({'error': 'Feature type required'}), 400
+        if not db: return jsonify({'error': 'Database unavailable'}), 503
+        
+        # Validate feature type
+        valid_features = ['resumeAnalyses', 'mockInterviews', 'pdfDownloads', 'aiEnhance']
+        if feature_type not in valid_features:
+            return jsonify({'error': f'Invalid feature type: {feature_type}. Valid features: {", ".join(valid_features)}'}), 400
+            
+        # Validate quantity
+        try:
+            quantity = int(quantity)
+            if quantity <= 0:
+                return jsonify({'error': 'Quantity must be greater than 0'}), 400
+        except ValueError:
+            return jsonify({'error': 'Quantity must be a valid number'}), 400
+            
+        # Get user profile
+        user_data = get_user_usage(user_id)
+        if not user_data:
+            return jsonify({'error': f'User {user_id} not found'}), 404
+            
+        # Calculate addon price (example pricing - adjust as needed)
+        addon_prices = {
+            'resumeAnalyses': 19,  # ₹19 per resume analysis
+            'mockInterviews': 49,  # ₹49 per mock interview
+            'pdfDownloads': 9,     # ₹9 per 10 downloads
+            'aiEnhance': 9         # ₹9 per 5 enhancements
+        }
+        
+        # Special quantity adjustments (for bulk features like PDF downloads and AI enhance)
+        quantity_multipliers = {
+            'pdfDownloads': 10,  # 10 per purchase
+            'aiEnhance': 5      # 5 per purchase
+        }
+        
+        effective_quantity = quantity * quantity_multipliers.get(feature_type, 1)
+        price_per_unit = addon_prices.get(feature_type, 0)
+        total_price = price_per_unit * quantity
+        
+        # In a real implementation, process payment here using payment_info
+        # For now, we'll assume payment was successful
+        
+        # Get current usage structure
+        usage = user_data.get('usage', {}).get(feature_type, {})
+        current_limit = usage.get('limit', 0)
+        current_used = usage.get('used', 0)
+        
+        # Update user's limit for the feature
+        user_ref = db.collection('users').document(user_id)
+        update_data = {
+            f'usage.{feature_type}.limit': current_limit + effective_quantity,
+            'last_updated': firestore.SERVER_TIMESTAMP
+        }
+        
+        # Record the addon purchase in a separate collection for tracking
+        addon_purchase = {
+            'userId': user_id,
+            'feature': feature_type,
+            'quantity': quantity,
+            'effectiveQuantity': effective_quantity,
+            'unitPrice': price_per_unit,
+            'totalPrice': total_price,
+            'purchaseDate': datetime.now().isoformat(),
+            'previousLimit': current_limit,
+            'newLimit': current_limit + effective_quantity,
+            'usedAtPurchase': current_used
+        }
+        
+        # Create a transaction to update user and record purchase atomically
+        transaction = db.transaction()
+        
+        @firestore.transactional
+        def update_in_transaction(transaction, user_ref, addon_purchase):
+            # Update user limits
+            transaction.update(user_ref, update_data)
+            
+            # Add purchase record
+            purchase_ref = db.collection('addonPurchases').document()
+            transaction.set(purchase_ref, addon_purchase)
+            
+            return purchase_ref.id
+        
+        purchase_id = update_in_transaction(transaction, user_ref, addon_purchase)
+        
+        print(f"User {user_id} purchased {quantity} {feature_type} addon(s) (effective: {effective_quantity})")
+        
+        return jsonify({
+            'success': True,
+            'purchaseId': purchase_id,
+            'feature': feature_type,
+            'quantityPurchased': quantity,
+            'effectiveQuantity': effective_quantity,
+            'previousLimit': current_limit,
+            'newLimit': current_limit + effective_quantity,
+            'price': total_price,
+            'currency': 'INR',
+            'currentUsage': current_used
+        })
+        
+    except Exception as e:
+        print(f"Error in /purchase-addon: {e}")
+        traceback.print_exc()
+        return jsonify({'error': f'Server error: {str(e)}', 'success': False}), 500
+
+
+@app.route('/get-addon-pricing', methods=['GET'])
+def get_addon_pricing():
+    """Returns the current pricing information for add-ons."""
+    try:
+        # This could be stored in a database in the future for easier updates
+        addon_pricing = {
+            'resumeAnalyses': {
+                'unitPrice': 19,
+                'currency': 'INR',
+                'description': 'Resume Analysis',
+                'quantityMultiplier': 1  # 1 per purchase
+            },
+            'mockInterviews': {
+                'unitPrice': 49,
+                'currency': 'INR',
+                'description': 'Mock Interview',
+                'quantityMultiplier': 1  # 1 per purchase
+            },
+            'pdfDownloads': {
+                'unitPrice': 9,
+                'currency': 'INR',
+                'description': 'PDF Download Pack',
+                'quantityMultiplier': 10  # 10 per purchase
+            },
+            'aiEnhance': {
+                'unitPrice': 9,
+                'currency': 'INR',
+                'description': 'AI Enhancement Pack',
+                'quantityMultiplier': 5  # 5 per purchase
+            }
+        }
+        
+        return jsonify(addon_pricing)
+    except Exception as e:
+        print(f"Error in /get-addon-pricing: {e}")
+        traceback.print_exc()
+        return jsonify({'error': f'Server error: {str(e)}'}), 500
+
+
+@app.route('/get-addon-purchase-history/<user_id>', methods=['GET'])
+def get_addon_purchase_history(user_id):
+    """Retrieves the addon purchase history for a user."""
+    try:
+        if not user_id: return jsonify({'error': 'User ID required'}), 400
+        if not db: return jsonify({'error': 'Database unavailable'}), 503
+        
+        # Query the addon purchases collection for this user
+        purchases_query = db.collection('addonPurchases').where('userId', '==', user_id).order_by('purchaseDate', direction=firestore.Query.DESCENDING)
+        purchases = []
+        
+        for doc in purchases_query.stream():
+            purchase_data = doc.to_dict()
+            purchase_data['id'] = doc.id
+            purchases.append(purchase_data)
+        
+        return jsonify({
+            'userId': user_id,
+            'purchases': purchases
+        })
+        
+    except Exception as e:
+        print(f"Error in /get-addon-purchase-history: {e}")
+        traceback.print_exc()
+        return jsonify({'error': f'Server error: {str(e)}'}), 500
+
+
 
 
 # --- Cleanup Function (Needs Review/Replacement with TTL) ---
