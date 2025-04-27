@@ -563,7 +563,7 @@
                                             <div class="d-flex justify-content-between align-items-center mb-2">
                                                 <h5>Objective / Professional Summary</h5>
                                                 <button class="btn btn-sm btn-outline-primary ai-generate-btn" data-target="resumeObjective" data-type="objective" title="Enhance Objective with AI">
-                                                    <i class="fas fa-magic"></i> Enhance
+                                                    <i class="fas fa-magic"></i> AI Enhance
                                                 </button>
                                             </div>
                                             <textarea class="form-control" id="resumeObjective" rows="3" placeholder="Write a brief summary or objective..."></textarea>
@@ -657,7 +657,7 @@
                                                         <label class="form-label d-flex justify-content-between">
                                                             Description / Responsibilities
                                                             <button class="btn btn-sm btn-outline-primary ai-generate-btn" data-target="description" data-type="experience" title="Enhance Description with AI">
-                                                                <i class="fas fa-magic"></i> Enhance
+                                                                <i class="fas fa-magic"></i> AI Enhance
                                                             </button>
                                                         </label>
                                                         <textarea class="form-control" data-field="description" rows="3" placeholder="Describe achievements using bullet points..."></textarea>
@@ -714,7 +714,7 @@
                                                         <label class="form-label d-flex justify-content-between">
                                                             Description
                                                              <button class="btn btn-sm btn-outline-primary ai-generate-btn" data-target="description" data-type="project" title="Enhance Description with AI">
-                                                                <i class="fas fa-magic"></i> Enhance
+                                                                <i class="fas fa-magic"></i> AI Enhance
                                                             </button>
                                                         </label>
                                                         <textarea class="form-control" data-field="description" rows="3" placeholder="Describe the project, tech used, outcomes..."></textarea>
@@ -779,6 +779,36 @@
                                                   <label class="btn btn-outline-secondary" for="fontLarge">Large</label>
                                               </div>
                                          </div>
+                                         <div class="mb-3">
+                                            <label class="form-label">Spacing & Density</label>
+                                            <div class="border rounded p-3 bg-light">
+                                                <div class="mb-2">
+                                                    <label for="resumeSpacingFactor" class="form-label d-flex justify-content-between">
+                                                        <span>Overall Spacing</span>
+                                                        <span id="spacingFactorValue">1.0×</span>
+                                                    </label>
+                                                    <input type="range" class="form-range" id="resumeSpacingFactor" min="0.8" max="1.6" step="0.1" value="1.0">
+                                                    <div class="form-text text-center d-flex justify-content-between">
+                                                        <span>Compact</span>
+                                                        <span>Spacious</span>
+                                                    </div>
+                                                </div>
+                                                <div class="mb-2">
+                                                    <label for="sectionSpacing" class="form-label d-flex justify-content-between">
+                                                        <span>Between Sections</span>
+                                                        <span id="sectionSpacingValue">1.0×</span>
+                                                    </label>
+                                                    <input type="range" class="form-range" id="sectionSpacing" min="0.8" max="1.6" step="0.1" value="1.0">
+                                                </div>
+                                                <div>
+                                                    <label for="itemSpacing" class="form-label d-flex justify-content-between">
+                                                        <span>Between Items</span>
+                                                        <span id="itemSpacingValue">1.0×</span>
+                                                    </label>
+                                                    <input type="range" class="form-range" id="itemSpacing" min="0.8" max="1.6" step="0.1" value="1.0">
+                                                </div>
+                                            </div>
+                                        </div>
                                           <div class="mb-3">
                                               <label class="form-label">Document Size</label>
                                                <div class="btn-group w-100" role="group" aria-label="Document Size">

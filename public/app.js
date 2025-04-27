@@ -410,7 +410,7 @@ function showPaymentModal() {
     const currentPlan = irisAuth?.getUserProfile()?.plan || 'free';
     
     // Show the upgrade modal with appropriate features highlighted
-    showUpgradeModal(currentPlan === 'free' ? 'resumeAnalyses' : 'mockInterviews');
+    showExistingUpgradeModal(currentPlan === 'free' ? 'resumeAnalyses' : 'mockInterviews');
 }
 
 function downloadUserData() {
@@ -790,7 +790,7 @@ function uploadResumeAndAnalyze() {
             return response.json().then(errData => {
                 if (errData.limitReached) {
                      showMessage(errData.error || 'Usage limit reached.', 'warning');
-                     showUpgradeModal('resumeAnalyses');
+                     showExistingUpgradeModal('resumeAnalyses');
                      throw new Error('Limit Reached');
                 }
                 throw new Error(errData.error || `Analysis request failed (${response.status})`);
@@ -2055,7 +2055,7 @@ function startMockInterview() {
              return response.json().then(errData => {
                 if (errData.limitReached) {
                      showMessage(errData.error || 'Usage limit reached.', 'warning');
-                     showUpgradeModal('mockInterviews');
+                     showExistingUpgradeModal('mockInterviews');
                      throw new Error('Limit Reached');
                 }
                 throw new Error(errData.error || `Failed to start interview (${response.status})`);
@@ -3525,7 +3525,7 @@ function checkFeatureAccess(featureType) {
         // If they've hit their limit, show upgrade modal
         if (usageInfo.used >= usageInfo.limit) {
             showMessage(`You've reached your ${featureType === 'resumeAnalyses' ? 'resume analysis' : 'mock interview'} limit (${usageInfo.used}/${usageInfo.limit}). Please upgrade your plan to continue.`, 'warning');
-            showUpgradeModal(featureType);
+            showExistingUpgradeModal(featureType);
             return false;
         }
     }
@@ -3606,7 +3606,7 @@ function updateUsageDisplay() {
 }
 
 // --- New function to show upgrade modal (continued) ---
-function showUpgradeModal(featureType) {
+function showExistingUpgradeModal(featureType) {
     // Get current plan to determine what plans to highlight
     const currentPlan = irisAuth?.getUserProfile()?.plan || 'free';
     const modalContent = document.createElement('div');
@@ -3961,13 +3961,56 @@ function initResumeBuilder() {
           console.log("Settings listeners attached.");
     }
 
+    // --- Spacing controls ---
+    const spacingFactorSlider = document.getElementById('resumeSpacingFactor');
+    const sectionSpacingSlider = document.getElementById('sectionSpacing');
+    const itemSpacingSlider = document.getElementById('itemSpacing');
 
-    // Download Button (no change needed)
-    document.getElementById('downloadResumeBtn')?.addEventListener('click', downloadResumePDF);
+    const spacingFactorValue = document.getElementById('spacingFactorValue');
+    const sectionSpacingValue = document.getElementById('sectionSpacingValue');
+    const itemSpacingValue = document.getElementById('itemSpacingValue');
 
-     // Initial preview render and style application
-    applyResumeStyles(); // Applies styles and triggers initial preview render
-    console.log("Initial resume builder setup complete.");
+    // Initialize spacing sliders if they exist
+    if (spacingFactorSlider && spacingFactorValue) {
+        spacingFactorSlider.addEventListener('input', function() {
+            spacingFactorValue.textContent = `${this.value}×`;
+            updateResumePreview(); // Update preview when spacing changes
+        });
+    }
+
+    if (sectionSpacingSlider && sectionSpacingValue) {
+        sectionSpacingSlider.addEventListener('input', function() {
+            sectionSpacingValue.textContent = `${this.value}×`;
+            updateResumePreview(); // Update preview when spacing changes
+        });
+    }
+
+    if (itemSpacingSlider && itemSpacingValue) {
+        itemSpacingSlider.addEventListener('input', function() {
+            itemSpacingValue.textContent = `${this.value}×`;
+            updateResumePreview(); // Update preview when spacing changes
+        });
+    }
+
+    // Download Button - Modified to use the original click handler
+    const downloadBtn = document.getElementById('downloadResumeBtn');
+    if (downloadBtn) {
+        // Remove any existing click handler
+        const newDownloadBtn = downloadBtn.cloneNode(true);
+        downloadBtn.parentNode.replaceChild(newDownloadBtn, downloadBtn);
+        
+        // Add the new handler with usage tracking
+        newDownloadBtn.addEventListener('click', downloadResumePDF);
+    }
+
+    // Apply initial styles and render preview
+    applyResumeStyles();
+    updateResumePreview();
+    
+    // NEW: Update usage UI to display remaining usage
+    updateResumeBuilderUsageUI();
+    
+    console.log("Resume builder initialized with usage tracking.");
 }
 
 // --- Ensure handleRemoveItem uses the passed button ---
@@ -4126,6 +4169,11 @@ function applyResumeStyles() {
 
 // AI Content Enhancement
 async function enhanceResumeContent(sectionType, contentElement, button) {
+    // First, check if user can use AI enhance
+    if (!trackAiEnhance()) {
+        return; // Stop if limit is reached or user not logged in
+    }
+
     const originalContent = contentElement.value.trim();
 
     if (!originalContent) {
@@ -4144,7 +4192,7 @@ async function enhanceResumeContent(sectionType, contentElement, button) {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                 // Add Auth headers if your backend requires them
+                // Add Auth headers if your backend requires them
                 // 'Authorization': `Bearer ${await firebase.auth().currentUser.getIdToken()}`
             },
             body: JSON.stringify({
@@ -4164,7 +4212,7 @@ async function enhanceResumeContent(sectionType, contentElement, button) {
             contentElement.value = data.enhancedContent; // Update the input/textarea
             showToast('✅ Content enhanced successfully!', 'success');
             // Trigger input event for potential frameworks that listen to changes
-             contentElement.dispatchEvent(new Event('input', { bubbles: true }));
+            contentElement.dispatchEvent(new Event('input', { bubbles: true }));
         } else {
             throw new Error(data.error || "Enhancement failed: No content returned.");
         }
@@ -4235,9 +4283,12 @@ function getResumeData() {
         certifications: [],
         // --- END ADDED LINE ---
         settings: {
-             fontFamily: document.getElementById('resumeFontFamily')?.value || "'Helvetica', 'Arial', sans-serif", // Use standard fallback
-             fontSize: document.querySelector('input[name="resumeFontSize"]:checked')?.value || 'standard',
-             docSize: document.querySelector('input[name="resumeDocSize"]:checked')?.value || 'letter'
+            fontFamily: document.getElementById('resumeFontFamily')?.value || "'Helvetica', 'Arial', sans-serif",
+            fontSize: document.querySelector('input[name="resumeFontSize"]:checked')?.value || 'standard',
+            docSize: document.querySelector('input[name="resumeDocSize"]:checked')?.value || 'letter',
+            spacingFactor: parseFloat(document.getElementById('resumeSpacingFactor')?.value || '1.0'),
+            sectionSpacing: parseFloat(document.getElementById('sectionSpacing')?.value || '1.0'),
+            itemSpacing: parseFloat(document.getElementById('itemSpacing')?.value || '1.0')
         }
     };
 
@@ -4291,12 +4342,18 @@ function getResumeData() {
 }
 
 function downloadResumePDF() {
+    // First, check if user can download PDF
+    if (!trackPdfDownload()) {
+        return; // Stop if limit is reached or user not logged in
+    }
+
     // Check if jsPDF library is loaded
     if (typeof jspdf === 'undefined') {
         showErrorMessage('PDF generation library (jsPDF) is not loaded.', 'danger');
         console.error("jsPDF is not defined. Make sure the library is included.");
         return;
     }
+    
     const { jsPDF } = jspdf; // Destructure jsPDF
     const resumeData = getResumeData(); // Get data from the form
     const docSize = resumeData.settings.docSize || 'letter'; // 'letter' or 'a4'
@@ -4308,319 +4365,273 @@ function downloadResumePDF() {
         format: docSize
     });
 
+    // --- Get Spacing Settings ---
+    const spacingFactor = resumeData.settings.spacingFactor || 1.0; // Default if not set
+    const sectionSpacing = resumeData.settings.sectionSpacing || 1.0; // Default if not set
+    const itemSpacing = resumeData.settings.itemSpacing || 1.0; // Default if not set
+    
+    console.log(`PDF Generation with spacing: Overall=${spacingFactor}, Sections=${sectionSpacing}, Items=${itemSpacing}`);
+
     // --- Margins and Page Dimensions ---
     const pageHeight = pdf.internal.pageSize.getHeight();
     const pageWidth = pdf.internal.pageSize.getWidth();
     
-    // More aggressive use of page space - reduce margins for better distribution
-    const margin = 36; // Smaller margin (was 40)
+    // Adjust margins based on page aspect ratio and spacing
+    const margin = 36; // Base margin
     const contentWidth = pageWidth - (2 * margin);
     let currentY = margin; // Start drawing from top margin
 
-    // --- Measure total content height first (two-pass approach) ---
-    // This will allow us to calculate scaling factors for better distribution
-    let measuredContentHeight = 0;
-    let contentSections = [];
-    
     // --- Font Settings ---
     // Determine font sizes based on user selection
     const baseFontSize = resumeData.settings.fontSize === 'compact' ? 9 : 
                           (resumeData.settings.fontSize === 'large' ? 11 : 10);
-    const headingFontSize = baseFontSize + 4; 
-    const subHeadingFontSize = baseFontSize + 1;
-    const bodyFontSize = baseFontSize;
+    const headingFontSize = baseFontSize + 4; // e.g., 14pt for standard
+    const subHeadingFontSize = baseFontSize + 1; // e.g., 11pt for standard
+    const bodyFontSize = baseFontSize; // e.g., 10pt for standard
 
-    // Use standard PDF fonts
+    // Use standard PDF fonts (Helvetica is generally available)
     const standardFont = 'Helvetica';
-    pdf.setFont(standardFont);
+    pdf.setFont(standardFont); // Set default font
 
     // --- Helper Functions ---
-    // Measure text height without drawing
-    const measureWrappedText = (text, maxWidth, options = {}) => {
-        const { fontSize = bodyFontSize, lineHeightFactor = 1.15 } = options;
-        pdf.setFontSize(fontSize);
-        const lines = pdf.splitTextToSize(text || '', maxWidth);
-        return lines.length * fontSize * lineHeightFactor;
-    };
 
-    // Actual render of text with wrapping
+    // Helper to add text that wraps within the content width
     const addWrappedText = (text, x, y, maxWidth, options = {}) => {
         const { fontSize = bodyFontSize, style = 'normal', align = 'left', lineHeightFactor = 1.15 } = options;
         pdf.setFontSize(fontSize);
-        pdf.setFont(standardFont, style);
-        const lines = pdf.splitTextToSize(text || '', maxWidth);
+        pdf.setFont(standardFont, style); // Set style (normal, bold, italic)
+        const lines = pdf.splitTextToSize(text || '', maxWidth); // Split text to fit width
         pdf.text(lines, x, y, { align: align, lineHeightFactor: lineHeightFactor });
-        return y + (lines.length * fontSize * lineHeightFactor);
+        // Return adjusted Y position with spacing factor
+        return y + (lines.length * fontSize * lineHeightFactor * spacingFactor);
     };
 
-    // First pass: Measure each section and add to contentSections array with heights
+    // Helper to check if a page break is needed before adding content
+    const checkAddPage = (requiredHeight) => {
+        if (currentY + requiredHeight > pageHeight - margin) { // Check if content exceeds bottom margin
+            pdf.addPage(); // Add a new page
+            currentY = margin; // Reset Y position to top margin
+            return true; // Page was added
+        }
+        return false; // No page added
+    };
+
+    // Helper to add a standard section heading with an underline
+    const addSectionHeading = (text) => {
+        // Don't add heading if the corresponding section data was deleted (because it was hidden in the editor)
+        const sectionKey = text.toLowerCase().replace(/\s+/g, '');
+        if (!resumeData[sectionKey] && 
+            !['workexperience', 'education', 'projects', 'skills', 'certifications'].includes(sectionKey)) {
+            console.log(`Skipping hidden section heading: ${text}`);
+            return false; // Indicate that heading was skipped
+        }
+
+        // Add extra section spacing (multiplied by the section spacing factor)
+        if (currentY > margin + 10) {
+            currentY += 12 * sectionSpacing; // Add section spacing before heading (if not the first section)
+        }
+
+        checkAddPage(headingFontSize + 15); // Check space for heading and line
+        pdf.setFontSize(headingFontSize);
+        pdf.setFont(standardFont, 'bold');
+        pdf.text(text.toUpperCase(), margin, currentY); // Add heading text in uppercase
+        currentY += headingFontSize * 0.6; // Move down slightly for underline
+        pdf.setLineWidth(0.5); // Set line thickness
+        pdf.line(margin, currentY, pageWidth - margin, currentY); // Draw the underline
+        currentY += 8 * spacingFactor; // Add space after the line with spacing factor
+        return true; // Indicate heading was added
+    };
+
+    // Calculate page distribution based on content and spacing
+    const calculateDistribution = () => {
+        // Get total available space on page
+        const availableSpace = pageHeight - (2 * margin);
+        
+        // Estimate minimum needed space (can be refined for better distribution)
+        let estimatedContentHeight = 0;
+        
+        // Personal info section
+        if (resumeData.personal?.name) {
+            estimatedContentHeight += (headingFontSize + 4) * 1.2; // Name
+            estimatedContentHeight += bodyFontSize * 1.5; // Contact info
+        }
+        
+        // Objective section
+        if (resumeData.objective) {
+            const lines = pdf.splitTextToSize(resumeData.objective, contentWidth);
+            estimatedContentHeight += lines.length * bodyFontSize * 1.2;
+            estimatedContentHeight += 20 * sectionSpacing; // Section gap
+        }
+        
+        // Work Experience section
+        if (resumeData.experience?.length > 0) {
+            estimatedContentHeight += 30 * sectionSpacing; // Section heading + gap
+            resumeData.experience.forEach(exp => {
+                estimatedContentHeight += subHeadingFontSize * 2; // Title + company
+                const descLines = exp.description?.split('\n') || [];
+                estimatedContentHeight += descLines.length * bodyFontSize * 1.2;
+                estimatedContentHeight += 15 * itemSpacing; // Item spacing
+            });
+        }
+        
+        // Education section
+        if (resumeData.education?.length > 0) {
+            estimatedContentHeight += 30 * sectionSpacing; // Section heading + gap
+            resumeData.education.forEach(edu => {
+                estimatedContentHeight += subHeadingFontSize * 2; // Degree + school
+                estimatedContentHeight += 15 * itemSpacing; // Item spacing
+            });
+        }
+        
+        // Projects section
+        if (resumeData.projects?.length > 0) {
+            estimatedContentHeight += 30 * sectionSpacing; // Section heading + gap
+            resumeData.projects.forEach(proj => {
+                estimatedContentHeight += subHeadingFontSize * 1.5; // Project name
+                const descLines = proj.description?.split('\n') || [];
+                estimatedContentHeight += descLines.length * bodyFontSize * 1.2;
+                estimatedContentHeight += 15 * itemSpacing; // Item spacing
+            });
+        }
+        
+        // Skills section
+        if (resumeData.skills) {
+            estimatedContentHeight += 30 * sectionSpacing; // Section heading + gap
+            const skillsLines = pdf.splitTextToSize(resumeData.skills, contentWidth);
+            estimatedContentHeight += skillsLines.length * bodyFontSize * 1.2;
+        }
+        
+        // Certifications section
+        if (resumeData.certifications?.length > 0) {
+            estimatedContentHeight += 30 * sectionSpacing; // Section heading + gap
+            estimatedContentHeight += resumeData.certifications.length * bodyFontSize * 2;
+        }
+        
+        // Calculate distribution factor based on content and available space
+        const distributionFactor = Math.max(1.0, availableSpace / (estimatedContentHeight * spacingFactor));
+        
+        // Limit the factor to a reasonable range to prevent excessive spacing
+        return Math.min(distributionFactor, 1.5);
+    };
     
-    // --- 1. Header Section Measurement ---
-    let headerHeight = 0;
+    // Calculate distribution factor once
+    const distributionFactor = calculateDistribution();
+    console.log(`Calculated distribution factor: ${distributionFactor}`);
+
+    // --- 1. Header Section ---
     if (resumeData.personal?.name) {
-        headerHeight += (headingFontSize + 4) * 1.05; // Name height
+        checkAddPage(headingFontSize + 4 + bodyFontSize * 1.5); // Estimate height needed
+        pdf.setFontSize(headingFontSize + 4); // Larger font for name
+        pdf.setFont(standardFont, 'bold');
+        pdf.text(resumeData.personal.name, pageWidth / 2, currentY, { align: 'center' }); // Center align name
+        currentY += (headingFontSize + 4) * 1.05 * spacingFactor; // Move Y down with spacing factor
     }
     
+    // Construct contact info string, filtering out empty values
     let contactInfo = [
         resumeData.personal?.location,
         resumeData.personal?.phone,
         resumeData.personal?.email,
         resumeData.personal?.website
-    ].filter(Boolean).join(' | ');
-    
-    if (contactInfo) {
-        headerHeight += bodyFontSize * 1.4; // Contact info height
-    }
-    
-    contentSections.push({ type: 'header', height: headerHeight });
-    measuredContentHeight += headerHeight;
+    ].filter(Boolean).join(' | '); // Join with separators
 
-    // --- 2. Objective/Summary Measurement ---
-    if (resumeData.objective) {
-        const objectiveHeight = measureWrappedText(resumeData.objective, contentWidth) + bodyFontSize * 0.8;
-        contentSections.push({ type: 'objective', height: objectiveHeight });
-        measuredContentHeight += objectiveHeight;
-    }
-
-    // --- 3. Sections with headers (add 20pt for each section header) ---
-    const sectionHeaderHeight = headingFontSize + 12; // Height for section header + line
-
-    // --- Measure Work Experience Section ---
-    if (resumeData.experience && resumeData.experience.length > 0) {
-        let sectionHeight = sectionHeaderHeight;
-        
-        resumeData.experience.forEach((exp, index) => {
-            let itemHeight = subHeadingFontSize * 1.05; // Job title line
-            itemHeight += bodyFontSize * 1.1; // Company line
-            
-            // Measure description
-            if (exp.description) {
-                const descLines = exp.description.split('\n').filter(line => line.trim());
-                descLines.forEach(line => {
-                    const cleanLine = line.replace(/^[\*\-\•]\s*/, '');
-                    itemHeight += measureWrappedText(cleanLine, contentWidth - 12);
-                });
-            }
-            
-            // Add spacing between items
-            if (index < resumeData.experience.length - 1) {
-                itemHeight += bodyFontSize * 0.4;
-            }
-            
-            sectionHeight += itemHeight;
-        });
-        
-        contentSections.push({ type: 'work', height: sectionHeight });
-        measuredContentHeight += sectionHeight;
-    }
-
-    // --- Measure Education Section ---
-    if (resumeData.education && resumeData.education.length > 0) {
-        let sectionHeight = sectionHeaderHeight;
-        
-        resumeData.education.forEach((edu, index) => {
-            let itemHeight = subHeadingFontSize * 1.05; // Degree line
-            itemHeight += bodyFontSize * 1.1; // School line
-            
-            // Add space for additional info
-            if (edu.additionalInfo) {
-                itemHeight += measureWrappedText(
-                    `Relevant Info: ${edu.additionalInfo}`, 
-                    contentWidth, 
-                    { fontSize: bodyFontSize - 1 }
-                );
-            }
-            
-            // Space between items
-            if (index < resumeData.education.length - 1) {
-                itemHeight += bodyFontSize * 0.4;
-            }
-            
-            sectionHeight += itemHeight;
-        });
-        
-        contentSections.push({ type: 'education', height: sectionHeight });
-        measuredContentHeight += sectionHeight;
-    }
-
-    // --- Measure Projects Section ---
-    if (resumeData.projects && resumeData.projects.length > 0) {
-        let sectionHeight = sectionHeaderHeight;
-        
-        resumeData.projects.forEach((proj, index) => {
-            let itemHeight = subHeadingFontSize * 1.05; // Project name line
-            
-            // Add height for link if present
-            if (proj.link) {
-                itemHeight += bodyFontSize * 1.1;
-            }
-            
-            // Add height for description
-            if (proj.description) {
-                const descLines = proj.description.split('\n').filter(line => line.trim());
-                descLines.forEach(line => {
-                    const cleanLine = line.replace(/^[\*\-\•]\s*/, '');
-                    itemHeight += measureWrappedText(cleanLine, contentWidth - 12);
-                });
-            }
-            
-            // Space between items
-            if (index < resumeData.projects.length - 1) {
-                itemHeight += bodyFontSize * 0.4;
-            }
-            
-            sectionHeight += itemHeight;
-        });
-        
-        contentSections.push({ type: 'projects', height: sectionHeight });
-        measuredContentHeight += sectionHeight;
-    }
-
-    // --- Measure Skills Section ---
-    if (resumeData.skills) {
-        const skillsHeight = sectionHeaderHeight + 
-            measureWrappedText(resumeData.skills.split(/[\n,]+/).join(', '), contentWidth) +
-            bodyFontSize * 0.5;
-        
-        contentSections.push({ type: 'skills', height: skillsHeight });
-        measuredContentHeight += skillsHeight;
-    }
-
-    // --- Measure Certifications Section ---
-    if (resumeData.certifications && resumeData.certifications.length > 0) {
-        let sectionHeight = sectionHeaderHeight;
-        
-        resumeData.certifications.forEach((cert, index) => {
-            // Estimate simple one-line height for certs
-            sectionHeight += bodyFontSize * 1.7;
-            // Space between items
-            if (index < resumeData.certifications.length - 1) {
-                sectionHeight += bodyFontSize * 0.2;
-            }
-        });
-        
-        contentSections.push({ type: 'certifications', height: sectionHeight });
-        measuredContentHeight += sectionHeight;
-    }
-
-    // --- Calculate adjustment factors for spacing ---
-    // Determine usable page height (accounting for margins)
-    const usableHeight = pageHeight - (2 * margin);
-    
-    // Calculate how much extra space we have
-    const extraSpace = Math.max(0, usableHeight - measuredContentHeight);
-    
-    // Calculate spacing factor - how much to multiply section spacing by
-    const spacingFactor = extraSpace > 0 ? 
-        (usableHeight / measuredContentHeight) : 1;
-    
-    // Minimum spacing factor to prevent excessive stretching
-    const adjustedFactor = Math.min(1.4, Math.max(1.0, spacingFactor));
-    
-    console.log(`Content Height: ${measuredContentHeight}px, Page Height: ${usableHeight}px`);
-    console.log(`Spacing Factor: ${spacingFactor}, Adjusted: ${adjustedFactor}`);
-
-    // --- Second pass: Actually render with adjusted spacing ---
-    currentY = margin; // Reset Y position for actual drawing
-
-    // --- Helper for section headings with adjusted spacing ---
-    const addSectionHeading = (text) => {
-        const sectionKey = text.toLowerCase().replace(/\s+/g, '');
-        if (!resumeData[sectionKey] && 
-            !['workexperience', 'education', 'projects', 'skills', 'certifications'].includes(sectionKey)) {
-            return false;
-        }
-
-        // Add extra space before sections (except for the first one)
-        if (currentY > margin + 10) {
-            currentY += 8 * adjustedFactor; // Add adjusted spacing before section
-        }
-
-        pdf.setFontSize(headingFontSize);
-        pdf.setFont(standardFont, 'bold');
-        pdf.text(text.toUpperCase(), margin, currentY);
-        currentY += headingFontSize * 0.6;
-        pdf.setLineWidth(0.5);
-        pdf.line(margin, currentY, pageWidth - margin, currentY);
-        currentY += 8;
-        return true;
-    };
-
-    // --- Actual rendering with adjusted spacing ---
-    
-    // --- 1. Header ---
-    if (resumeData.personal?.name) {
-        pdf.setFontSize(headingFontSize + 4);
-        pdf.setFont(standardFont, 'bold');
-        pdf.text(resumeData.personal.name, pageWidth / 2, currentY, { align: 'center' });
-        currentY += (headingFontSize + 4) * 1.05 * adjustedFactor; // Adjusted spacing
-    }
-    
     if (contactInfo) {
         pdf.setFontSize(bodyFontSize);
         pdf.setFont(standardFont, 'normal');
-        pdf.text(contactInfo, pageWidth / 2, currentY, { align: 'center' });
-        currentY += bodyFontSize * 1.4 * adjustedFactor; // Adjusted spacing
+        pdf.text(contactInfo, pageWidth / 2, currentY, { align: 'center' }); // Center align contact info
+        currentY += bodyFontSize * 1.4 * spacingFactor; // Add space after contact info with spacing factor
     }
 
-    // --- 2. Objective/Summary ---
+    // --- 2. Objective/Summary Section ---
     if (resumeData.objective) {
+        checkAddPage(bodyFontSize * 3); // Estimate height
+        // No heading for summary, just add the text, potentially italicized
         currentY = addWrappedText(resumeData.objective, margin, currentY, contentWidth, { style: 'italic' });
-        currentY += bodyFontSize * 0.7 * adjustedFactor; // Adjusted spacing
+        currentY += bodyFontSize * 0.7 * spacingFactor * sectionSpacing; // Add space after summary with section spacing
     }
 
-    // --- 3. Work Experience ---
+    // --- 3. Work Experience Section ---
     if (resumeData.experience && resumeData.experience.length > 0) {
-        if (addSectionHeading('Work Experience')) {
+        if (addSectionHeading('Work Experience')) { // Only proceed if heading was added (section not hidden)
             resumeData.experience.forEach((exp, index) => {
+                // Add item spacing between experiences
+                if (index > 0) {
+                    currentY += bodyFontSize * 0.4 * itemSpacing;
+                }
+                
+                checkAddPage(subHeadingFontSize * 2 + bodyFontSize * 3); // Estimate space needed
                 pdf.setFontSize(subHeadingFontSize);
                 pdf.setFont(standardFont, 'bold');
+                // Add Job Title (left aligned)
                 pdf.text(exp.jobTitle || 'Job Title', margin, currentY);
                 
+                // Add Date Range (right aligned)
                 if (exp.date) {
                     pdf.setFont(standardFont, 'normal');
                     pdf.text(exp.date, pageWidth - margin, currentY, { align: 'right' });
                 }
-                currentY += subHeadingFontSize * 1.05 * adjustedFactor; // Adjusted spacing
+                currentY += subHeadingFontSize * 1.05 * spacingFactor; // Move Y down with spacing factor
 
+                // Add Company & Location (italicized)
                 pdf.setFontSize(bodyFontSize);
                 pdf.setFont(standardFont, 'italic');
                 pdf.text(`${exp.company || 'Company'} | ${exp.location || 'Location'}`, margin, currentY);
-                currentY += bodyFontSize * 1.1 * adjustedFactor; // Adjusted spacing
+                currentY += bodyFontSize * 1.1 * spacingFactor; // Move Y down with spacing factor
 
+                // Add Description (as bullet points)
                 if (exp.description) {
                     const descLines = exp.description.split('\n').map(line => line.trim()).filter(line => line);
-                    descLines.forEach(line => {
-                        const cleanLine = line.replace(/^[\*\-\•]\s*/, '');
+                    descLines.forEach((line, i) => {
+                        const cleanLine = line.replace(/^[\*\-\•]\s*/, ''); // Remove leading bullet characters
+                        
+                        // Check for page break, but only if not the first line
+                        if (i > 0) {
+                            checkAddPage(bodyFontSize * 1.2);
+                        }
+                        
                         pdf.setFontSize(bodyFontSize);
                         pdf.setFont(standardFont, 'normal');
-                        pdf.text('•', margin + 3, currentY);
+                        pdf.text('•', margin + 3, currentY); // Draw bullet point
+                        
+                        // Add the wrapped text line, indented
                         currentY = addWrappedText(cleanLine, margin + 12, currentY, contentWidth - 12);
                     });
                 }
                 
-                // Adjust spacing between items based on factor
+                // Add spacing after each experience item (except last) based on item spacing
                 if (index < resumeData.experience.length - 1) {
-                    currentY += bodyFontSize * 0.4 * adjustedFactor;
+                    currentY += bodyFontSize * 0.5 * itemSpacing;
                 }
             });
+            
+            // Add spacing after the section
+            currentY += bodyFontSize * 0.5 * sectionSpacing;
         }
     }
 
-    // --- 4. Education Section (with adjusted spacing) ---
+    // --- 4. Education Section ---
     if (resumeData.education && resumeData.education.length > 0) {
         if (addSectionHeading('Education')) {
             resumeData.education.forEach((edu, index) => {
+                // Add item spacing between education items
+                if (index > 0) {
+                    currentY += bodyFontSize * 0.4 * itemSpacing;
+                }
+                
+                checkAddPage(subHeadingFontSize * 2 + bodyFontSize * 2);
                 pdf.setFontSize(subHeadingFontSize);
                 pdf.setFont(standardFont, 'bold');
+                // Add Degree/Major (left aligned)
                 pdf.text(edu.degreeMajor || 'Degree/Major', margin, currentY);
                 
+                // Add Graduation Date (right aligned)
                 if (edu.date) {
                     pdf.setFont(standardFont, 'normal');
                     pdf.text(edu.date, pageWidth - margin, currentY, { align: 'right' });
                 }
-                currentY += subHeadingFontSize * 1.05 * adjustedFactor; // Adjusted spacing
+                currentY += subHeadingFontSize * 1.05 * spacingFactor; // Move Y down with spacing factor
 
+                // Add School, Location, GPA (italicized)
                 pdf.setFontSize(bodyFontSize);
                 pdf.setFont(standardFont, 'italic');
                 let schoolLine = `${edu.school || 'School'} | ${edu.location || 'Location'}`;
@@ -4628,8 +4639,9 @@ function downloadResumePDF() {
                     schoolLine += ` | GPA: ${edu.gpa}`;
                 }
                 pdf.text(schoolLine, margin, currentY);
-                currentY += bodyFontSize * 1.1 * adjustedFactor; // Adjusted spacing
+                currentY += bodyFontSize * 1.1 * spacingFactor; // Move Y down with spacing factor
 
+                // Add Additional Info if present
                 if (edu.additionalInfo) {
                     currentY = addWrappedText(`Relevant Info: ${edu.additionalInfo}`, margin, currentY, contentWidth, { 
                         style: 'italic', 
@@ -4637,66 +4649,97 @@ function downloadResumePDF() {
                     });
                 }
                 
-                // Adjust spacing between items
+                // Add spacing after each education item
                 if (index < resumeData.education.length - 1) {
-                    currentY += bodyFontSize * 0.4 * adjustedFactor;
+                    currentY += bodyFontSize * 0.4 * itemSpacing;
                 }
             });
+            
+            // Add spacing after the section
+            currentY += bodyFontSize * 0.5 * sectionSpacing;
         }
     }
 
-    // --- 5. Projects Section (with adjusted spacing) ---
+    // --- 5. Projects Section ---
     if (resumeData.projects && resumeData.projects.length > 0) {
         if (addSectionHeading('Projects')) {
             resumeData.projects.forEach((proj, index) => {
+                // Add item spacing between projects
+                if (index > 0) {
+                    currentY += bodyFontSize * 0.4 * itemSpacing;
+                }
+                
+                checkAddPage(subHeadingFontSize + bodyFontSize * 3); // Estimate space
                 pdf.setFontSize(subHeadingFontSize);
                 pdf.setFont(standardFont, 'bold');
+                // Add Project Name (left aligned)
                 pdf.text(proj.projectName || 'Project Name', margin, currentY);
                 
+                // Add Date (right aligned, if present)
                 if(proj.date) {
                     pdf.setFont(standardFont, 'normal');
                     pdf.text(proj.date, pageWidth - margin, currentY, { align: 'right' });
                 }
-                currentY += subHeadingFontSize * 1.05 * adjustedFactor; // Adjusted spacing
+                currentY += subHeadingFontSize * 1.05 * spacingFactor; // Move Y down with spacing factor
 
+                // Add Link (if present)
                 if (proj.link) {
-                    pdf.setFontSize(bodyFontSize - 1);
+                    checkAddPage(bodyFontSize * 1.2);
+                    pdf.setFontSize(bodyFontSize - 1); // Smaller font for link
                     pdf.setFont(standardFont, 'italic');
                     currentY = addWrappedText(proj.link, margin, currentY, contentWidth);
                 }
 
+                // Add Description (as bullet points)
                 if (proj.description) {
                     const descLines = proj.description.split('\n').map(line => line.trim()).filter(line => line);
-                    descLines.forEach(line => {
+                    descLines.forEach((line, i) => {
                         const cleanLine = line.replace(/^[\*\-\•]\s*/, '');
+                        
+                        // Check for page break, but only if not the first line
+                        if (i > 0) {
+                            checkAddPage(bodyFontSize * 1.2);
+                        }
+                        
                         pdf.setFontSize(bodyFontSize);
                         pdf.setFont(standardFont, 'normal');
-                        pdf.text('•', margin + 3, currentY);
-                        currentY = addWrappedText(cleanLine, margin + 12, currentY, contentWidth - 12);
+                        pdf.text('•', margin + 3, currentY); // Draw bullet closer
+                        currentY = addWrappedText(cleanLine, margin + 12, currentY, contentWidth - 12); // Indented text
                     });
                 }
                 
-                // Adjust spacing between items
+                // Add spacing after each project
                 if (index < resumeData.projects.length - 1) {
-                    currentY += bodyFontSize * 0.4 * adjustedFactor;
+                    currentY += bodyFontSize * 0.4 * itemSpacing;
                 }
             });
+            
+            // Add spacing after the section
+            currentY += bodyFontSize * 0.5 * sectionSpacing;
         }
     }
 
-    // --- 6. Skills Section (with adjusted spacing) ---
+    // --- 6. Skills Section ---
     if (resumeData.skills) {
         if (addSectionHeading('Skills')) {
+            checkAddPage(bodyFontSize * 3); // Estimate space
+            // Format skills as a comma-separated list
             const skillsList = resumeData.skills.split(/[\n,]+/).map(s => s.trim()).filter(s => s);
             currentY = addWrappedText(skillsList.join(', '), margin, currentY, contentWidth);
-            currentY += bodyFontSize * 0.7 * adjustedFactor; // Adjusted spacing
+            currentY += bodyFontSize * 0.7 * sectionSpacing; // Add space after skills with section spacing
         }
     }
 
-    // --- 7. Certifications Section (with adjusted spacing) ---
+    // --- 7. Certifications Section ---
     if (resumeData.certifications && resumeData.certifications.length > 0) {
         if (addSectionHeading('Certifications')) {
             resumeData.certifications.forEach((cert, index) => {
+                // Add item spacing between certifications
+                if (index > 0) {
+                    currentY += bodyFontSize * 0.3 * itemSpacing;
+                }
+                
+                checkAddPage(bodyFontSize * 2); // Estimate space
                 pdf.setFontSize(bodyFontSize);
                 
                 // Handle available width for certification text
@@ -4709,34 +4752,38 @@ function downloadResumePDF() {
                     pdf.text(dateText, pageWidth - margin, currentY, { align: 'right' });
                 }
                 
-                // Add certification with bold style
+                // Combine certification name and issuing body
                 let certLine = cert.certificationName || 'Certification';
                 if (cert.issuingBody) {
                     certLine += ` - ${cert.issuingBody}`;
                 }
                 
+                // Add certification with bold style
                 pdf.setFont(standardFont, 'bold');
                 currentY = addWrappedText(certLine, margin, currentY, availableWidth);
                 
                 // Add space between certifications
                 if (index < resumeData.certifications.length - 1) {
-                    currentY += bodyFontSize * 0.3 * adjustedFactor;
+                    currentY += bodyFontSize * 0.3 * itemSpacing;
                 }
             });
         }
     }
 
-    // --- Add additional spacing at the end to push content down if needed ---
+    // --- Optimize white space by checking if we can fit more on the page ---
     // Get remaining space and distribute if there's still a gap
     const remainingSpace = pageHeight - margin - currentY;
-    if (remainingSpace > 30) {
-        console.log(`Adding extra ${remainingSpace}px of margin at the bottom`);
-        // Add final filler space (could be a footer or just redistribute)
-        // Option 1: Add subtle footer text
-        pdf.setFontSize(8);
-        pdf.setTextColor(180, 180, 180); // Light gray
-        pdf.text(`Generated on ${new Date().toLocaleDateString()}`, pageWidth/2, pageHeight - 15, {align: 'center'});
-        pdf.setTextColor(0, 0, 0); // Reset color
+    if (remainingSpace > 50) {
+        console.log(`PDF has ${remainingSpace}px of empty space at bottom - applying distribution factor: ${distributionFactor}`);
+        
+        // If we still have significant white space at the end,
+        // we could add a subtle footer or watermark
+        if (remainingSpace > 100) {
+            pdf.setFontSize(8);
+            pdf.setTextColor(180, 180, 180); // Light gray
+            pdf.text(`Generated on ${new Date().toLocaleDateString()}`, pageWidth/2, pageHeight - 20, {align: 'center'});
+            pdf.setTextColor(0, 0, 0); // Reset color
+        }
     }
 
     // --- Save PDF ---
@@ -4765,6 +4812,16 @@ function updateResumePreview() {
     const resumeData = getResumeData(); // Calls the function you already have
     const previewArea = document.getElementById('resumePreviewArea');
     if (!previewArea) return;
+
+    // Apply spacing variables to the preview area
+    const spacingFactor = resumeData.settings.spacingFactor || 1.0;
+    const sectionSpacing = resumeData.settings.sectionSpacing || 1.0;
+    const itemSpacing = resumeData.settings.itemSpacing || 1.0;
+    
+    // Set CSS variables for spacing
+    previewArea.style.setProperty('--spacing-factor', spacingFactor);
+    previewArea.style.setProperty('--section-spacing', sectionSpacing);
+    previewArea.style.setProperty('--item-spacing', itemSpacing);
 
     // Clear previous preview content
     previewArea.innerHTML = '';
@@ -4977,5 +5034,321 @@ function applyDocumentSize() {
         }
         
         console.log(`Applied document size: ${docSizeOption} to preview area`);
+    }
+}
+
+// Tracks usage of PDF downloads
+function trackPdfDownload() {
+    // Check if user is logged in
+    if (!firebase.auth().currentUser) {
+        showMessage('Please sign in to download PDFs', 'warning');
+        if (typeof irisAuth !== 'undefined' && typeof irisAuth.showSignInModal === 'function') {
+            irisAuth.showSignInModal();
+        }
+        return false;
+    }
+    
+    // Check usage limit
+    if (!checkFeatureAccess('pdfDownloads')) {
+        return false;
+    }
+    
+    // Increment usage counter
+    if (typeof irisAuth !== 'undefined' && typeof irisAuth.incrementUsageCounter === 'function') {
+        irisAuth.incrementUsageCounter('pdfDownloads')
+            .then(result => {
+                console.log('PDF download usage updated:', result);
+                updateResumeBuilderUsageUI();
+            })
+            .catch(error => {
+                console.error('Failed to update PDF download usage:', error);
+            });
+    }
+    
+    return true;
+}
+
+// Tracks usage of AI enhance feature
+function trackAiEnhance() {
+    // Check if user is logged in
+    if (!firebase.auth().currentUser) {
+        showMessage('Please sign in to use AI enhancement', 'warning');
+        if (typeof irisAuth !== 'undefined' && typeof irisAuth.showSignInModal === 'function') {
+            irisAuth.showSignInModal();
+        }
+        return false;
+    }
+    
+    // Check usage limit
+    if (!checkFeatureAccess('aiEnhance')) {
+        return false;
+    }
+    
+    // Increment usage counter
+    if (typeof irisAuth !== 'undefined' && typeof irisAuth.incrementUsageCounter === 'function') {
+        irisAuth.incrementUsageCounter('aiEnhance')
+            .then(result => {
+                console.log('AI enhance usage updated:', result);
+                updateResumeBuilderUsageUI();
+            })
+            .catch(error => {
+                console.error('Failed to update AI enhance usage:', error);
+            });
+    }
+    
+    return true;
+}
+
+// Check if user can use a specific feature
+function checkFeatureAccess(featureType) {
+    // Check if user is authenticated
+    const user = firebase.auth().currentUser;
+    if (!user) {
+        showMessage('Please sign in to use this feature', 'warning');
+        if (typeof irisAuth !== 'undefined' && typeof irisAuth.showSignInModal === 'function') {
+            irisAuth.showSignInModal();
+        }
+        return false;
+    }
+    
+    // Check if user can use this feature based on their plan
+    if (!irisAuth.canUseFeature(featureType)) {
+        const usageInfo = irisAuth.getUserProfile()?.usage?.[featureType] || { used: 0, limit: 0 };
+        
+        // If they've hit their limit, show upgrade modal
+        if (usageInfo.used >= usageInfo.limit) {
+            showMessage(`You've reached your ${featureType === 'pdfDownloads' ? 'PDF download' : 'AI enhancement'} limit (${usageInfo.used}/${usageInfo.limit}). Please upgrade your plan to continue.`, 'warning');
+            showUpgradeModal(featureType);
+            return false;
+        }
+    }
+    
+    return true;
+}
+
+// Update UI to show usage limits
+function updateResumeBuilderUsageUI() {
+    const userProfile = irisAuth?.getUserProfile();
+    if (!userProfile || !userProfile.usage) return;
+    
+    // Update PDF downloads counter
+    const pdfUsage = userProfile.usage.pdfDownloads || { used: 0, limit: 0 };
+    const aiUsage = userProfile.usage.aiEnhance || { used: 0, limit: 0 };
+    
+    // Update text on download button to show usage
+    const downloadBtn = document.getElementById('downloadResumeBtn');
+    if (downloadBtn) {
+        const remainingPdf = Math.max(0, pdfUsage.limit - pdfUsage.used);
+        downloadBtn.innerHTML = `<i class="fas fa-download me-1"></i> Download Resume (${remainingPdf} left)`;
+        
+        // Disable button if no downloads left
+        downloadBtn.disabled = remainingPdf <= 0;
+        if (remainingPdf <= 0) {
+            downloadBtn.classList.remove('btn-primary');
+            downloadBtn.classList.add('btn-secondary');
+        } else {
+            downloadBtn.classList.add('btn-primary');
+            downloadBtn.classList.remove('btn-secondary');
+        }
+    }
+    
+    // Update all AI enhance buttons to show remaining usage
+    const aiEnhanceButtons = document.querySelectorAll('.ai-generate-btn');
+    const remainingAi = Math.max(0, aiUsage.limit - aiUsage.used);
+    
+    aiEnhanceButtons.forEach(button => {
+        // We don't want to change the button too much, just add a counter
+        if (remainingAi <= 0) {
+            button.disabled = true;
+            button.title = "AI enhance limit reached. Please upgrade.";
+            // Keep original text but add the counter
+            const originalText = button.innerHTML;
+            if (!originalText.includes('(0)')) {
+                button.innerHTML = originalText.replace('<i class="fas fa-magic"></i> Enhance', '<i class="fas fa-magic"></i> Enhance (0)');
+            }
+        } else {
+            button.disabled = false;
+            button.title = `Enhance content with AI (${remainingAi} left)`;
+            // Update counter or add it if not present
+            const originalText = button.innerHTML;
+            if (originalText.includes('(')) {
+                button.innerHTML = originalText.replace(/\(\d+\)/, `(${remainingAi})`);
+            } else {
+                button.innerHTML = originalText.replace('<i class="fas fa-magic"></i> Enhance', `<i class="fas fa-magic"></i> Enhance (${remainingAi})`);
+            }
+        }
+    });
+}
+
+// Function to show upgrade modal for resume builder features
+function showResumeBuilderUpgradeModal(featureType) {
+    // Get current plan to determine what plans to highlight
+    const currentPlan = irisAuth?.getUserProfile()?.plan || 'free';
+    const modalContent = document.createElement('div');
+    
+    // Configure title and description based on feature
+    let featureTitle = "Resume Builder";
+    let featureDesc = "features";
+    
+    if (featureType === 'pdfDownloads') {
+        featureTitle = "PDF Downloads";
+        featureDesc = "resume PDF downloads";
+    } else if (featureType === 'aiEnhance') {
+        featureTitle = "AI Enhancement";
+        featureDesc = "AI content enhancements";
+    }
+    
+    // Determine recommended plan based on feature and current plan
+    let recommendedPlan = 'standard'; // Default recommendation
+    
+    if (currentPlan === 'free') {
+        recommendedPlan = 'starter'; // From free to starter as first step
+    } else if (currentPlan === 'starter') {
+        recommendedPlan = 'standard'; // From starter to standard for more features
+    } else if (currentPlan === 'standard') {
+        recommendedPlan = 'pro'; // From standard to pro for unlimited
+    }
+    
+    modalContent.innerHTML = `
+        <div class="modal fade" id="resumeUpgradeModal" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Upgrade for More ${featureTitle}</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="alert alert-info">
+                            <i class="fas fa-info-circle me-2"></i>
+                            <strong>You've reached your ${featureDesc} limit on your current plan (${currentPlan}).</strong>
+                            <p class="mb-0">Upgrade to continue using all resume builder features.</p>
+                        </div>
+                        
+                        <div class="row mt-4">
+                            <!-- Feature comparison -->
+                            <div class="col-12 mb-4">
+                                <table class="table table-bordered">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>Feature</th>
+                                            <th>Free</th>
+                                            <th>Starter</th>
+                                            <th>Standard</th>
+                                            <th>Pro</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr>
+                                            <td>PDF Downloads</td>
+                                            <td>5</td>
+                                            <td>20</td>
+                                            <td>50</td>
+                                            <td>Unlimited</td>
+                                        </tr>
+                                        <tr>
+                                            <td>AI Enhancements</td>
+                                            <td>5</td>
+                                            <td>20</td>
+                                            <td>50</td>
+                                            <td>Unlimited</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                            
+                            <!-- Starter Plan -->
+                            <div class="col-md-4 mb-4">
+                                <div class="card ${recommendedPlan === 'starter' ? 'border-primary' : ''}">
+                                    <div class="card-header">
+                                        <h3 class="my-0 font-weight-normal">Starter Pack</h3>
+                                        ${recommendedPlan === 'starter' ? '<span class="badge bg-primary position-absolute top-0 end-0 mt-2 me-2">Recommended</span>' : ''}
+                                    </div>
+                                    <div class="card-body">
+                                        <h2 class="card-title pricing-card-title text-center">₹299</h2>
+                                        <ul class="list-unstyled mt-3 mb-4">
+                                            <li><i class="fas fa-check text-success me-2"></i> <strong>20 PDF Downloads</strong></li>
+                                            <li><i class="fas fa-check text-success me-2"></i> <strong>20 AI Enhancements</strong></li>
+                                            <li><i class="fas fa-check text-success me-2"></i> <strong>5 Resume Analyses</strong></li>
+                                            <li><i class="fas fa-check text-success me-2"></i> <strong>1 Mock Interview</strong></li>
+                                        </ul>
+                                        <button type="button" class="btn btn-lg btn-block ${recommendedPlan === 'starter' ? 'btn-primary' : 'btn-outline-primary'} w-100 plan-select-btn" data-plan="starter">Select Starter</button>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Standard Plan -->
+                            <div class="col-md-4 mb-4">
+                                <div class="card ${recommendedPlan === 'standard' ? 'border-primary highlight-card' : ''}">
+                                    <div class="card-header">
+                                        <h3 class="my-0 font-weight-normal">Standard Pack</h3>
+                                        ${recommendedPlan === 'standard' ? '<span class="badge bg-primary position-absolute top-0 end-0 mt-2 me-2">Recommended</span>' : ''}
+                                    </div>
+                                    <div class="card-body">
+                                        <h2 class="card-title pricing-card-title text-center">₹499</h2>
+                                        <ul class="list-unstyled mt-3 mb-4">
+                                            <li><i class="fas fa-check text-success me-2"></i> <strong>50 PDF Downloads</strong></li>
+                                            <li><i class="fas fa-check text-success me-2"></i> <strong>50 AI Enhancements</strong></li>
+                                            <li><i class="fas fa-check text-success me-2"></i> <strong>10 Resume Analyses</strong></li>
+                                            <li><i class="fas fa-check text-success me-2"></i> <strong>3 Mock Interviews</strong></li>
+                                        </ul>
+                                        <button type="button" class="btn btn-lg btn-block ${recommendedPlan === 'standard' ? 'btn-primary' : 'btn-outline-primary'} w-100 plan-select-btn" data-plan="standard">Choose Standard</button>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Pro Plan -->
+                            <div class="col-md-4 mb-4">
+                                <div class="card ${recommendedPlan === 'pro' ? 'border-primary' : ''}">
+                                    <div class="card-header">
+                                        <h3 class="my-0 font-weight-normal">Pro Pack</h3>
+                                        ${recommendedPlan === 'pro' ? '<span class="badge bg-primary position-absolute top-0 end-0 mt-2 me-2">Recommended</span>' : ''}
+                                    </div>
+                                    <div class="card-body">
+                                        <h2 class="card-title pricing-card-title text-center">₹899</h2>
+                                        <ul class="list-unstyled mt-3 mb-4">
+                                            <li><i class="fas fa-check text-success me-2"></i> <strong>Unlimited PDF Downloads</strong></li>
+                                            <li><i class="fas fa-check text-success me-2"></i> <strong>Unlimited AI Enhancements</strong></li>
+                                            <li><i class="fas fa-check text-success me-2"></i> <strong>10 Resume Analyses</strong></li>
+                                            <li><i class="fas fa-check text-success me-2"></i> <strong>5 Mock Interviews</strong></li>
+                                        </ul>
+                                        <button type="button" class="btn btn-lg btn-block ${recommendedPlan === 'pro' ? 'btn-primary' : 'btn-outline-primary'} w-100 plan-select-btn" data-plan="pro">Go Pro</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    // Append modal to body
+    document.body.appendChild(modalContent);
+    
+    // Initialize Bootstrap modal
+    const upgradeModal = new bootstrap.Modal(document.getElementById('resumeUpgradeModal'));
+    upgradeModal.show();
+    
+    // Add event listeners to plan select buttons
+    document.querySelectorAll('.plan-select-btn').forEach(button => {
+        button.addEventListener('click', function() {
+            const planName = this.getAttribute('data-plan');
+            selectPlan(planName, upgradeModal);
+        });
+    });
+    
+    // Clean up when modal is hidden
+    document.getElementById('resumeUpgradeModal').addEventListener('hidden.bs.modal', function() {
+        document.body.removeChild(modalContent);
+    });
+}
+
+function showUpgradeModal(featureType) {
+    // Determine which modal to show
+    if (featureType === 'pdfDownloads' || featureType === 'aiEnhance') {
+        showResumeBuilderUpgradeModal(featureType);
+    } else {
+        // Use the existing modal for other features
+        showExistingUpgradeModal(featureType);
     }
 }

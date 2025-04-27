@@ -1859,3 +1859,253 @@ h2:after {
     /* A4 dimensions approximately in points: 595 x 842 */
     aspect-ratio: 595 / 842; /* Maintain A4 paper ratio */
 }
+
+/* Spacing Preview Styles */
+/* Add these to your existing CSS */
+
+/* Create variable spacings that will update with the sliders */
+.resume-preview-area {
+    --spacing-factor: 1.0;
+    --section-spacing: 1.0;
+    --item-spacing: 1.0;
+}
+
+/* Apply the spacing variables to appropriate elements */
+.resume-preview-area .preview-section {
+    margin-bottom: calc(8pt * var(--section-spacing));
+}
+
+.resume-preview-area .preview-section h2 {
+    margin-top: calc(10pt * var(--section-spacing));
+    margin-bottom: calc(8pt * var(--spacing-factor));
+}
+
+.resume-preview-area .preview-item {
+    margin-bottom: calc(5pt * var(--item-spacing));
+}
+
+.resume-preview-area .preview-item ul li {
+    margin-bottom: calc(2pt * var(--spacing-factor));
+}
+
+.resume-preview-area .preview-header .name {
+    margin-bottom: calc(8pt * var(--spacing-factor));
+}
+
+.resume-preview-area .preview-header .contact-info {
+    margin-bottom: calc(12pt * var(--spacing-factor));
+}
+
+.resume-preview-area .preview-objective p {
+    margin-bottom: calc(8pt * var(--spacing-factor));
+}
+
+.resume-preview-area .preview-item .item-header {
+    margin-bottom: calc(2pt * var(--spacing-factor));
+}
+
+.resume-preview-area .preview-item .item-subtitle {
+    margin-bottom: calc(4pt * var(--spacing-factor));
+}
+
+.resume-preview-area .preview-item ul {
+    margin-top: calc(3pt * var(--spacing-factor));
+    margin-bottom: calc(3pt * var(--spacing-factor));
+}
+
+/* Enhanced Range Slider Visibility */
+/* Enhanced Range Slider Visibility - Blue Theme */
+.form-range {
+/* Make the track more visible with a blue gradient background */
+background-image: linear-gradient(to right, #cfe2ff, #0d6efd);
+border: 1px solid #0d6efd;
+border-radius: 1rem;
+height: 0.6rem; /* Slightly taller */
+box-shadow: inset 0 1px 2px rgba(0,0,0,0.1);
+}
+
+/* Style the slider thumb (the blue dot) with better contrast */
+/* Enhanced Range Slider Visibility - Blue Theme with improved visibility */
+.form-range {
+/* Make the track more visible with a blue gradient background */
+background-image: linear-gradient(to right, #cfe2ff, #0d6efd);
+border: 1px solid #0d6efd;
+border-radius: 1rem;
+height: 0.6rem; /* Slightly taller */
+box-shadow: inset 0 1px 2px rgba(0,0,0,0.1);
+/* Add more padding and margin to ensure slider is fully visible */
+margin: 12px 0;  /* Add vertical margin to show full slider */
+padding: 0;      /* Reset padding */
+width: 100%;     /* Ensure full width */
+}
+
+/* Style the slider thumb (the blue dot) with better contrast */
+.form-range::-webkit-slider-thumb {
+background-color: #0d6efd;
+border: 3px solid #fff;
+box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+width: 20px;
+height: 20px;
+border-radius: 50%;
+cursor: pointer;
+margin-top: -7px; /* Better vertical centering */
+}
+
+.form-range::-moz-range-thumb {
+background-color: #0d6efd;
+border: 3px solid #fff;
+box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+width: 20px;
+height: 20px;
+border-radius: 50%;
+cursor: pointer;
+}
+
+/* Containing elements for better spacing */
+.form-range-container {
+padding: 10px 0;
+margin-bottom: 15px;
+}
+
+/* Add more space to the slider group container */
+.border.rounded.p-3.bg-light {
+background-color: #f8f9fa !important;
+border: 1px solid #0d6efd !important;
+border-radius: 8px !important;
+box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+padding: 1.5rem !important; /* Increased padding */
+margin-bottom: 1.5rem;
+}
+
+/* Give more space to each individual slider control */
+.mb-2 {
+margin-bottom: 1rem !important; /* Increase the margin between sliders */
+padding: 8px 0;                 /* Add some padding on top/bottom */
+}
+
+/* Labels above sliders */
+.form-label {
+font-weight: 600;
+margin-bottom: 0.75rem; /* More space before the slider */
+color: #495057;
+display: flex;          /* For aligning the label and value */
+justify-content: space-between;
+align-items: center;
+}
+
+/* Value indicators styling */
+#spacingFactorValue, 
+#sectionSpacingValue, 
+#itemSpacingValue {
+font-weight: 600;
+background-color: #0d6efd;
+color: white;
+padding: 0.2rem 0.5rem;
+border-radius: 4px;
+min-width: 3rem;
+text-align: center;
+box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+}
+
+/* Min/max labels below slider */
+.form-text.text-center.d-flex.justify-content-between {
+font-size: 0.8rem;
+color: #495057;
+margin-top: 0.75rem; /* More space after the slider */
+font-weight: 500;
+}
+
+/* Style AI enhancement usage counter */
+.ai-generate-btn {
+position: relative;
+transition: all 0.2s;
+}
+
+/* When AI button is disabled due to limit */
+.ai-generate-btn:disabled {
+cursor: not-allowed;
+opacity: 0.6;
+}
+
+/* Styling for usage counts on buttons */
+.ai-generate-btn .usage-count {
+font-size: 0.75rem;
+font-weight: 600;
+margin-left: 3px;
+}
+
+/* Warning styles for different usage levels */
+.usage-warning {
+color: #856404;
+}
+
+.usage-danger {
+color: #721c24;
+}
+
+/* Styles for the download button with usage display */
+#downloadResumeBtn {
+position: relative;
+transition: all 0.2s;
+}
+
+#downloadResumeBtn:disabled {
+cursor: not-allowed;
+opacity: 0.65;
+}
+
+/* Styling for the upgrade modal */
+.highlight-card {
+box-shadow: 0 0 15px rgba(13, 110, 253, 0.2);
+transform: scale(1.05);
+z-index: 1;
+}
+
+.highlight-card .card-header {
+background-color: #e7f1ff;
+}
+
+.plan-select-btn {
+transition: all 0.3s;
+}
+
+.plan-select-btn:hover {
+transform: translateY(-2px);
+box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+/* Add feature comparison table styles */
+.modal-body .table th,
+.modal-body .table td {
+text-align: center;
+vertical-align: middle;
+}
+
+.modal-body .table th:first-child,
+.modal-body .table td:first-child {
+text-align: left;
+font-weight: 500;
+}
+
+/* Feature comparison highlight */
+.feature-highlight {
+background-color: #e7f5ff;
+font-weight: bold;
+}
+
+/* Animate AI enhance button on hover */
+.ai-generate-btn:hover:not(:disabled) i.fa-magic {
+transform: rotate(15deg);
+transition: transform 0.3s;
+}
+
+/* Pulse animation for low-count warnings */
+@keyframes pulse-warning {
+0% { opacity: 1; }
+50% { opacity: 0.5; }
+100% { opacity: 1; }
+}
+
+.count-warning {
+animation: pulse-warning 2s infinite;
+}

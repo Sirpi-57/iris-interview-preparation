@@ -114,12 +114,14 @@ function loadUserProfile(user) {
               
               // Ensure usage stats exist for existing profiles
               if (!authState.userProfile.usage) {
-                  const usageUpdate = { 
-                      usage: {
-                          resumeAnalyses: { used: 0, limit: getPackageLimit('resumeAnalyses', authState.userProfile.plan || 'free') },
-                          mockInterviews: { used: 0, limit: getPackageLimit('mockInterviews', authState.userProfile.plan || 'free') }
-                      }
-                  };
+                const usageUpdate = { 
+                    usage: {
+                        resumeAnalyses: { used: 0, limit: getPackageLimit('resumeAnalyses', authState.userProfile.plan || 'free') },
+                        mockInterviews: { used: 0, limit: getPackageLimit('mockInterviews', authState.userProfile.plan || 'free') },
+                        pdfDownloads: { used: 0, limit: getPackageLimit('pdfDownloads', authState.userProfile.plan || 'free') },
+                        aiEnhance: { used: 0, limit: getPackageLimit('aiEnhance', authState.userProfile.plan || 'free') }
+                    }
+                };
                   return db.collection('users').doc(user.uid).update(usageUpdate)
                       .then(() => {
                           authState.userProfile = {...authState.userProfile, ...usageUpdate};
@@ -146,7 +148,9 @@ function loadUserProfile(user) {
                   sectionId: null, // New field
                   usage: {
                       resumeAnalyses: { used: 0, limit: getPackageLimit('resumeAnalyses', 'free') },
-                      mockInterviews: { used: 0, limit: getPackageLimit('mockInterviews', 'free') }
+                      mockInterviews: { used: 0, limit: getPackageLimit('mockInterviews', 'free') },
+                      pdfDownloads: { used: 0, limit: getPackageLimit('pdfDownloads', 'free') },
+                      aiEnhance: { used: 0, limit: getPackageLimit('aiEnhance', 'free') }
                   },
                   // lastActiveSessionId: null // Initialize explicitly if needed
               };
@@ -171,22 +175,30 @@ function loadUserProfile(user) {
 
 function getPackageLimit(feature, packageName) {
   const limits = {
-      free: {
-          resumeAnalyses: 2,
-          mockInterviews: 0
-      },
-      starter: {
-          resumeAnalyses: 5,
-          mockInterviews: 1
-      },
-      standard: {
-          resumeAnalyses: 10,
-          mockInterviews: 3
-      },
-      pro: {
-          resumeAnalyses: 10,
-          mockInterviews: 5
-      }
+    free: {
+        resumeAnalyses: 2,
+        mockInterviews: 0,
+        pdfDownloads: 5,     // New: PDF download limits
+        aiEnhance: 5         // New: AI enhance limits
+    },
+    starter: {
+        resumeAnalyses: 5,
+        mockInterviews: 1,
+        pdfDownloads: 20,    // New: PDF download limits
+        aiEnhance: 20        // New: AI enhance limits
+    },
+    standard: {
+        resumeAnalyses: 10,
+        mockInterviews: 3,
+        pdfDownloads: 50,    // New: PDF download limits
+        aiEnhance: 50        // New: AI enhance limits
+    },
+    pro: {
+        resumeAnalyses: 10,
+        mockInterviews: 5,
+        pdfDownloads: 9999,  // Essentially unlimited
+        aiEnhance: 9999      // Essentially unlimited
+    }
   };
   
   // Default to free package limits if package not found
@@ -224,13 +236,17 @@ function updateUserPlan(planName, expiresAt = null) {
   
   // Update profile with new plan and limits
   const planUpdate = {
-      plan: planName,
-      planPurchasedAt: new Date().toISOString(),
-      planExpiresAt: expiresAt, // null for free/no expiration
-      'usage.resumeAnalyses.limit': resumeLimit,
-      'usage.resumeAnalyses.used': currentResumeUsage,
-      'usage.mockInterviews.limit': interviewLimit, 
-      'usage.mockInterviews.used': currentInterviewUsage
+    plan: planName,
+    planPurchasedAt: new Date().toISOString(),
+    planExpiresAt: expiresAt, // null for free/no expiration
+    'usage.resumeAnalyses.limit': resumeLimit,
+    'usage.resumeAnalyses.used': currentResumeUsage,
+    'usage.mockInterviews.limit': interviewLimit, 
+    'usage.mockInterviews.used': currentInterviewUsage,
+    'usage.pdfDownloads.limit': getPackageLimit('pdfDownloads', planName),
+    'usage.pdfDownloads.used': authState.userProfile?.usage?.pdfDownloads?.used || 0,
+    'usage.aiEnhance.limit': getPackageLimit('aiEnhance', planName),
+    'usage.aiEnhance.used': authState.userProfile?.usage?.aiEnhance?.used || 0
   };
   
   return db.collection('users').doc(user.uid).update(planUpdate)
@@ -258,6 +274,24 @@ function updateUserPlan(planName, expiresAt = null) {
               } else {
                   authState.userProfile.usage.mockInterviews.limit = interviewLimit;
               }
+
+              if (!authState.userProfile.usage.pdfDownloads) {
+                authState.userProfile.usage.pdfDownloads = { 
+                    used: authState.userProfile?.usage?.pdfDownloads?.used || 0, 
+                    limit: getPackageLimit('pdfDownloads', planName) 
+                };
+              } else {
+                  authState.userProfile.usage.pdfDownloads.limit = getPackageLimit('pdfDownloads', planName);
+              }
+              
+              if (!authState.userProfile.usage.aiEnhance) {
+                  authState.userProfile.usage.aiEnhance = { 
+                      used: authState.userProfile?.usage?.aiEnhance?.used || 0, 
+                      limit: getPackageLimit('aiEnhance', planName) 
+                  };
+              } else {
+                  authState.userProfile.usage.aiEnhance.limit = getPackageLimit('aiEnhance', planName);
+              }
           }
           
           // Update UI elements
@@ -279,8 +313,8 @@ function incrementUsageCounter(featureType) {
   }
   
   // Validate feature type
-  if (!['resumeAnalyses', 'mockInterviews'].includes(featureType)) {
-      return Promise.reject(new Error(`Invalid feature type: ${featureType}`));
+  if (!['resumeAnalyses', 'mockInterviews', 'pdfDownloads', 'aiEnhance'].includes(featureType)) {
+    return Promise.reject(new Error(`Invalid feature type: ${featureType}`));
   }
   
   const db = firebase.firestore();
