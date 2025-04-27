@@ -2109,3 +2109,121 @@ transition: transform 0.3s;
 .count-warning {
 animation: pulse-warning 2s infinite;
 }
+
+/* For 5 columns on extra-large screens (adjust breakpoint if needed) */
+@media (min-width: 1200px) {
+.col-xl-custom {
+    flex: 0 0 auto;
+    width: 20%; /* 100% / 5 columns */
+}
+}
+
+/* Style for the feature card itself (you likely have this) */
+.feature-card {
+background-color: #f8f9fa; /* Example background */
+padding: 20px;
+border-radius: 8px;
+text-align: center;
+height: 100%; /* Ensures cards in a row have the same height */
+display: flex; /* Optional: Helps align content vertically */
+flex-direction: column; /* Optional */
+align-items: center; /* Optional */
+justify-content: flex-start; /* Optional */
+box-shadow: 0 2px 4px rgba(0,0,0,0.1); /* Optional: subtle shadow */
+}
+
+.feature-card i {
+font-size: 2.5rem; /* Adjust icon size */
+color: #0d6efd; /* Example primary color */
+margin-bottom: 15px;
+}
+
+.feature-card h3 {
+font-size: 1.1rem; /* Adjust heading size */
+margin-bottom: 10px;
+}
+
+.feature-card p {
+font-size: 0.9rem; /* Adjust paragraph size */
+color: #6c757d; /* Example secondary text color */
+flex-grow: 1; /* Optional: Helps push button down if added */
+}
+
+/* Ensure consistent spacing (gy-4 handles vertical gap) */
+.row.gy-4 > * {
+    padding-top: 1rem; /* Adjust as needed */
+    padding-bottom: 1rem; /* Adjust as needed */
+}
+
+/* --- Styles for Revised Showcase Tab --- */
+
+#showcase-tab .showcase-section {
+/* Adds consistent spacing and separation */
+padding-bottom: 3rem;
+margin-bottom: 3rem;
+border-bottom: 1px solid #e9ecef; /* Light border */
+}
+
+#showcase-tab .showcase-section:last-of-type {
+/* Remove border from the very last section */
+    border-bottom: none;
+    margin-bottom: 0; /* Adjust if CTA spacing is enough*/
+    padding-bottom: 0;
+}
+
+#showcase-tab .showcase-number {
+/* Style the numbers */
+display: inline-block;
+background-color: #0d6efd; /* Primary color */
+color: white;
+border-radius: 50%;
+width: 30px;
+height: 30px;
+line-height: 30px; /* Vertically center number */
+text-align: center;
+font-weight: bold;
+margin-right: 10px;
+font-size: 0.9rem;
+}
+
+#showcase-tab img.img-fluid {
+/* Ensure images scale well and add definition */
+max-width: 100%;
+height: auto;
+border: 1px solid #dee2e6;
+border-radius: 0.375rem; /* Bootstrap's default rounded */
+box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15); /* Slightly larger shadow */
+}
+
+#showcase-tab .ratio {
+/* Style for the video container */
+border: 1px solid #dee2e6;
+box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+border-radius: 0.375rem;
+overflow: hidden; /* Ensures iframe respects rounded corners */
+}
+
+#showcase-tab .card .card-img-top {
+    border-top-left-radius: calc(0.375rem - 1px);
+    border-top-right-radius: calc(0.375rem - 1px);
+    border-bottom: 1px solid #dee2e6; /* Add border below card image */
+}
+
+#showcase-tab .card {
+    /* Ensure card styling is consistent */
+    border: 1px solid #dee2e6;
+}
+
+#showcase-tab .card-title {
+    font-weight: 600; /* Make card titles slightly bolder */
+}
+
+/* Responsive adjustments */
+@media (max-width: 991.98px) {
+#showcase-tab .row.align-items-center > div {
+    text-align: center; /* Center text below image on smaller screens */
+}
+    #showcase-tab .row.align-items-center h3 {
+        margin-top: 1rem; /* Add space above heading when stacked */
+    }
+}
