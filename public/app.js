@@ -55,7 +55,9 @@ document.addEventListener('DOMContentLoaded', function() {
     initProfilePage();
     initAddonPurchaseModal();
     enhanceModalCloseHandlers();
-
+    
+    // Add this line to initialize the modal fixes
+    initModalFixes();
 
     // Load available browser voices (for fallback TTS)
     loadVoices();
@@ -3639,11 +3641,21 @@ function updateUsageDisplay() {
     }
 }
 
-// --- New function to show upgrade modal (continued) ---
 function showExistingUpgradeModal(featureType) {
+    // First clean up any existing modals
+    safelyCloseModal('upgradeModal');
+    safelyCloseModal('paymentProcessingModal');
+    safelyCloseModal('paymentSuccessModal');
+    safelyCloseModal('limitReachedModal');
+    
     // Get current plan to determine what plans to highlight
     const currentPlan = irisAuth?.getUserProfile()?.plan || 'free';
-    const modalContent = document.createElement('div');
+    
+    // Remove any existing upgrade modal from the DOM
+    const existingModal = document.getElementById('upgradeModal');
+    if (existingModal) {
+        existingModal.remove();
+    }
     
     // Determine recommended plan based on feature and current plan
     let recommendedPlan = 'standard'; // Default recommendation
@@ -3667,113 +3679,168 @@ function showExistingUpgradeModal(featureType) {
         ? 'Upgrade for More Resume Analyses'
         : 'Upgrade for Mock Interviews';
     
-    modalContent.innerHTML = `
-        <div class="modal fade" id="upgradeModal" tabindex="-1" aria-hidden="true">
-            <div class="modal-dialog modal-lg">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h5 class="modal-title">${heading}</h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+    // Create the modal element with a special class for tracking
+    const modalDiv = document.createElement('div');
+    modalDiv.className = 'modal fade dynamic-modal'; // Add custom class for cleanup
+    modalDiv.id = 'upgradeModal';
+    modalDiv.tabIndex = '-1';
+    modalDiv.setAttribute('aria-hidden', 'true');
+    
+    // Build the modal HTML structure
+    modalDiv.innerHTML = `
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">${heading}</h5>
+                    <button type="button" class="btn-close close-upgrade-modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle me-2"></i>
+                        <strong>You've reached your ${featureType === 'resumeAnalyses' ? 'resume analysis' : 'mock interview'} limit on your current plan (${currentPlan}).</strong>
+                        <p class="mb-0">Upgrade to continue your interview preparation journey.</p>
                     </div>
-                    <div class="modal-body">
-                        <div class="alert alert-info">
-                            <i class="fas fa-info-circle me-2"></i>
-                            <strong>You've reached your ${featureType === 'resumeAnalyses' ? 'resume analysis' : 'mock interview'} limit on your current plan (${currentPlan}).</strong>
-                            <p class="mb-0">Upgrade to continue your interview preparation journey.</p>
+                    
+                    <div class="row mt-4">
+                        <!-- Starter Plan -->
+                        <div class="col-md-4 mb-4">
+                            <div class="card ${recommendedPlan === 'starter' ? 'border-primary' : ''}">
+                                <div class="card-header">
+                                    <h3 class="my-0 font-weight-normal">Starter Pack</h3>
+                                    ${recommendedPlan === 'starter' ? '<span class="badge bg-primary position-absolute top-0 end-0 mt-2 me-2">Recommended</span>' : ''}
+                                </div>
+                                <div class="card-body">
+                                    <h2 class="card-title pricing-card-title text-center">₹299</h2>
+                                    <ul class="list-unstyled mt-3 mb-4">
+                                        <li><i class="fas fa-check text-success me-2"></i> <strong>5 Resume Analyses</strong></li>
+                                        <li><i class="fas fa-check text-success me-2"></i> <strong>1 Mock Interview</strong></li>
+                                        <li><i class="fas fa-check text-success me-2"></i> Detailed Prep Plan</li>
+                                        <li><i class="fas fa-check text-success me-2"></i> Detailed Performance Report</li>
+                                        <li><i class="fas fa-check text-success me-2"></i> Dynamic Timeline Generator</li>
+                                        <li class="text-muted"><i class="fas fa-times me-2"></i> Suggested Answers Library</li>
+                                    </ul>
+                                    <button type="button" class="btn btn-lg btn-block ${recommendedPlan === 'starter' ? 'btn-primary' : 'btn-outline-primary'} w-100 plan-select-btn" data-plan="starter">Select Starter</button>
+                                </div>
+                            </div>
                         </div>
                         
-                        <div class="row mt-4">
-                            <!-- Starter Plan -->
-                            <div class="col-md-4 mb-4">
-                                <div class="card ${recommendedPlan === 'starter' ? 'border-primary' : ''}">
-                                    <div class="card-header">
-                                        <h3 class="my-0 font-weight-normal">Starter Pack</h3>
-                                        ${recommendedPlan === 'starter' ? '<span class="badge bg-primary position-absolute top-0 end-0 mt-2 me-2">Recommended</span>' : ''}
-                                    </div>
-                                    <div class="card-body">
-                                        <h2 class="card-title pricing-card-title text-center">₹299</h2>
-                                        <ul class="list-unstyled mt-3 mb-4">
-                                            <li><i class="fas fa-check text-success me-2"></i> <strong>5 Resume Analyses</strong></li>
-                                            <li><i class="fas fa-check text-success me-2"></i> <strong>1 Mock Interview</strong></li>
-                                            <li><i class="fas fa-check text-success me-2"></i> Detailed Prep Plan</li>
-                                            <li><i class="fas fa-check text-success me-2"></i> Detailed Performance Report</li>
-                                            <li><i class="fas fa-check text-success me-2"></i> Dynamic Timeline Generator</li>
-                                            <li class="text-muted"><i class="fas fa-times me-2"></i> Suggested Answers Library</li>
-                                        </ul>
-                                        <button type="button" class="btn btn-lg btn-block ${recommendedPlan === 'starter' ? 'btn-primary' : 'btn-outline-primary'} w-100 plan-select-btn" data-plan="starter">Select Starter</button>
-                                    </div>
+                        <!-- Standard Plan -->
+                        <div class="col-md-4 mb-4">
+                            <div class="card ${recommendedPlan === 'standard' ? 'border-primary highlight-card' : ''}">
+                                <div class="card-header">
+                                    <h3 class="my-0 font-weight-normal">Standard Pack</h3>
+                                    ${recommendedPlan === 'standard' ? '<span class="badge bg-primary position-absolute top-0 end-0 mt-2 me-2">Recommended</span>' : ''}
+                                </div>
+                                <div class="card-body">
+                                    <h2 class="card-title pricing-card-title text-center">₹499</h2>
+                                    <ul class="list-unstyled mt-3 mb-4">
+                                        <li><i class="fas fa-check text-success me-2"></i> <strong>10 Resume Analyses</strong></li>
+                                        <li><i class="fas fa-check text-success me-2"></i> <strong>3 Mock Interviews</strong></li>
+                                        <li><i class="fas fa-check text-success me-2"></i> Detailed Prep Plan</li>
+                                        <li><i class="fas fa-check text-success me-2"></i> Detailed Performance Reports</li>
+                                        <li><i class="fas fa-check text-success me-2"></i> Dynamic Timeline Generator</li>
+                                        <li><i class="fas fa-check text-success me-2"></i> Suggested Answers Library</li>
+                                    </ul>
+                                    <button type="button" class="btn btn-lg btn-block ${recommendedPlan === 'standard' ? 'btn-primary' : 'btn-outline-primary'} w-100 plan-select-btn" data-plan="standard">Choose Standard</button>
                                 </div>
                             </div>
-                            
-                            <!-- Standard Plan -->
-                            <div class="col-md-4 mb-4">
-                                <div class="card ${recommendedPlan === 'standard' ? 'border-primary highlight-card' : ''}">
-                                    <div class="card-header">
-                                        <h3 class="my-0 font-weight-normal">Standard Pack</h3>
-                                        ${recommendedPlan === 'standard' ? '<span class="badge bg-primary position-absolute top-0 end-0 mt-2 me-2">Recommended</span>' : ''}
-                                    </div>
-                                    <div class="card-body">
-                                        <h2 class="card-title pricing-card-title text-center">₹499</h2>
-                                        <ul class="list-unstyled mt-3 mb-4">
-                                            <li><i class="fas fa-check text-success me-2"></i> <strong>10 Resume Analyses</strong></li>
-                                            <li><i class="fas fa-check text-success me-2"></i> <strong>3 Mock Interviews</strong></li>
-                                            <li><i class="fas fa-check text-success me-2"></i> Detailed Prep Plan</li>
-                                            <li><i class="fas fa-check text-success me-2"></i> Detailed Performance Reports</li>
-                                            <li><i class="fas fa-check text-success me-2"></i> Dynamic Timeline Generator</li>
-                                            <li><i class="fas fa-check text-success me-2"></i> Suggested Answers Library</li>
-                                        </ul>
-                                        <button type="button" class="btn btn-lg btn-block ${recommendedPlan === 'standard' ? 'btn-primary' : 'btn-outline-primary'} w-100 plan-select-btn" data-plan="standard">Choose Standard</button>
-                                    </div>
+                        </div>
+                        
+                        <!-- Pro Plan -->
+                        <div class="col-md-4 mb-4">
+                            <div class="card ${recommendedPlan === 'pro' ? 'border-primary' : ''}">
+                                <div class="card-header">
+                                    <h3 class="my-0 font-weight-normal">Pro Pack</h3>
+                                    ${recommendedPlan === 'pro' ? '<span class="badge bg-primary position-absolute top-0 end-0 mt-2 me-2">Recommended</span>' : ''}
                                 </div>
-                            </div>
-                            
-                            <!-- Pro Plan -->
-                            <div class="col-md-4 mb-4">
-                                <div class="card ${recommendedPlan === 'pro' ? 'border-primary' : ''}">
-                                    <div class="card-header">
-                                        <h3 class="my-0 font-weight-normal">Pro Pack</h3>
-                                        ${recommendedPlan === 'pro' ? '<span class="badge bg-primary position-absolute top-0 end-0 mt-2 me-2">Recommended</span>' : ''}
-                                    </div>
-                                    <div class="card-body">
-                                        <h2 class="card-title pricing-card-title text-center">₹899</h2>
-                                        <ul class="list-unstyled mt-3 mb-4">
-                                            <li><i class="fas fa-check text-success me-2"></i> <strong>10 Resume Analyses</strong></li>
-                                            <li><i class="fas fa-check text-success me-2"></i> <strong>5 Mock Interviews</strong></li>
-                                            <li><i class="fas fa-check text-success me-2"></i> Detailed Prep Plan</li>
-                                            <li><i class="fas fa-check text-success me-2"></i> Detailed Performance Reports</li>
-                                            <li><i class="fas fa-check text-success me-2"></i> Dynamic Timeline Generator</li>
-                                            <li><i class="fas fa-check text-success me-2"></i> Suggested Answers Library</li>
-                                        </ul>
-                                        <button type="button" class="btn btn-lg btn-block ${recommendedPlan === 'pro' ? 'btn-primary' : 'btn-outline-primary'} w-100 plan-select-btn" data-plan="pro">Go Pro</button>
-                                    </div>
+                                <div class="card-body">
+                                    <h2 class="card-title pricing-card-title text-center">₹899</h2>
+                                    <ul class="list-unstyled mt-3 mb-4">
+                                        <li><i class="fas fa-check text-success me-2"></i> <strong>10 Resume Analyses</strong></li>
+                                        <li><i class="fas fa-check text-success me-2"></i> <strong>5 Mock Interviews</strong></li>
+                                        <li><i class="fas fa-check text-success me-2"></i> Detailed Prep Plan</li>
+                                        <li><i class="fas fa-check text-success me-2"></i> Detailed Performance Reports</li>
+                                        <li><i class="fas fa-check text-success me-2"></i> Dynamic Timeline Generator</li>
+                                        <li><i class="fas fa-check text-success me-2"></i> Suggested Answers Library</li>
+                                    </ul>
+                                    <button type="button" class="btn btn-lg btn-block ${recommendedPlan === 'pro' ? 'btn-primary' : 'btn-outline-primary'} w-100 plan-select-btn" data-plan="pro">Go Pro</button>
                                 </div>
                             </div>
                         </div>
                     </div>
                 </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary close-upgrade-modal">Close</button>
+                </div>
             </div>
         </div>
     `;
     
-    // Append modal to body
-    document.body.appendChild(modalContent);
+    // Append the modal to the document body
+    document.body.appendChild(modalDiv);
     
-    // Initialize Bootstrap modal
-    const upgradeModal = new bootstrap.Modal(document.getElementById('upgradeModal'));
+    // Initialize Bootstrap modal with specific options
+    const upgradeModal = new bootstrap.Modal(modalDiv, {
+        backdrop: true,
+        keyboard: true, // Allow ESC key to close
+        focus: true
+    });
+    
+    // Show the modal
     upgradeModal.show();
     
     // Add event listeners to plan select buttons
     document.querySelectorAll('.plan-select-btn').forEach(button => {
         button.addEventListener('click', function() {
             const planName = this.getAttribute('data-plan');
-            selectPlan(planName, upgradeModal);
+            
+            // First hide the modal properly
+            upgradeModal.hide();
+            
+            // Remove modal and continue with plan selection after animation completes
+            modalDiv.addEventListener('hidden.bs.modal', function() {
+                // Force cleanup after modal hide animation
+                setTimeout(() => {
+                    safelyCloseModal('upgradeModal');
+                    // Call selectPlan function with the selected plan
+                    selectPlanFixed(planName);
+                }, 150);
+            }, { once: true }); // Use once to prevent multiple handlers
         });
     });
     
-    // Clean up when modal is hidden
-    document.getElementById('upgradeModal').addEventListener('hidden.bs.modal', function() {
-        document.body.removeChild(modalContent);
+    // Add special handling for close buttons
+    document.querySelectorAll('.close-upgrade-modal').forEach(button => {
+        button.addEventListener('click', function() {
+            upgradeModal.hide();
+            
+            // Ensure modal gets removed after hiding
+            setTimeout(() => {
+                safelyCloseModal('upgradeModal');
+            }, 300);
+        });
     });
+    
+    // Handle modal hidden event for proper cleanup
+    modalDiv.addEventListener('hidden.bs.modal', function() {
+        // Wait for animation to complete, then remove from DOM
+        setTimeout(() => {
+            // Remove the element from the DOM
+            if (this.parentNode) {
+                this.parentNode.removeChild(this);
+            }
+            
+            // Double-check for any lingering backdrop
+            document.querySelectorAll('.modal-backdrop').forEach(backdrop => {
+                backdrop.remove();
+            });
+            
+            // Ensure body doesn't remain in modal state
+            document.body.classList.remove('modal-open');
+            document.body.style.removeProperty('padding-right');
+            document.body.style.removeProperty('overflow');
+        }, 300);
+    }, { once: true });
 }
 
 // --- Function to handle plan selection ---
@@ -5692,7 +5759,6 @@ function showLimitReachedModal(featureType) {
     modalInstance.show();
 }
 
-// Function to safely close modal and clean up backdrop
 function safelyCloseModal(modalId) {
     try {
         // Get the modal element
@@ -5706,25 +5772,32 @@ function safelyCloseModal(modalId) {
             modalInstance.hide();
         }
         
-        // Remove any lingering backdrops
-        const backdrops = document.querySelectorAll('.modal-backdrop');
-        backdrops.forEach(backdrop => {
+        // Remove any lingering backdrops immediately
+        document.querySelectorAll('.modal-backdrop').forEach(backdrop => {
             backdrop.classList.remove('show');
-            setTimeout(() => backdrop.remove(), 300);
+            backdrop.remove(); // Force immediate removal
         });
         
-        // In case body still has modal classes
+        // Force cleanup of modal-related body classes
         document.body.classList.remove('modal-open');
-        document.body.style.paddingRight = '';
-        document.body.style.overflow = '';
+        document.body.style.removeProperty('padding-right');
+        document.body.style.removeProperty('overflow');
         
+        // For dynamically created modals, remove from DOM after a short delay
+        if (modalElement.classList.contains('dynamic-modal')) {
+            setTimeout(() => {
+                if (modalElement.parentNode) {
+                    modalElement.parentNode.removeChild(modalElement);
+                }
+            }, 300);
+        }
     } catch (error) {
         console.error(`Error safely closing modal ${modalId}:`, error);
-        // Forcibly cleanup as last resort
+        // Emergency cleanup
         document.querySelectorAll('.modal-backdrop').forEach(el => el.remove());
         document.body.classList.remove('modal-open');
-        document.body.style.paddingRight = '';
-        document.body.style.overflow = '';
+        document.body.style.removeProperty('padding-right');
+        document.body.style.removeProperty('overflow');
     }
 }
 
@@ -5805,4 +5878,280 @@ function setSuccessModalLimits(featureType, newLimit) {
             element.textContent = currentLimit;
         }
     }
+}
+
+function setupGlobalModalCleanup() {
+    // Create emergency cleanup button (hidden by default)
+    const emergencyButton = document.createElement('button');
+    emergencyButton.id = 'emergency-modal-cleanup';
+    emergencyButton.className = 'btn btn-danger btn-sm';
+    emergencyButton.style.cssText = 'position: fixed; bottom: 10px; right: 10px; z-index: 10000; opacity: 0.8; display: none;';
+    emergencyButton.innerHTML = '<i class="fas fa-times-circle"></i> Unstick UI';
+    emergencyButton.onclick = function() {
+        console.log("Emergency cleanup triggered by user");
+        
+        // Close all known modals
+        ['upgradeModal', 'paymentProcessingModal', 'paymentSuccessModal', 
+         'limitReachedModal', 'addonPurchaseModal', 'auth-modal'].forEach(modalId => {
+            safelyCloseModal(modalId);
+        });
+        
+        // Force remove any modal backdrops
+        document.querySelectorAll('.modal-backdrop').forEach(el => el.remove());
+        
+        // Reset body
+        document.body.classList.remove('modal-open');
+        document.body.style.removeProperty('padding-right');
+        document.body.style.removeProperty('overflow');
+        
+        // Hide the emergency button
+        this.style.display = 'none';
+    };
+    document.body.appendChild(emergencyButton);
+    
+    // Check periodically if the user might be stuck
+    setInterval(function() {
+        const hasModalClass = document.body.classList.contains('modal-open');
+        const hasVisibleModals = document.querySelectorAll('.modal.show').length > 0;
+        const hasBackdrops = document.querySelectorAll('.modal-backdrop').length > 0;
+        
+        // If body has modal class but no visible modal, or has backdrops but no visible modal
+        const isPossiblyStuck = (hasModalClass && !hasVisibleModals) || 
+                              (hasBackdrops && !hasVisibleModals);
+        
+        document.getElementById('emergency-modal-cleanup').style.display = 
+            isPossiblyStuck ? 'block' : 'none';
+    }, 2000); // Check every 2 seconds
+    
+    // Add ESC key handler to fix stuck modals
+    document.addEventListener('keydown', function(event) {
+        if (event.key === 'Escape') {
+            // Check if any modal backdrop exists without visible modal
+            const hasBackdrops = document.querySelectorAll('.modal-backdrop').length > 0;
+            const hasVisibleModals = document.querySelectorAll('.modal.show').length > 0;
+            
+            if (hasBackdrops && !hasVisibleModals) {
+                console.log("ESC pressed with backdrop but no visible modal - cleaning up");
+                document.querySelectorAll('.modal-backdrop').forEach(el => el.remove());
+                document.body.classList.remove('modal-open');
+                document.body.style.removeProperty('padding-right');
+                document.body.style.removeProperty('overflow');
+            }
+        }
+    });
+}
+
+// Add this function to modify the showExistingUpgradeModal function to ensure proper cleanup
+function enhanceUpgradeModal() {
+    // Patch the existing showExistingUpgradeModal function to ensure modals close properly
+    const originalShowUpgradeModal = window.showExistingUpgradeModal;
+    
+    if (typeof originalShowUpgradeModal === 'function') {
+        window.showExistingUpgradeModal = function(featureType) {
+            // First clean up any existing modals
+            safelyCloseModal('upgradeModal');
+            
+            // Call the original function
+            originalShowUpgradeModal(featureType);
+            
+            // Add additional event listener to the close button
+            setTimeout(() => {
+                const modal = document.getElementById('upgradeModal');
+                if (modal) {
+                    const closeButtons = modal.querySelectorAll('[data-bs-dismiss="modal"]');
+                    closeButtons.forEach(button => {
+                        button.addEventListener('click', function() {
+                            safelyCloseModal('upgradeModal');
+                        }, { once: true });
+                    });
+                    
+                    // Add event listener for modal hidden event
+                    modal.addEventListener('hidden.bs.modal', function() {
+                        // Double-check for any lingering backdrops after a short delay
+                        setTimeout(() => {
+                            safelyCloseModal('upgradeModal');
+                            
+                            // Make sure body is scrollable
+                            document.body.style.overflow = '';
+                        }, 300);
+                    }, { once: true });
+                }
+            }, 100);
+        };
+    }
+    
+    // Also patch showPaymentModal if it exists
+    const originalShowPaymentModal = window.showPaymentModal;
+    if (typeof originalShowPaymentModal === 'function') {
+        window.showPaymentModal = function() {
+            // First clean up any existing modals
+            safelyCloseModal('upgradeModal');
+            
+            // Call the original function
+            originalShowPaymentModal();
+            
+            // Similarly, enhance the new modal with proper close handling
+            // (implementation similar to above)
+        };
+    }
+}
+
+function selectPlanFixed(planName) {
+    console.log(`Selected plan: ${planName}`);
+    
+    // First, clean up any existing modals
+    safelyCloseModal('paymentProcessingModal');
+    safelyCloseModal('paymentSuccessModal');
+    
+    // Create payment processing modal with proper structure
+    const processingModalContent = document.createElement('div');
+    processingModalContent.className = 'modal fade dynamic-modal';
+    processingModalContent.id = 'paymentProcessingModal';
+    processingModalContent.setAttribute('tabindex', '-1');
+    processingModalContent.setAttribute('aria-hidden', 'true');
+    processingModalContent.setAttribute('data-bs-backdrop', 'static');
+    
+    processingModalContent.innerHTML = `
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Processing Payment</h5>
+                </div>
+                <div class="modal-body text-center">
+                    <div class="spinner-border text-primary mb-3" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <p>Processing your upgrade to the ${planName.charAt(0).toUpperCase() + planName.slice(1)} plan...</p>
+                    <div class="progress mt-3">
+                        <div id="payment-progress-bar" class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 0%"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    // Append and show processing modal
+    document.body.appendChild(processingModalContent);
+    const processingModal = new bootstrap.Modal(processingModalContent, {
+        backdrop: 'static', // Prevent closing by clicking outside
+        keyboard: false     // Prevent closing with keyboard
+    });
+    processingModal.show();
+    
+    // Simulate payment processing (for testing)
+    const progressBar = document.getElementById('payment-progress-bar');
+    let progress = 0;
+    
+    const progressInterval = setInterval(() => {
+        progress += 10;
+        if (progressBar) progressBar.style.width = `${progress}%`;
+        
+        if (progress >= 100) {
+            clearInterval(progressInterval);
+            setTimeout(() => {
+                // Simulate successful payment
+                safelyCloseModal('paymentProcessingModal');
+                
+                // Update the user's plan
+                irisAuth.updateUserPlan(planName)
+                    .then(() => {
+                        showMessage(`Successfully upgraded to ${planName.charAt(0).toUpperCase() + planName.slice(1)} plan!`, 'success');
+                        updateUsageDisplay();
+                        
+                        // Remove the modal element from DOM
+                        if (processingModalContent.parentNode) {
+                            processingModalContent.parentNode.removeChild(processingModalContent);
+                        }
+                    })
+                    .catch(error => {
+                        showMessage(`Error upgrading plan: ${error.message}`, 'danger');
+                        
+                        // Remove the modal element from DOM
+                        if (processingModalContent.parentNode) {
+                            processingModalContent.parentNode.removeChild(processingModalContent);
+                        }
+                    });
+            }, 1000);
+        }
+    }, 300);
+}
+
+function patchAddonPurchaseModal() {
+    // Preserve original function
+    if (window.showAddonPurchaseModal) {
+        window._originalShowAddonPurchaseModal = window.showAddonPurchaseModal;
+    }
+    
+    // Replace with fixed version
+    window.showAddonPurchaseModal = function(featureType = null) {
+        // First clean up any existing modals
+        safelyCloseModal('paymentProcessingModal');
+        safelyCloseModal('paymentSuccessModal');
+        safelyCloseModal('limitReachedModal');
+        safelyCloseModal('addonPurchaseModal');
+        
+        const modal = document.getElementById('addonPurchaseModal');
+        if (!modal) return;
+        
+        // If a specific feature was requested, focus on that card
+        if (featureType) {
+            // Scroll to and highlight that specific add-on card
+            const featureCard = modal.querySelector(`.addon-purchase-btn[data-feature="${featureType}"]`)?.closest('.card');
+            if (featureCard) {
+                // Clear any existing highlights
+                modal.querySelectorAll('.card').forEach(card => {
+                    card.classList.remove('border-primary');
+                });
+                
+                featureCard.classList.add('border-primary');
+                setTimeout(() => {
+                    featureCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }, 300);
+            }
+        }
+        
+        // Show the modal
+        const modalInstance = new bootstrap.Modal(modal);
+        modalInstance.show();
+        
+        // Enhance close button behavior
+        const closeBtn = modal.querySelector('[data-bs-dismiss="modal"]');
+        if (closeBtn) {
+            // Clone to remove existing listeners
+            const newCloseBtn = closeBtn.cloneNode(true);
+            if (closeBtn.parentNode) {
+                closeBtn.parentNode.replaceChild(newCloseBtn, closeBtn);
+            }
+            
+            newCloseBtn.addEventListener('click', function() {
+                modalInstance.hide();
+                setTimeout(() => {
+                    safelyCloseModal('addonPurchaseModal');
+                }, 300);
+            });
+        }
+        
+        // Add hidden event handler
+        modal.addEventListener('hidden.bs.modal', function() {
+            setTimeout(() => {
+                safelyCloseModal('addonPurchaseModal');
+            }, 300);
+        }, { once: true });
+    };
+}
+
+// Initialize all modal fixes 
+function initModalFixes() {
+    // Replace global functions with fixed versions
+    window.safelyCloseModal = safelyCloseModal;
+    window.showExistingUpgradeModal = showExistingUpgradeModal;
+    window.selectPlan = selectPlanFixed; // Replace selectPlan
+    
+    // Add global cleanup mechanism
+    setupGlobalModalCleanup();
+    
+    // Patch addon purchase modal
+    patchAddonPurchaseModal();
+    
+    console.log("IRIS Modal Fixes initialized successfully!");
 }

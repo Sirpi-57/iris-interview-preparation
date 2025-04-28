@@ -454,43 +454,124 @@ If a field is not found, use null, "", or []. Ensure name, email, phoneNumber ar
         raise
 
 def match_resume_jd_with_gemini(resume_data, job_description):
-    """Matches resume (JSON) with job description using Gemini."""
-    print("--- Matching Resume/JD with Gemini (Requesting 5-8 Improvements) ---")
+    """Matches resume (JSON) with job description using Gemini to produce specific, actionable improvements."""
+    print("--- Matching Resume/JD with Gemini (Requesting Specific Improvements) ---")
     if not GEMINI_API_KEY: raise ValueError("Gemini API Key is not configured.")
     resume_data_str = json.dumps(resume_data, indent=2) if isinstance(resume_data, dict) else str(resume_data)
+    
+    # Create sections overview for easier reference
+    sections_overview = ""
+    for key, value in resume_data.items():
+        if key in ["projects", "education", "workExperience", "skills", "certifications", "languages"]:
+            if isinstance(value, list):
+                sections_overview += f"- {key}: Contains {len(value)} entries\n"
+            else:
+                sections_overview += f"- {key}: Present\n"
+    
     prompt = f"""
-Act as an expert AI career advisor. Compare the candidate's resume data against the provided job description.
+Act as an expert AI resume writer with 15+ years of experience crafting high-impact resumes for top candidates. 
+Your task is to provide SPECIFIC, DETAILED improvements to transform this resume for the target job.
+
 Job Description:
 --- START JD ---
 {job_description[:10000]}
 --- END JD ---
+
 Candidate Resume Data (JSON):
 --- START JSON ---
 {resume_data_str[:10000]}
 --- END JSON ---
-Perform a comprehensive analysis and return ONLY a single valid JSON object with these exact fields:
-- "matchScore": integer 0-100
-- "matchAnalysis": string (2-3 paragraphs explanation)
-- "keyStrengths": array of objects [{{"strength": "...", "relevance": "..."}}]
-- "skillGaps": array of objects [{{"missingSkill": "...", "importance": "high/medium/low", "suggestion": "..."}}]
-- "jobRequirements": object {{"jobTitle": "...", "requiredSkills": [...], "experienceLevel": "...", "educationNeeded": "..."}}
-- "resumeImprovements": array of 5-8 objects [{{"section": "...", "issue": "...", "recommendation": "...", "example": "..."}}]
-Ensure valid JSON structure with NO extra text before or after.
+
+Resume Sections Overview:
+{sections_overview}
+
+IMPORTANT: I need CONCRETE, SPECIFIC suggestions with BEFORE/AFTER examples, not generic advice.
+
+Perform a detailed analysis and return ONLY a valid JSON object with these exact fields:
+
+- "matchScore": integer 0-100 (honest assessment of current fit)
+- "matchAnalysis": string (2-3 paragraphs explanation, be specific about strengths/weaknesses)
+- "keyStrengths": array of objects [
+    {{
+      "strength": "<Specific strength from resume>", 
+      "relevance": "<Detailed explanation of why this matters for the job>",
+      "howToEmphasize": "<Specific way to highlight this strength better>"
+    }}
+  ]
+- "skillGaps": array of objects [
+    {{
+      "missingSkill": "<Specific required skill missing from resume>", 
+      "importance": "high/medium/low", 
+      "suggestion": "<Detailed advice on how to address this gap in resume>",
+      "alternateSkillToHighlight": "<Related skill candidate has that could partially compensate>"
+    }}
+  ]
+- "jobRequirements": object {{
+    "jobTitle": "<Extracted from JD>", 
+    "requiredSkills": ["<Specific skill 1>", "<Specific skill 2>", ...], 
+    "experienceLevel": "<Years/level required>", 
+    "educationNeeded": "<Education requirements>"
+  }}
+- "resumeImprovements": array of 6-10 objects [
+    {{
+      "section": "<Specific section to improve>",
+      "issue": "<Precise problem in current content>",
+      "recommendation": "<Detailed, specific change recommendation>",
+      "currentContent": "<Exact text from resume that needs changing>",
+      "improvedVersion": "<Complete rewritten version with all changes applied>",
+      "explanation": "<Why this improvement matters for this specific job>"
+    }}
+  ]
+
+CRITICAL INSTRUCTIONS:
+1. For "resumeImprovements", provide COMPLETE rewrites in "improvedVersion", not just hints or guidelines
+2. Each "improvedVersion" must be ready to copy-paste into the resume - fully formatted and complete
+3. Improvements must be tailored to this SPECIFIC job description
+4. Verify that suggestions don't recommend adding content that's already present
+5. Focus on SUBSTANCE improvements, not just format or wording
+6. If bullet points need improvement, provide ALL bullets in the improved version, not just the changed ones
+7. Include AT LEAST 3 improvements for work experience or projects sections
+8. For each bullet point improvement, use strong action verbs and include metrics/achievements where possible
+
+Format as VALID JSON only. No markdown, no explanations outside the JSON structure.
 """
+
     try:
         result_text = call_gemini_api(prompt=prompt, model=GEMINI_MODEL, temperature=0.2, response_mime_type="application/json")
         # Clean potential markdown backticks
         if result_text.strip().startswith("```json"): result_text = result_text.strip()[7:]
         if result_text.strip().endswith("```"): result_text = result_text.strip()[:-3]
         match_result_obj = json.loads(result_text.strip(), strict=False)
-        # Basic Validation (Example - expand as needed)
+        
+        # Basic Validation and cleanup
         match_result_obj.setdefault("matchScore", 0)
         match_result_obj.setdefault("matchAnalysis", "[Analysis not provided]")
         match_result_obj.setdefault("keyStrengths", [])
         match_result_obj.setdefault("skillGaps", [])
         match_result_obj.setdefault("jobRequirements", {})
         match_result_obj.setdefault("resumeImprovements", [])
-        print(f"Gemini analysis complete. Match Score: {match_result_obj.get('matchScore')}")
+        
+        # Ensure the required fields exist in each object
+        for strength in match_result_obj.get("keyStrengths", []):
+            strength.setdefault("strength", "")
+            strength.setdefault("relevance", "")
+            strength.setdefault("howToEmphasize", "")
+            
+        for gap in match_result_obj.get("skillGaps", []):
+            gap.setdefault("missingSkill", "")
+            gap.setdefault("importance", "medium")
+            gap.setdefault("suggestion", "")
+            gap.setdefault("alternateSkillToHighlight", "")
+            
+        for improvement in match_result_obj.get("resumeImprovements", []):
+            improvement.setdefault("section", "")
+            improvement.setdefault("issue", "")
+            improvement.setdefault("recommendation", "")
+            improvement.setdefault("currentContent", "")
+            improvement.setdefault("improvedVersion", "")
+            improvement.setdefault("explanation", "")
+        
+        print(f"Gemini analysis complete. Match Score: {match_result_obj.get('matchScore')}, Improvements: {len(match_result_obj.get('resumeImprovements', []))}")
         return match_result_obj
     except json.JSONDecodeError as e:
         print(f"Gemini analysis JSON decoding error: {e}. Response text (partial): {result_text[:1000]}")
@@ -814,11 +895,34 @@ def generate_suggested_answers(transcript, resume_data, job_data):
     }
     job_req_str = json.dumps(job_req_summary, indent=2)
 
-    # Extract just interviewer questions to save tokens
+    # Extract actual questions from interviewer lines
     lines = transcript.split('\n')
-    interviewer_lines = [line for line in lines if line.startswith('Interviewer:')]
-
-    system_prompt = f"""
+    interviewer_questions = []
+    
+    for i, line in enumerate(lines):
+        if line.startswith('Interviewer'):
+            # Skip lines that are not questions (like thank you, apologies, etc.)
+            if any(skip in line.lower() for skip in ["thank you", "i apologize", "concluded", "this mock interview"]):
+                continue
+                
+            # Extract the question text (might be on the same line or next line)
+            question_text = line.replace('Interviewer', '').strip()
+            
+            # If question is too short, check next line for the actual question
+            if len(question_text) < 15 and i+1 < len(lines) and not lines[i+1].startswith(('Interviewer', 'Candidate')):
+                question_text = lines[i+1].strip()
+                
+            if question_text and '?' in question_text:  # Make sure it's a question
+                interviewer_questions.append(question_text)
+    
+    # Process questions in batches to avoid hitting token limits
+    all_suggested_answers = []
+    BATCH_SIZE = 3  # Process 3 questions at a time
+    
+    for i in range(0, len(interviewer_questions), BATCH_SIZE):
+        batch_questions = interviewer_questions[i:i+BATCH_SIZE]
+        
+        system_prompt = f"""
 You are an expert interview coach reviewing a mock interview. For each significant interviewer question, provide ONE strong alternative answer the candidate could have given.
 
 Interview Context:
@@ -827,7 +931,7 @@ Interview Context:
 - Skills Required: {", ".join(job_req_summary.get("requiredSkills", []))}
 
 Interview Questions:
-{json.dumps(interviewer_lines[:10], indent=2)[:1000]}
+{json.dumps(batch_questions, indent=2)}
 
 For each question, provide ONLY ONE better sample answer. Format as valid JSON with NO control characters:
 {{
@@ -844,84 +948,82 @@ For each question, provide ONLY ONE better sample answer. Format as valid JSON w
 Return ONLY valid JSON with NO additional text before or after. IMPORTANT: Do NOT include any control characters in the output.
 """
 
-    messages = [{"role": "user", "content": "Provide one strong alternative answer for each interviewer question."}]
+        messages = [{"role": "user", "content": "Provide one strong alternative answer for each interviewer question."}]
 
+        try:
+            # Lower temperature for more predictable JSON
+            response_content = call_claude_api(
+                messages=messages,
+                system_prompt=system_prompt,
+                model=CLAUDE_MODEL,
+                max_tokens=3000,
+                temperature=0.5
+            )
+
+            response_text = response_content.strip()
+
+            # Handle markdown code blocks
+            if response_text.startswith('```json'):
+                response_text = response_text[7:]
+            if response_text.endswith('```'):
+                response_text = response_text[:-3]
+            response_text = response_text.strip()
+
+            # Fallback find {} block if needed
+            json_start = response_text.find('{')
+            json_end = response_text.rfind('}') + 1
+            if json_start >= 0 and json_end > json_start:
+                json_text = response_text[json_start:json_end].strip()
+            else:
+                print(f"Failed to extract JSON object for batch {i//BATCH_SIZE + 1}")
+                continue
+
+            # Aggressive sanitization of the entire JSON string before parsing
+            sanitized_json_text = sanitize_string_for_json(json_text)
+            
+            try:
+                # First try to parse the sanitized JSON
+                raw_parsed_data = json.loads(sanitized_json_text)
+            except json.JSONDecodeError as e:
+                print(f"JSON decode error for batch {i//BATCH_SIZE + 1}: {e}")
+                continue
+
+            # Add answers from this batch to the full list
+            if "suggestedAnswers" in raw_parsed_data and isinstance(raw_parsed_data.get("suggestedAnswers"), list):
+                for qa_item in raw_parsed_data["suggestedAnswers"]:
+                    sanitized_qa = {}
+                    sanitized_qa["question"] = sanitize_string_for_json(qa_item.get("question"))
+
+                    sanitized_suggestions = []
+                    # Ensure suggestions exist and keep only the first one
+                    suggestions = qa_item.get("suggestions", [])
+                    if suggestions and isinstance(suggestions, list):
+                        first_suggestion = suggestions[0]
+                        if isinstance(first_suggestion, dict):
+                            sanitized_suggestions.append({
+                                "answer": sanitize_string_for_json(first_suggestion.get("answer")),
+                                "rationale": sanitize_string_for_json(first_suggestion.get("rationale"))
+                            })
+
+                    sanitized_qa["suggestions"] = sanitized_suggestions
+                    all_suggested_answers.append(sanitized_qa)
+
+        except Exception as e:
+            print(f"Error processing batch {i//BATCH_SIZE + 1}: {e}")
+            traceback.print_exc()
+            continue
+
+    # Construct the final data structure with all sanitized content
+    final_data = {"suggestedAnswers": all_suggested_answers}
+
+    # Validate JSON serialization works
     try:
-        # Lower temperature for more predictable JSON
-        response_content = call_claude_api(
-            messages=messages,
-            system_prompt=system_prompt,
-            model=CLAUDE_MODEL,
-            max_tokens=3000,
-            temperature=0.5
-        )
-
-        response_text = response_content.strip()
-
-        # Handle markdown code blocks
-        if response_text.startswith('```json'):
-            response_text = response_text[7:]
-        if response_text.endswith('```'):
-            response_text = response_text[:-3]
-        response_text = response_text.strip()
-
-        # Fallback find {} block if needed
-        json_start = response_text.find('{')
-        json_end = response_text.rfind('}') + 1
-        if json_start >= 0 and json_end > json_start:
-            json_text = response_text[json_start:json_end].strip()
-        else:
-            return {"suggestedAnswers": [], "error": "Failed to extract JSON object from response"}
-
-        # Aggressive sanitization of the entire JSON string before parsing
-        sanitized_json_text = sanitize_string_for_json(json_text)
-        
-        try:
-            # First try to parse the sanitized JSON
-            raw_parsed_data = json.loads(sanitized_json_text)
-        except json.JSONDecodeError as e:
-            print(f"JSON decode error even after sanitization: {e}")
-            print(f"First 500 chars of sanitized JSON: {sanitized_json_text[:500]}")
-            return {"suggestedAnswers": [], "error": f"Failed to parse sanitized JSON: {e}"}
-
-        # Manual reconstruction of sanitized content
-        sanitized_suggested_answers = []
-        if "suggestedAnswers" in raw_parsed_data and isinstance(raw_parsed_data.get("suggestedAnswers"), list):
-            for qa_item in raw_parsed_data["suggestedAnswers"]:
-                sanitized_qa = {}
-                sanitized_qa["question"] = sanitize_string_for_json(qa_item.get("question"))
-
-                sanitized_suggestions = []
-                # Ensure suggestions exist and keep only the first one
-                suggestions = qa_item.get("suggestions", [])
-                if suggestions and isinstance(suggestions, list):
-                    first_suggestion = suggestions[0]
-                    if isinstance(first_suggestion, dict):
-                        sanitized_suggestions.append({
-                            "answer": sanitize_string_for_json(first_suggestion.get("answer")),
-                            "rationale": sanitize_string_for_json(first_suggestion.get("rationale"))
-                        })
-
-                sanitized_qa["suggestions"] = sanitized_suggestions
-                sanitized_suggested_answers.append(sanitized_qa)
-
-        # Construct the final data structure with sanitized content
-        final_data = {"suggestedAnswers": sanitized_suggested_answers}
-
-        # Validate JSON serialization works
-        try:
-            json.dumps(final_data)  # Test that it can be serialized
-            print(f"Suggested answers generated and sanitized successfully: {len(final_data.get('suggestedAnswers', []))} questions")
-            return final_data  # Return the sanitized data
-        except Exception as json_err:
-            print(f"Final JSON serialization test failed: {json_err}")
-            return {"suggestedAnswers": [], "error": "Final JSON validation failed"}
-
-    except Exception as e:
-        print(f"Error generating suggested answers: {e}")
-        traceback.print_exc()
-        # Return valid structure even on error
-        return {"suggestedAnswers": [], "error": str(e)}
+        json.dumps(final_data)  # Test that it can be serialized
+        print(f"Suggested answers generated and sanitized successfully: {len(final_data.get('suggestedAnswers', []))} questions")
+        return final_data  # Return the sanitized data
+    except Exception as json_err:
+        print(f"Final JSON serialization test failed: {json_err}")
+        return {"suggestedAnswers": [], "error": "Final JSON validation failed"}
 
 
 def rewrite_resume_section(resume_data, job_description, section_to_improve):
@@ -1269,6 +1371,18 @@ def get_package_limit(package_name, feature_type):
     
     # Return the limit for the feature, or 0 if feature not found
     return limits[package_name].get(feature_type, 0)
+
+# Example if using Redis for caching
+def get_cached_suggested_answers(interview_id):
+    cache_key = f"suggested_answers:{interview_id}"
+    cached_data = redis_client.get(cache_key)
+    if cached_data:
+        return json.loads(cached_data)
+    return None
+    
+def cache_suggested_answers(interview_id, suggestions, ttl=86400):  # Cache for 24 hours
+    cache_key = f"suggested_answers:{interview_id}"
+    redis_client.setex(cache_key, ttl, json.dumps(suggestions))
 
 
 # === Flask Routes ===
@@ -1887,6 +2001,19 @@ def end_interview():
             try:
                 print(f"[{current_interview_id}] Starting background analysis.")
                 analysis_result = analyze_interview_performance(transcript_text, job_reqs, resume_info)
+                # Generate suggested answers in the same background process
+                print(f"[{current_interview_id}] Generating suggested answers...")
+                suggested_answers = generate_suggested_answers(transcript_text, resume_info, job_reqs)
+                
+                # Store both analysis and suggested answers in interview document
+                update_interview_data(current_interview_id, {
+                    'analysis': analysis_result, 
+                    'suggested_answers': suggested_answers,  # Store suggested answers too
+                    'analysis_status': 'completed'
+                })
+        
+        analysis_status = 'completed'
+        print(f"[{current_interview_id}] Analysis and suggested answers completed and saved.")
                 # Store analysis in interview document
                 update_interview_data(current_interview_id, {'analysis': analysis_result, 'analysis_status': 'completed'})
                 analysis_status = 'completed'
@@ -2002,12 +2129,19 @@ def get_interview_analysis(interview_id):
 # --- Make sure the route uses the updated function ---
 @app.route('/get-suggested-answers/<interview_id>', methods=['GET'])
 def get_suggested_answers_route(interview_id):
-    """Generates and returns suggested answers for the interview questions."""
+    """Retrieves suggested answers from Firestore or generates them if not available."""
     try:
         if not db: return jsonify({'error': 'Database unavailable'}), 503
         interview_data = get_interview_data(interview_id)
         if interview_data is None: return jsonify({'error': 'Interview session not found'}), 404
 
+        # Check if suggested answers are already stored in the document
+        if 'suggested_answers' in interview_data:
+            print(f"[{interview_id}] Retrieving cached suggested answers from Firestore")
+            return jsonify(interview_data['suggested_answers'])
+        
+        # If not cached, generate them on-demand (as a fallback)
+        print(f"[{interview_id}] Suggested answers not found, generating on-demand...")
         conversation = interview_data.get('conversation', [])
         resume_data = interview_data.get('resume_data_snapshot')
         job_data = interview_data.get('job_data_snapshot')
@@ -2019,21 +2153,17 @@ def get_suggested_answers_route(interview_id):
             for msg in conversation
         ])
         
-        # Generate suggestions with the improved function
+        # Generate suggestions
         suggestions = generate_suggested_answers(transcript_text, resume_data, job_data)
         
-        # Extra validation of the output before returning
+        # Store for future requests (optional)
         try:
-            # Test serialization separately with dumps first
-            suggestions_json = json.dumps(suggestions)
-            # Now return the jsonify response
-            return jsonify(suggestions)
-        except Exception as json_err:
-            print(f"Final JSON serialization failed in route: {json_err}")
-            return jsonify({
-                'error': f'Failed to serialize response: {str(json_err)}',
-                'suggestedAnswers': [] 
-            }), 500
+            update_interview_data(interview_id, {'suggested_answers': suggestions})
+            print(f"[{interview_id}] Cached newly generated suggested answers in Firestore")
+        except Exception as cache_err:
+            print(f"[{interview_id}] Warning: Could not cache suggested answers: {cache_err}")
+        
+        return jsonify(suggestions)
             
     except Exception as e:
         print(f"Error in /get-suggested-answers route for {interview_id}: {e}")
