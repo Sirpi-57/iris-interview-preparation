@@ -302,7 +302,7 @@ def call_openai_api(prompt, model=OPENAI_MODEL, temperature=0.4):
         "model": model,
         "messages": [{"role": "user", "content": prompt}],
         "temperature": temperature,
-        "max_tokens": 2048
+        "max_tokens": 5000
     }
     
     try:
@@ -313,7 +313,7 @@ def call_openai_api(prompt, model=OPENAI_MODEL, temperature=0.4):
                 "Authorization": f"Bearer {OPENAI_API_KEY}"
             },
             json=payload,
-            timeout=90  # Increased timeout
+            timeout=120  # Increased timeout
         )
         response.raise_for_status()
         data = response.json()
