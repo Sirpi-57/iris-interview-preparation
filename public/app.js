@@ -4539,7 +4539,7 @@ function downloadResumePDF() {
         currentY += headingFontSize * 0.6; // Move down slightly for underline
         pdf.setLineWidth(0.5); // Set line thickness
         pdf.line(margin, currentY, pageWidth - margin, currentY); // Draw the underline
-        currentY += 8 * spacingFactor; // Add space after the line with spacing factor
+        currentY += 10 * spacingFactor; // Add space after the line with spacing factor
         return true; // Indicate heading was added
     };
 
