@@ -194,10 +194,10 @@ function getPackageLimit(feature, packageName) {
         aiEnhance: 50        // New: AI enhance limits
     },
     pro: {
-        resumeAnalyses: 10,
+        resumeAnalyses: 20,
         mockInterviews: 5,
-        pdfDownloads: 9999,  // Essentially unlimited
-        aiEnhance: 9999      // Essentially unlimited
+        pdfDownloads: 100,  // Essentially unlimited
+        aiEnhance: 100      // Essentially unlimited
     }
   };
   

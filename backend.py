@@ -1376,7 +1376,7 @@ def get_package_limit(package_name, feature_type):
             'mockInterviews': 3
         },
         'pro': {
-            'resumeAnalyses': 10,
+            'resumeAnalyses': 20,
             'mockInterviews': 5
         }
     }
@@ -1567,10 +1567,10 @@ def get_package_limit(package_name, feature_type):
             'aiEnhance': 50
         },
         'pro': {
-            'resumeAnalyses': 10,
+            'resumeAnalyses': 20,
             'mockInterviews': 5,
-            'pdfDownloads': 9999,
-            'aiEnhance': 9999
+            'pdfDownloads': 100,
+            'aiEnhance': 100
         }
     }
     
@@ -2600,7 +2600,7 @@ def purchase_addon():
         # Calculate addon price (example pricing - adjust as needed)
         addon_prices = {
             'resumeAnalyses': 19,  # ₹19 per resume analysis
-            'mockInterviews': 49,  # ₹49 per mock interview
+            'mockInterviews': 89,  # ₹49 per mock interview
             'pdfDownloads': 9,     # ₹9 per 10 downloads
             'aiEnhance': 9         # ₹9 per 5 enhancements
         }
@@ -2694,7 +2694,7 @@ def get_addon_pricing():
                 'quantityMultiplier': 1  # 1 per purchase
             },
             'mockInterviews': {
-                'unitPrice': 49,
+                'unitPrice': 89,
                 'currency': 'INR',
                 'description': 'Mock Interview',
                 'quantityMultiplier': 1  # 1 per purchase

@@ -3710,13 +3710,20 @@ function showExistingUpgradeModal(featureType) {
                                     ${recommendedPlan === 'starter' ? '<span class="badge bg-primary position-absolute top-0 end-0 mt-2 me-2">Recommended</span>' : ''}
                                 </div>
                                 <div class="card-body">
-                                    <h2 class="card-title pricing-card-title text-center">₹299</h2>
+                                    <h2 class="card-title pricing-card-title text-center">
+                                        <span class="original-price text-decoration-line-through text-muted">₹399</span>
+                                        <span class="discount-price text-success">₹199</span>
+                                        <span class="discount-badge">-50%</span>
+                                    </h2>
                                     <ul class="list-unstyled mt-3 mb-4">
-                                        <li><i class="fas fa-check text-success me-2"></i> <strong>5 Resume Analyses</strong></li>
-                                        <li><i class="fas fa-check text-success me-2"></i> <strong>1 Mock Interview</strong></li>
+                                        <li><i class="fas fa-check text-success me-2"></i> AI Resume Builder</li>
+                                        <li><i class="fas fa-check text-success me-2"></i> 20 AI Enhancements</li>
+                                        <li><i class="fas fa-check text-success me-2"></i> 20 PDF Downloads</li>
+                                        <li><i class="fas fa-check text-success me-2"></i> 5 Resume Analyses</li>
                                         <li><i class="fas fa-check text-success me-2"></i> Detailed Prep Plan</li>
-                                        <li><i class="fas fa-check text-success me-2"></i> Detailed Performance Report</li>
                                         <li><i class="fas fa-check text-success me-2"></i> Dynamic Timeline Generator</li>
+                                        <li><i class="fas fa-check text-success me-2"></i> 1 Full Mock Interview</li>
+                                        <li><i class="fas fa-check text-success me-2"></i> Detailed Performance Report</li>
                                         <li class="text-muted"><i class="fas fa-times me-2"></i> Suggested Answers Library</li>
                                     </ul>
                                     <button type="button" class="btn btn-lg btn-block ${recommendedPlan === 'starter' ? 'btn-primary' : 'btn-outline-primary'} w-100 plan-select-btn" data-plan="starter">Select Starter</button>
@@ -3732,13 +3739,20 @@ function showExistingUpgradeModal(featureType) {
                                     ${recommendedPlan === 'standard' ? '<span class="badge bg-primary position-absolute top-0 end-0 mt-2 me-2">Recommended</span>' : ''}
                                 </div>
                                 <div class="card-body">
-                                    <h2 class="card-title pricing-card-title text-center">₹499</h2>
+                                    <h2 class="card-title pricing-card-title text-center">
+                                        <span class="original-price text-decoration-line-through text-muted">₹599</span>
+                                        <span class="discount-price text-success">₹399</span>
+                                        <span class="discount-badge">-33%</span>
+                                    </h2>
                                     <ul class="list-unstyled mt-3 mb-4">
-                                        <li><i class="fas fa-check text-success me-2"></i> <strong>10 Resume Analyses</strong></li>
-                                        <li><i class="fas fa-check text-success me-2"></i> <strong>3 Mock Interviews</strong></li>
+                                        <li><i class="fas fa-check text-success me-2"></i> AI Resume Builder (Full)</li>
+                                        <li><i class="fas fa-check text-success me-2"></i> 50 AI Enhancements</li>
+                                        <li><i class="fas fa-check text-success me-2"></i> 50 PDF Downloads</li>
+                                        <li><i class="fas fa-check text-success me-2"></i> 10 Resume Analyses</li>
                                         <li><i class="fas fa-check text-success me-2"></i> Detailed Prep Plan</li>
-                                        <li><i class="fas fa-check text-success me-2"></i> Detailed Performance Reports</li>
                                         <li><i class="fas fa-check text-success me-2"></i> Dynamic Timeline Generator</li>
+                                        <li><i class="fas fa-check text-success me-2"></i> 3 Full Mock Interviews</li>
+                                        <li><i class="fas fa-check text-success me-2"></i> Detailed Performance Reports</li>
                                         <li><i class="fas fa-check text-success me-2"></i> Suggested Answers Library</li>
                                     </ul>
                                     <button type="button" class="btn btn-lg btn-block ${recommendedPlan === 'standard' ? 'btn-primary' : 'btn-outline-primary'} w-100 plan-select-btn" data-plan="standard">Choose Standard</button>
@@ -3754,13 +3768,20 @@ function showExistingUpgradeModal(featureType) {
                                     ${recommendedPlan === 'pro' ? '<span class="badge bg-primary position-absolute top-0 end-0 mt-2 me-2">Recommended</span>' : ''}
                                 </div>
                                 <div class="card-body">
-                                    <h2 class="card-title pricing-card-title text-center">₹899</h2>
+                                    <h2 class="card-title pricing-card-title text-center">
+                                        <span class="original-price text-decoration-line-through text-muted">₹999</span>
+                                        <span class="discount-price text-success">₹799</span>
+                                        <span class="discount-badge">-20%</span>
+                                    </h2>
                                     <ul class="list-unstyled mt-3 mb-4">
-                                        <li><i class="fas fa-check text-success me-2"></i> <strong>10 Resume Analyses</strong></li>
-                                        <li><i class="fas fa-check text-success me-2"></i> <strong>5 Mock Interviews</strong></li>
-                                        <li><i class="fas fa-check text-success me-2"></i> Detailed Prep Plan</li>
-                                        <li><i class="fas fa-check text-success me-2"></i> Detailed Performance Reports</li>
+                                        <li><i class="fas fa-check text-success me-2"></i> AI Resume Builder (Full)</li>
+                                        <li><i class="fas fa-check text-success me-2"></i> 100 AI Enhancements</li> 
+                                        <li><i class="fas fa-check text-success me-2"></i> 100 PDF Downloads</li> 
+                                        <li><i class="fas fa-check text-success me-2"></i> 20 Resume Analyses</li>
                                         <li><i class="fas fa-check text-success me-2"></i> Dynamic Timeline Generator</li>
+                                        <li><i class="fas fa-check text-success me-2"></i> Detailed Prep Plan</li>
+                                        <li><i class="fas fa-check text-success me-2"></i> 5 Full Mock Interviews</li>
+                                        <li><i class="fas fa-check text-success me-2"></i> Detailed Performance Reports</li>                                         
                                         <li><i class="fas fa-check text-success me-2"></i> Suggested Answers Library</li>
                                     </ul>
                                     <button type="button" class="btn btn-lg btn-block ${recommendedPlan === 'pro' ? 'btn-primary' : 'btn-outline-primary'} w-100 plan-select-btn" data-plan="pro">Go Pro</button>
@@ -5344,14 +5365,14 @@ function showResumeBuilderUpgradeModal(featureType) {
                                             <td>5</td>
                                             <td>20</td>
                                             <td>50</td>
-                                            <td>Unlimited</td>
+                                            <td>100</td>
                                         </tr>
                                         <tr>
                                             <td>AI Enhancements</td>
                                             <td>5</td>
                                             <td>20</td>
                                             <td>50</td>
-                                            <td>Unlimited</td>
+                                            <td>100</td>
                                         </tr>
                                     </tbody>
                                 </table>
@@ -5407,9 +5428,9 @@ function showResumeBuilderUpgradeModal(featureType) {
                                     <div class="card-body">
                                         <h2 class="card-title pricing-card-title text-center">₹899</h2>
                                         <ul class="list-unstyled mt-3 mb-4">
-                                            <li><i class="fas fa-check text-success me-2"></i> <strong>Unlimited PDF Downloads</strong></li>
-                                            <li><i class="fas fa-check text-success me-2"></i> <strong>Unlimited AI Enhancements</strong></li>
-                                            <li><i class="fas fa-check text-success me-2"></i> <strong>10 Resume Analyses</strong></li>
+                                            <li><i class="fas fa-check text-success me-2"></i> <strong>100 PDF Downloads</strong></li>
+                                            <li><i class="fas fa-check text-success me-2"></i> <strong>100 AI Enhancements</strong></li>
+                                            <li><i class="fas fa-check text-success me-2"></i> <strong>20 Resume Analyses</strong></li>
                                             <li><i class="fas fa-check text-success me-2"></i> <strong>5 Mock Interviews</strong></li>
                                         </ul>
                                         <button type="button" class="btn btn-lg btn-block ${recommendedPlan === 'pro' ? 'btn-primary' : 'btn-outline-primary'} w-100 plan-select-btn" data-plan="pro">Go Pro</button>
