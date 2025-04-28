@@ -1984,7 +1984,7 @@ def end_interview():
         updated_interview_data = get_interview_data(interview_id) # Fetch again to ensure end_time etc. is present?
         conversation = updated_interview_data.get('conversation', [])
         resume_data = updated_interview_data.get('resume_data_snapshot', {})
-        job_data = updated_interview_data.get('job_data_snapshot', {}).get('jobRequirements', {}) # Pass only job reqs? Or full match results? Let's pass job_data_snapshot for now
+        job_data = updated_interview_data.get('job_data_snapshot', {}) # Pass full match results
         session_id = updated_interview_data.get('sessionId')
 
         # Format transcript
@@ -2001,23 +2001,20 @@ def end_interview():
             try:
                 print(f"[{current_interview_id}] Starting background analysis.")
                 analysis_result = analyze_interview_performance(transcript_text, job_reqs, resume_info)
-                # Generate suggested answers in the same background process
+                
+                # Generate suggested answers in the same process
                 print(f"[{current_interview_id}] Generating suggested answers...")
                 suggested_answers = generate_suggested_answers(transcript_text, resume_info, job_reqs)
                 
                 # Store both analysis and suggested answers in interview document
                 update_interview_data(current_interview_id, {
                     'analysis': analysis_result, 
-                    'suggested_answers': suggested_answers,  # Store suggested answers too
+                    'suggested_answers': suggested_answers,
                     'analysis_status': 'completed'
                 })
-        
-        analysis_status = 'completed'
-        print(f"[{current_interview_id}] Analysis and suggested answers completed and saved.")
-                # Store analysis in interview document
-                update_interview_data(current_interview_id, {'analysis': analysis_result, 'analysis_status': 'completed'})
+                
                 analysis_status = 'completed'
-                print(f"[{current_interview_id}] Analysis completed and saved.")
+                print(f"[{current_interview_id}] Analysis and suggested answers completed and saved.")
 
                 # --- Track Progress ---
                 if linked_session_id and analysis_result:
@@ -2027,16 +2024,16 @@ def end_interview():
                     if session_data:
                         past_interviews = session_data.get('progress_history', {}).get('interviews', [])
                         metrics = {
-                            "date": updated_interview_data.get('end_time', datetime.now().isoformat()), # Use interview end time
+                            "date": datetime.now().isoformat(),
                             "interviewId": current_interview_id,
-                            "interviewType": updated_interview_data.get('interviewType', 'general'),
+                            "interviewType": "general",  # You might want to get this from interview_data
                             "overallScore": analysis_result.get("overallScore", 0),
                             "technicalScore": analysis_result.get("technicalAssessment", {}).get("score", 0),
                             "communicationScore": analysis_result.get("communicationAssessment", {}).get("score", 0),
                             "behavioralScore": analysis_result.get("behavioralAssessment", {}).get("score", 0)
                         }
                         past_interviews.append(metrics)
-                        past_interviews.sort(key=lambda x: x["date"]) # Sort oldest first
+                        past_interviews.sort(key=lambda x: x["date"])  # Sort oldest first
 
                         trends = {}
                         if len(past_interviews) > 1:
@@ -2064,7 +2061,7 @@ def end_interview():
                     else:
                          print(f"[{current_interview_id}] WARNING: Could not find session {linked_session_id} to track progress.")
                 # --- End Track Progress ---
-
+                
             except Exception as e:
                 error_msg = f"Error analyzing interview {current_interview_id}: {e}"
                 print(error_msg)
@@ -2136,7 +2133,7 @@ def get_suggested_answers_route(interview_id):
         if interview_data is None: return jsonify({'error': 'Interview session not found'}), 404
 
         # Check if suggested answers are already stored in the document
-        if 'suggested_answers' in interview_data:
+        if 'suggested_answers' in interview_data and interview_data['suggested_answers']:
             print(f"[{interview_id}] Retrieving cached suggested answers from Firestore")
             return jsonify(interview_data['suggested_answers'])
         
@@ -2163,7 +2160,18 @@ def get_suggested_answers_route(interview_id):
         except Exception as cache_err:
             print(f"[{interview_id}] Warning: Could not cache suggested answers: {cache_err}")
         
-        return jsonify(suggestions)
+        # Extra validation of the output before returning
+        try:
+            # Test serialization separately with dumps first
+            suggestions_json = json.dumps(suggestions)
+            # Now return the jsonify response
+            return jsonify(suggestions)
+        except Exception as json_err:
+            print(f"Final JSON serialization failed in route: {json_err}")
+            return jsonify({
+                'error': f'Failed to serialize response: {str(json_err)}',
+                'suggestedAnswers': [] 
+            }), 500
             
     except Exception as e:
         print(f"Error in /get-suggested-answers route for {interview_id}: {e}")
