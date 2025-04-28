@@ -295,12 +295,7 @@ def call_claude_api(messages, system_prompt, model=CLAUDE_MODEL, temperature=0.7
         print(error_msg)
         raise Exception(error_msg) from e
 
-
-def get_gemini_url(model_name):
-    if not GEMINI_API_KEY: raise ValueError("Gemini API Key not configured.")
-    return f"{GEMINI_API_URL_BASE}{model_name}:generateContent?key={GEMINI_API_KEY}"
-
-def call_openai_api(prompt, model="OPENAI_MODEL", temperature=0.4):
+def call_openai_api(prompt, model=OPENAI_MODEL, temperature=0.4):
     if not OPENAI_API_KEY: raise ValueError("OpenAI API Key not configured.")
     
     payload = {
@@ -549,7 +544,7 @@ Format as VALID JSON only. No markdown, no explanations outside the JSON structu
 """
 
     try:
-        result_text = call_openai_api(prompt=prompt, model="OPENAI_MODEL", temperature=0.2)
+        result_text = call_openai_api(prompt=prompt, model=OPENAI_MODEL, temperature=0.2)
         # Clean potential markdown backticks
         if result_text.strip().startswith("```json"): result_text = result_text.strip()[7:]
         if result_text.strip().endswith("```"): result_text = result_text.strip()[:-3]
@@ -697,7 +692,7 @@ Instructions:
 Strictly follow JSON format. No extra text or markdown.
 """
     try:
-        result_text = call_openai_api(prompt=prompt, model="OPENAI_MODEL", temperature=0.5)
+        result_text = call_openai_api(prompt=prompt, model=OPENAI_MODEL, temperature=0.5)
         if result_text.strip().startswith("```json"): result_text = result_text.strip()[7:]
         if result_text.strip().endswith("```"): result_text = result_text.strip()[:-3]
         timeline_data = json.loads(result_text.strip(), strict=False)
