@@ -463,21 +463,31 @@ If a field is not found, use null, "", or []. Ensure name, email, phoneNumber ar
 def match_resume_jd_with_openai(resume_data, job_description):
     """Matches resume (JSON) with job description using OpenAI to produce specific, actionable improvements."""
     print("--- Matching Resume/JD with OpenAI (Requesting Specific Improvements) ---")
-    if not OPENAI_API_KEY: raise ValueError("OpenAI API Key is not configured.")
+    # Ensure OPENAI_API_KEY is configured - replace with your actual check
+    if not globals().get("OPENAI_API_KEY"): raise ValueError("OpenAI API Key is not configured.")
+
     resume_data_str = json.dumps(resume_data, indent=2) if isinstance(resume_data, dict) else str(resume_data)
-    
+
     # Create sections overview for easier reference
     sections_overview = ""
-    for key, value in resume_data.items():
-        if key in ["projects", "education", "workExperience", "skills", "certifications", "languages"]:
-            if isinstance(value, list):
-                sections_overview += f"- {key}: Contains {len(value)} entries\n"
-            else:
-                sections_overview += f"- {key}: Present\n"
-    
+    if isinstance(resume_data, dict): # Check if it's a dict before iterating
+        for key, value in resume_data.items():
+            if key in ["projects", "education", "workExperience", "skills", "certifications", "languages"]:
+                if isinstance(value, list):
+                    sections_overview += f"- {key}: Contains {len(value)} entries\n"
+                elif value: # Check if value is not empty/None
+                     sections_overview += f"- {key}: Present\n"
+            elif key == "summary" and value:
+                 sections_overview += f"- {key}: Present\n"
+            # Add other key sections if needed
+    else:
+        sections_overview = "Resume data is not in expected dictionary format."
+
+
+    # --- Start of Modified Prompt ---
     prompt = f"""
-Act as an expert AI resume writer with 15+ years of experience crafting high-impact resumes for top candidates. 
-Your task is to provide SPECIFIC, DETAILED improvements to transform this resume for the target job.
+Act as an expert AI resume writer and career coach with 15+ years of experience, specializing in tailoring resumes for competitive roles.
+Your task is to perform a rigorous analysis of the provided resume against the job description and generate SPECIFIC, DETAILED, and ACTIONABLE improvements.
 
 Job Description:
 --- START JD ---
@@ -492,223 +502,416 @@ Candidate Resume Data (JSON):
 Resume Sections Overview:
 {sections_overview}
 
-IMPORTANT: I need CONCRETE, SPECIFIC suggestions with BEFORE/AFTER examples, not generic advice.
+CRITICAL TASK: Perform a detailed analysis and return ONLY a valid JSON object adhering precisely to the structure and minimum count requirements specified below. NO extra text, markdown, or explanations outside the JSON format.
 
-Perform a detailed analysis and return ONLY a valid JSON object with these exact fields:
-
-- "matchScore": integer 0-100 (honest assessment of current fit)
-- "matchAnalysis": string (2-3 paragraphs explanation, be specific about strengths/weaknesses)
-- "keyStrengths": array of objects [
+JSON Output Structure:
+{{
+  "matchScore": integer (0-100, honest assessment of CURRENT fit based *only* on provided data),
+  "matchAnalysis": string (MUST be **at least 3-4 detailed paragraphs**. Go beyond surface-level summary. Discuss specific alignments and mismatches between resume sections and JD requirements. Mention nuances, quantify alignment where possible (e.g., 'possesses 6/8 key required skills'), and clearly articulate the core strengths/weaknesses relative to *this specific role*.),
+  "keyStrengths": array of objects (MUST contain **at least 5 distinct strengths** derived directly from the resume) [
     {{
-      "strength": "<Specific strength from resume>", 
-      "relevance": "<Detailed explanation of why this matters for the job>",
-      "howToEmphasize": "<Specific way to highlight this strength better>"
+      "strength": "<Specific skill, experience, or achievement from resume>",
+      "relevance": "<Detailed explanation connecting this strength *directly* to a specific requirement, responsibility, or keyword in the Job Description>",
+      "howToEmphasize": "<Concrete suggestion on making this strength more prominent or impactful in the resume (e.g., move higher, add metrics, use specific keywords from JD)>"
+    }}
+  ],
+  "skillGaps": array of objects (MUST identify **at least 3 distinct skill gaps**, aim for 4 if clearly applicable based on JD 'Required' or 'Preferred' qualifications) [
+    {{
+      "missingSkill": "<Specific required or preferred skill/experience from JD NOT EVIDENT in the resume>",
+      "importance": "high/medium/low" (Based on JD emphasis),
+      "suggestion": "<Actionable advice on how to address this gap - e.g., acquire skill, reframe existing experience, mention relevant coursework/projects, or acknowledge it in cover letter>",
+      "alternateSkillToHighlight": "<Identify a related skill the candidate *does* possess that could partially compensate or show related aptitude (or state 'None apparent')>"
+    }}
+  ],
+  "jobRequirements": object {{
+    "jobTitle": "<Accurately extracted Job Title from JD>",
+    "requiredSkills": ["<List of specific key skills explicitly stated as required in JD>"],
+    "experienceLevel": "<Required years/level (e.g., '5+ years', 'Senior Level', 'Entry Level')>",
+    "educationNeeded": "<Minimum education requirements mentioned in JD (e.g., 'Bachelor's degree in CS', 'Master's preferred')>"
+  }},
+  "resumeImprovements": array of objects (MUST contain **at least 7 distinct improvements**, aim for 8. **Minimum 5 improvements must target 'workExperience' or 'projects' sections**) [
+    {{
+      "section": "<Specific resume section (e.g., 'workExperience[0].description', 'projects[1].bulletPoints', 'summary', 'skills')>",
+      "issue": "<Precise problem with the current content (e.g., 'Vague description lacks metrics', 'Bullet point uses weak verb', 'Skill listed without context', 'Project outcome unclear')>",
+      "recommendation": "<Detailed, specific change needed (e.g., 'Quantify achievement with estimated impact', 'Rewrite bullet using STAR method', 'Group skills by category', 'Add specific technologies used')>",
+      "currentContent": "<Exact text snippet from the resume that needs changing>",
+      "improvedVersion": "<COMPLETE rewritten version of the content (e.g., the full bullet point, the revised project description block, the updated skills list section). MUST be ready to copy-paste. If improving bullets, provide the complete set of improved bullets for that entry.>",
+      "explanation": "<Crucial: Explain *precisely why* this improvement makes the candidate a stronger fit for *this specific job*, referencing JD keywords or requirements>"
     }}
   ]
-- "skillGaps": array of objects [
-    {{
-      "missingSkill": "<Specific required skill missing from resume>", 
-      "importance": "high/medium/low", 
-      "suggestion": "<Detailed advice on how to address this gap in resume>",
-      "alternateSkillToHighlight": "<Related skill candidate has that could partially compensate>"
-    }}
-  ]
-- "jobRequirements": object {{
-    "jobTitle": "<Extracted from JD>", 
-    "requiredSkills": ["<Specific skill 1>", "<Specific skill 2>", ...], 
-    "experienceLevel": "<Years/level required>", 
-    "educationNeeded": "<Education requirements>"
-  }}
-- "resumeImprovements": array of 6-10 objects [
-    {{
-      "section": "<Specific section to improve>",
-      "issue": "<Precise problem in current content>",
-      "recommendation": "<Detailed, specific change recommendation>",
-      "currentContent": "<Exact text from resume that needs changing>",
-      "improvedVersion": "<Complete rewritten version with all changes applied>",
-      "explanation": "<Why this improvement matters for this specific job>"
-    }}
-  ]
+}}
 
-CRITICAL INSTRUCTIONS:
-1. For "resumeImprovements", provide COMPLETE rewrites in "improvedVersion", not just hints or guidelines
-2. Each "improvedVersion" must be ready to copy-paste into the resume - fully formatted and complete
-3. Improvements must be tailored to this SPECIFIC job description
-4. Verify that suggestions don't recommend adding content that's already present
-5. Focus on SUBSTANCE improvements, not just format or wording
-6. If bullet points need improvement, provide ALL bullets in the improved version, not just the changed ones
-7. Include AT LEAST 3 improvements for work experience or projects sections
-8. For each bullet point improvement, use strong action verbs and include metrics/achievements where possible
-
-Format as VALID JSON only. No markdown, no explanations outside the JSON structure.
+MANDATORY INSTRUCTIONS:
+1.  **Strict Minimum Counts:** Ensure `keyStrengths` has >= 5 items, `skillGaps` has >= 3 items, and `resumeImprovements` has >= 7 items (with >= 5 targeting work/projects). Failure to meet counts results in an invalid response.
+2.  **Complete Rewrites:** For `resumeImprovements.improvedVersion`, provide the FULLY rewritten text, not just instructions or partial edits. Ensure it's copy-paste ready.
+3.  **Job Specificity:** All suggestions, analysis, and improvements MUST be tailored directly to the provided Job Description.
+4.  **Substance over Style:** Focus on improvements that add quantifiable results, impact, relevant keywords, and stronger alignment with the JD, not just minor grammatical or formatting changes.
+5.  **Action Verbs & Metrics:** Ensure `improvedVersion` for work/project bullets uses strong action verbs and incorporates metrics/quantifiable achievements whenever possible.
+6.  **Validity:** The final output MUST be a single, valid JSON object with no preceding/succeeding text or markdown. Double-check structure and types.
 """
+    # --- End of Modified Prompt ---
 
     try:
-        result_text = call_openai_api(prompt=prompt, model=OPENAI_MODEL, temperature=0.2)
+        result_text = call_openai_api(prompt=prompt, model=OPENAI_MODEL, temperature=0.2) # Assume call_openai_api exists
         # Clean potential markdown backticks
         if result_text.strip().startswith("```json"): result_text = result_text.strip()[7:]
         if result_text.strip().endswith("```"): result_text = result_text.strip()[:-3]
+
         match_result_obj = json.loads(result_text.strip(), strict=False)
-        
-        # Basic Validation and cleanup
+
+        # --- Start: Enhanced Validation & Defaulting ---
+        # Basic structure check
+        if not isinstance(match_result_obj, dict):
+             raise ValueError("OpenAI response is not a JSON object.")
+
+        # Set defaults for top-level keys
         match_result_obj.setdefault("matchScore", 0)
-        match_result_obj.setdefault("matchAnalysis", "[Analysis not provided]")
+        match_result_obj.setdefault("matchAnalysis", "[Analysis not provided or failed validation]")
         match_result_obj.setdefault("keyStrengths", [])
         match_result_obj.setdefault("skillGaps", [])
         match_result_obj.setdefault("jobRequirements", {})
         match_result_obj.setdefault("resumeImprovements", [])
-        
-        # Ensure the required fields exist in each object
-        for strength in match_result_obj.get("keyStrengths", []):
-            strength.setdefault("strength", "")
-            strength.setdefault("relevance", "")
-            strength.setdefault("howToEmphasize", "")
-            
-        for gap in match_result_obj.get("skillGaps", []):
-            gap.setdefault("missingSkill", "")
-            gap.setdefault("importance", "medium")
-            gap.setdefault("suggestion", "")
-            gap.setdefault("alternateSkillToHighlight", "")
-            
-        for improvement in match_result_obj.get("resumeImprovements", []):
-            improvement.setdefault("section", "")
-            improvement.setdefault("issue", "")
-            improvement.setdefault("recommendation", "")
-            improvement.setdefault("currentContent", "")
-            improvement.setdefault("improvedVersion", "")
-            improvement.setdefault("explanation", "")
-        
-        print(f"OpenAI analysis complete. Match Score: {match_result_obj.get('matchScore')}, Improvements: {len(match_result_obj.get('resumeImprovements', []))}")
+
+        # Validate and clean list items
+        def validate_list_items(items, required_keys, list_name):
+            validated_list = []
+            if not isinstance(items, list):
+                 print(f"Warning: '{list_name}' is not a list in the response. Defaulting to empty list.")
+                 return []
+            for i, item in enumerate(items):
+                if not isinstance(item, dict):
+                    print(f"Warning: Item {i} in '{list_name}' is not an object. Skipping.")
+                    continue
+                for key in required_keys:
+                    item.setdefault(key, f"[Missing: {key}]") # Ensure key exists
+                validated_list.append(item)
+            return validated_list
+
+        match_result_obj["keyStrengths"] = validate_list_items(
+            match_result_obj["keyStrengths"],
+            ["strength", "relevance", "howToEmphasize"],
+            "keyStrengths"
+        )
+        match_result_obj["skillGaps"] = validate_list_items(
+            match_result_obj["skillGaps"],
+            ["missingSkill", "importance", "suggestion", "alternateSkillToHighlight"],
+            "skillGaps"
+        )
+        match_result_obj["resumeImprovements"] = validate_list_items(
+            match_result_obj["resumeImprovements"],
+            ["section", "issue", "recommendation", "currentContent", "improvedVersion", "explanation"],
+            "resumeImprovements"
+        )
+        # --- End: Enhanced Validation & Defaulting ---
+
+        # Add checks for minimum counts after parsing
+        if len(match_result_obj.get("keyStrengths", [])) < 5: print("Warning: Less than 5 key strengths provided.")
+        if len(match_result_obj.get("skillGaps", [])) < 3: print("Warning: Less than 3 skill gaps provided.")
+        if len(match_result_obj.get("resumeImprovements", [])) < 7: print("Warning: Less than 7 resume improvements provided.")
+        # Optional: Check work/project improvement count
+
+        print(f"OpenAI analysis complete. Match Score: {match_result_obj.get('matchScore')}, Strengths: {len(match_result_obj.get('keyStrengths', []))}, Gaps: {len(match_result_obj.get('skillGaps', []))}, Improvements: {len(match_result_obj.get('resumeImprovements', []))}")
         return match_result_obj
     except json.JSONDecodeError as e:
         print(f"OpenAI analysis JSON decoding error: {e}. Response text (partial): {result_text[:1000]}")
-        return {"error": "Invalid JSON from OpenAI analysis", "matchScore": 0, "matchAnalysis": f"[Error: {e}]", "keyStrengths": [], "skillGaps": [], "jobRequirements": {}, "resumeImprovements": []}
+        # Return structure consistent with success, but with error info
+        return {"error": f"Invalid JSON from OpenAI analysis: {e}", "matchScore": 0, "matchAnalysis": f"[Error decoding JSON: {e}]\nResponse Text (start): {result_text[:200]}", "keyStrengths": [], "skillGaps": [], "jobRequirements": {}, "resumeImprovements": []}
     except Exception as e:
         print(f"OpenAI analysis error: {e}")
         traceback.print_exc()
-        return {"error": str(e), "matchScore": 0, "matchAnalysis": f"[Error: {e}]", "keyStrengths": [], "skillGaps": [], "jobRequirements": {}, "resumeImprovements": []}
+        return {"error": str(e), "matchScore": 0, "matchAnalysis": f"[Error during analysis: {e}]", "keyStrengths": [], "skillGaps": [], "jobRequirements": {}, "resumeImprovements": []}
 
 
 def generate_interview_prep_plan(resume_match_data):
     """Generates a personalized interview prep plan using Claude (no timeline)."""
     print("--- Generating Prep Plan (No Timeline) ---")
-    if not CLAUDE_API_KEY: raise ValueError("Claude API Key not configured.")
+    # Ensure CLAUDE_API_KEY is configured - replace with your actual check
+    if not globals().get("CLAUDE_API_KEY"): raise ValueError("Claude API Key is not configured.")
+
     # Extract context safely
     match_score = resume_match_data.get("matchScore", 0)
-    match_analysis = resume_match_data.get("matchAnalysis", "")
+    match_analysis = resume_match_data.get("matchAnalysis", "[Analysis not available]")
     skill_gaps = resume_match_data.get("skillGaps", [])
     job_requirements = resume_match_data.get("jobRequirements", {})
-    parsed_resume = resume_match_data.get("parsedResume", {}) # Assumes parsedResume is added to match_results
+    # Assuming parsedResume might be added elsewhere or passed in resume_match_data
+    parsed_resume = resume_match_data.get("parsedResume", {})
+    if not parsed_resume and "resume_data" in resume_match_data: # Fallback if parsedResume isn't top-level
+        parsed_resume = resume_match_data["resume_data"]
+
     try:
-        gaps_str = json.dumps(skill_gaps, indent=2)
-        requirements_str = json.dumps(job_requirements, indent=2)
-        resume_summary_str = json.dumps({k: parsed_resume.get(k) for k in ['name', 'currentPosition', 'yearsOfExperience', 'technicalSkills']}, indent=2)
+        gaps_str = json.dumps(skill_gaps, indent=2) if skill_gaps else "[]"
+        requirements_str = json.dumps(job_requirements, indent=2) if job_requirements else "{}"
+        # Extract only basic info for summary to keep prompt concise
+        resume_summary_dict = {
+            "name": parsed_resume.get("name", parsed_resume.get("contactInfo", {}).get("name")),
+            "currentPosition": parsed_resume.get("currentPosition", parsed_resume.get("workExperience", [{}])[0].get("jobTitle")),
+            "yearsOfExperience": parsed_resume.get("yearsOfExperience", "[Not specified]"),
+            "technicalSkillsSummary": [s.get("skill") for s in parsed_resume.get("skills", []) if s.get("type") == "TECHNICAL"][:10] # Sample of tech skills
+        }
+        resume_summary_str = json.dumps(resume_summary_dict, indent=2)
+
     except Exception as json_err:
-        print(f"Warning: Could not serialize data for prep plan prompt - {json_err}")
-        gaps_str, requirements_str, resume_summary_str = str(skill_gaps), str(job_requirements), str(parsed_resume)
+        print(f"Warning: Could not serialize data cleanly for prep plan prompt - {json_err}")
+        gaps_str, requirements_str, resume_summary_str = str(skill_gaps), str(job_requirements), str(parsed_resume) # Fallback to string
 
+
+    # --- Start of Modified Prompt ---
     system_prompt = f"""
-You are an expert interview coach creating a prep plan based on analysis.
-Candidate Summary: {resume_summary_str}
-Job Requirements: {requirements_str}
-Identified Skill Gaps: {gaps_str}
-Analysis Summary: Match Score: {match_score}/100. {match_analysis}
+You are an expert interview coach tasked with creating a highly targeted interview preparation plan. Base your plan *strictly* on the provided analysis data.
 
-Create a plan as a JSON object ONLY with these sections (no timeline):
-1. "focusAreas": [4-6 specific technical/non-technical topics]
-2. "likelyQuestions": [15-20 objects [{{"category": "...", "question": "...", "guidance": "SPECIFIC, tailored advice (1-2 sentences)"}}]]
-3. "conceptsToStudy": [Detailed technical concepts/tools based on JD and gaps]
-4. "gapStrategies": [For EACH gap: [{{"gap": "...", "strategy": "Concrete advice to address gap in interview", "focus_during_prep": "What to study beforehand"}}]]
+Candidate Summary:
+{resume_summary_str[:1000]}
 
-Your response MUST be only the valid JSON object. **DO NOT INCLUDE a 'preparationTimeline' section.**
+Job Requirements:
+{requirements_str[:2000]}
+
+Identified Skill Gaps:
+{gaps_str[:1500]}
+
+Analysis Summary: Match Score: {match_score}/100. {match_analysis[:1500]}
+
+Your Task: Create a detailed preparation plan structured ONLY as a valid JSON object. Adhere precisely to the specified structure and content requirements below.
+
+JSON Output Structure:
+{{
+  "focusAreas": [Array of 4-6 specific technical concepts, skills, or behavioral areas MOST critical for success in this interview, derived from JD and gaps],
+  "likelyQuestions": [Array of **exactly 15 to 20** question objects. CRITICAL: This list MUST contain **at least 13 technical/fundamental questions** directly related to the job's required skills (from `jobRequirements`) and the candidate's `skillGaps`. Include **only 1-2 behavioral questions**. For each question, provide tailored guidance.],
+  "conceptsToStudy": [Array of strings listing specific technical concepts, tools, algorithms, or methodologies the candidate MUST review, based heavily on `jobRequirements.requiredSkills` and `skillGaps`],
+  "gapStrategies": [Array containing one object for EACH identified skill gap from the input. If no gaps were identified, provide an empty array `[]`.]
+}}
+
+Detailed Structure Definitions:
+- "likelyQuestions": Each object must be `{{"category": "Technical/Behavioral/Situational", "question": "<Specific interview question>", "guidance": "<1-2 sentences of SPECIFIC, actionable advice on how to approach *this* question, referencing candidate's potential experience or gaps>"}}`.
+- "gapStrategies": Each object must be `{{"gap": "<The missingSkill from the input>", "strategy": "<Concrete advice on how to address this gap during the interview (e.g., 'Highlight project X which used related tech Y', 'Discuss relevant coursework Z', 'Acknowledge gap and express eagerness to learn')>", "focus_during_prep": "<Specific topic/skill to study beforehand to mitigate this gap>"}}`.
+
+MANDATORY INSTRUCTIONS:
+1.  **Strict Question Count & Mix:** Generate exactly 15-20 questions total for `likelyQuestions`. At least 13 must be technical/fundamental, max 2 behavioral.
+2.  **JSON Only:** Your response MUST be ONLY the valid JSON object described above. No introductory text, explanations, apologies, or markdown formatting.
+3.  **No Timeline:** **DO NOT INCLUDE** any form of timeline or schedule (e.g., `preparationTimeline`).
+4.  **Relevance:** All content MUST be directly derived from the provided context (Summary, Requirements, Gaps, Analysis).
+5.  **Specificity:** Guidance, concepts, and strategies must be concrete and actionable, not generic.
 """
-    messages = [{"role": "user", "content": "Generate the detailed interview preparation plan (excluding timeline)."}]
+    # --- End of Modified Prompt ---
+
+    messages = [{"role": "user", "content": "Generate the detailed interview preparation plan (excluding timeline) strictly following the JSON structure and content rules provided in the system prompt."}]
     response_content = ""
     try:
-        response_content = call_claude_api(
+        response_content = call_claude_api( # Assume call_claude_api exists
             messages=messages, system_prompt=system_prompt, model=CLAUDE_HAIKU_MODEL,
             max_tokens=4096, temperature=0.5
         )
-        json_start = response_content.find('{')
-        json_end = response_content.rfind('}') + 1
-        if json_start >= 0 and json_end > json_start:
-            json_text = response_content[json_start:json_end].strip()
-            prep_plan = json.loads(json_text, strict=False)
-            # Basic validation
-            prep_plan.setdefault("focusAreas", [])
-            prep_plan.setdefault("likelyQuestions", [])
-            prep_plan.setdefault("conceptsToStudy", [])
-            prep_plan.setdefault("gapStrategies", [])
-            if "preparationTimeline" in prep_plan: del prep_plan["preparationTimeline"]
-            print("Prep plan (no timeline) generated successfully.")
-            return prep_plan
-        else:
-            raise ValueError(f"Valid JSON object not found in prep plan response: {response_content[:1000]}")
-    except json.JSONDecodeError as e:
-        print(f"Prep plan JSON decoding error: {e}. Response text: {json_text[:1000]}")
+
+        # --- Robust JSON extraction ---
+        json_text = ""
+        try:
+            # Try parsing directly first
+            prep_plan = json.loads(response_content, strict=False)
+        except json.JSONDecodeError:
+            # If direct parsing fails, find JSON block
+            json_start = response_content.find('{')
+            json_end = response_content.rfind('}') + 1
+            if json_start != -1 and json_end != -1 and json_end > json_start:
+                json_text = response_content[json_start:json_end].strip()
+                try:
+                    prep_plan = json.loads(json_text, strict=False)
+                except json.JSONDecodeError as e_inner:
+                    print(f"Prep plan JSON decoding error after extraction: {e_inner}. Response text slice: {json_text[:1000]}")
+                    raise ValueError(f"Valid JSON object not found or parsable in prep plan response: {response_content[:1000]}") from e_inner
+            else:
+                 raise ValueError(f"Valid JSON object markers not found in prep plan response: {response_content[:1000]}")
+
+        # --- Validation and Cleanup ---
+        if not isinstance(prep_plan, dict):
+             raise ValueError("Extracted content is not a JSON object.")
+
+        prep_plan.setdefault("focusAreas", [])
+        prep_plan.setdefault("likelyQuestions", [])
+        prep_plan.setdefault("conceptsToStudy", [])
+        prep_plan.setdefault("gapStrategies", [])
+
+        # Ensure no timeline sneaked in
+        if "preparationTimeline" in prep_plan:
+            del prep_plan["preparationTimeline"]
+            print("Warning: Removed 'preparationTimeline' found in response.")
+
+        # Validate question count and rough mix (optional but good)
+        q_count = len(prep_plan.get("likelyQuestions", []))
+        if not (15 <= q_count <= 20):
+             print(f"Warning: Generated question count ({q_count}) is outside the target range (15-20).")
+        # Add more detailed validation if needed (e.g., check question object structure)
+
+        print(f"Prep plan (no timeline) generated successfully. Questions: {q_count}")
+        return prep_plan
+
+    except json.JSONDecodeError as e: # Catch errors from the primary attempt if extraction wasn't needed
+        print(f"Prep plan JSON decoding error: {e}. Full response: {response_content[:1000]}")
         raise Exception("Claude API returned invalid JSON for prep plan.") from e
+    except ValueError as e: # Catch errors from extraction/validation logic
+        print(f"Prep plan generation error: {e}")
+        # Optionally re-raise or return error structure
+        raise Exception(f"Failed to generate valid prep plan JSON: {str(e)}") from e
     except Exception as e:
         print(f"Error generating interview prep plan (no timeline): {e}")
         traceback.print_exc()
+        # Return a consistent error structure if needed, or re-raise
         raise Exception(f"Failed to generate prep plan: {str(e)}") from e
 
 def generate_dynamic_timeline_with_openai(session_data, days):
     """Generates a dynamic, day-by-day interview prep timeline using OpenAI."""
     print(f"--- Generating Dynamic Timeline with OpenAI ({days} days) ---")
-    if not OPENAI_API_KEY: raise ValueError("OpenAI API Key is not configured.")
+    # Ensure OPENAI_API_KEY is configured - replace with your actual check
+    if not globals().get("OPENAI_API_KEY"): raise ValueError("OpenAI API Key is not configured.")
     if not session_data: raise ValueError("Session data is required to generate timeline.")
+
+    # Safely extract necessary data from session_data
     prep_plan = session_data.get('results', {}).get('prep_plan', {})
     match_results = session_data.get('results', {}).get('match_results', {})
-    parsed_resume = session_data.get('results', {}).get('parsed_resume', {})
+    # Fallback for resume data location
+    parsed_resume_results = session_data.get('results', {}).get('parsed_resume', {})
+    parsed_resume_input = session_data.get('resume_data', {}) # Assuming resume_data might be top-level input
+    parsed_resume = parsed_resume_results if parsed_resume_results else parsed_resume_input
+
     focus_areas = prep_plan.get('focusAreas', [])
     concepts_to_study = prep_plan.get('conceptsToStudy', [])
-    skill_gaps = match_results.get('skillGaps', [])
+    skill_gaps = match_results.get('skillGaps', []) # Expecting list of objects as defined before
     job_title = match_results.get('jobRequirements', {}).get('jobTitle', 'the position')
-    candidate_name = parsed_resume.get('name', 'Candidate')
-    try:
-        focus_areas_str = "- " + "\n- ".join(focus_areas) if focus_areas else "N/A"
-        if isinstance(concepts_to_study, dict): concepts_str = json.dumps(concepts_to_study, indent=2)
-        elif isinstance(concepts_to_study, list): concepts_str = "- " + "\n- ".join(concepts_to_study) if concepts_to_study else "N/A"
-        else: concepts_str = str(concepts_to_study)
-        gaps_str = json.dumps(skill_gaps, indent=2) if skill_gaps else "None identified."
-    except Exception as json_err:
-        print(f"Warning: Could not serialize context for timeline prompt - {json_err}")
-        focus_areas_str, concepts_str, gaps_str = str(focus_areas), str(concepts_to_study), str(skill_gaps)
+    candidate_name = parsed_resume.get('name', parsed_resume.get('contactInfo', {}).get("name", 'Candidate'))
 
+    # Prepare context strings carefully
+    try:
+        focus_areas_str = "- " + "\n- ".join(focus_areas) if focus_areas and isinstance(focus_areas, list) else "N/A"
+
+        # Handle concepts_to_study being list or dict (or other)
+        if isinstance(concepts_to_study, list):
+            concepts_str = "- " + "\n- ".join(concepts_to_study) if concepts_to_study else "N/A"
+        elif isinstance(concepts_to_study, dict):
+             concepts_str = json.dumps(concepts_to_study, indent=2)
+        else:
+             concepts_str = str(concepts_to_study) if concepts_to_study else "N/A"
+
+        # Format skill gaps for clarity in the prompt
+        if skill_gaps and isinstance(skill_gaps, list):
+             gaps_list_str = []
+             for gap in skill_gaps:
+                 gap_desc = gap.get('missingSkill', 'Unknown Gap')
+                 gap_imp = gap.get('importance', 'medium')
+                 gaps_list_str.append(f"- {gap_desc} (Importance: {gap_imp})")
+             gaps_str = "\n".join(gaps_list_str) if gaps_list_str else "None identified."
+        else:
+            gaps_str = "None identified or data missing."
+
+    except Exception as fmt_err:
+        print(f"Warning: Could not format context cleanly for timeline prompt - {fmt_err}")
+        focus_areas_str = str(focus_areas)
+        concepts_str = str(concepts_to_study)
+        gaps_str = str(skill_gaps)
+
+
+    # --- Start of Modified Prompt ---
     prompt = f"""
-Act as an expert interview coach. Create a detailed, day-by-day preparation timeline for {candidate_name} interviewing for a {job_title} position in {days} days.
-Context:
-* Duration: {days} days
-* Key Focus Areas: {focus_areas_str[:1000]}
-* Concepts to Study: {concepts_str[:2000]}
-* Gaps to Address: {gaps_str[:1000]}
+Act as an expert interview coach designing a hyper-personalized, actionable preparation timeline.
+The candidate, {candidate_name}, is interviewing for a {job_title} position and has {days} days to prepare.
 
-Instructions:
-1. Create plan for {days} days + "Interview Day".
-2. For each day (1 to {days}): Define `focus` (string), `schedule` (array of objects [{{"time_slot": "Optional time", "task": "Specific task..."}}]), `notes` (string). Tasks should cover concepts, question practice (STAR method), gap strategies, company research. Distribute focus areas/concepts.
-3. For "Interview Day": Focus on relaxation, quick review, setup check.
-4. Optionally, estimate `estimated_total_hours` (integer).
-5. Output ONLY a valid JSON object: {{"timeline": [{{"day": 1/.. /"Interview Day", "focus": "...", "schedule": [...], "notes": "..."}}], "estimated_total_hours": <int, optional>}}
-Strictly follow JSON format. No extra text or markdown.
+Key Context for Planning:
+* Preparation Duration: {days} days until the interview.
+* Priority Focus Areas:
+{focus_areas_str[:1000]}
+* Specific Concepts/Tools to Master:
+{concepts_str[:2000]}
+* Identified Skill Gaps to Address:
+{gaps_str[:1000]}
+
+Instructions: Create a detailed, day-by-day timeline from Day 1 to Day {days}, plus a final "Interview Day" plan.
+Output ONLY a valid JSON object with the following structure:
+{{
+  "timeline": [
+    {{
+      "day": <integer | "Interview Day">,
+      "focus": "<Primary theme or goal for the day (e.g., 'Deep Dive: Core Algorithm Review', 'Behavioral Question Practice & Company Research')>",
+      "schedule": [
+        {{
+          "time_slot": "<Optional suggested time (e.g., 'Morning', 'Afternoon', '1 hour')>",
+          "task": "<**Highly Specific Task**: Must be actionable. Instead of 'Study X', use 'Review [Specific Concept from Concepts list]', 'Implement [Specific Algorithm]', 'Draft STAR answers for 2 likely technical questions about [Specific Skill/Project]', 'Research [Company Name]'s approach to [Relevant Area]', 'Practice explaining [Concept related to a Skill Gap]'. Reference the Concepts/Gaps lists explicitly.>"
+        }}
+        // Include multiple tasks per day, covering concepts, practice, gaps, research etc.
+      ],
+      "notes": "<Brief strategic advice or reminders for the day>"
+    }}
+    // Repeat structure for each day from 1 to {days}, and for "Interview Day"
+  ],
+  "estimated_total_hours": <integer, optional estimate of total prep time>
+}}
+
+CRITICAL REQUIREMENTS:
+1.  **Task Specificity:** Each task in the 'schedule' MUST be concrete and reference specific items from the 'Concepts to Study' or 'Skill Gaps' context provided above. Prioritize fundamental concepts relevant to the job and gaps.
+2.  **Gap Integration:** Explicitly schedule tasks aimed at addressing the identified 'Skill Gaps'.
+3.  **Daily Structure:** Provide entries for every day from 1 to {days}, plus one for "Interview Day".
+4.  **Interview Day Focus:** Tasks for "Interview Day" should focus on light review, mental prep, logistics, and relaxation.
+5.  **JSON Format Only:** The entire output must be a single, valid JSON object. No introductory text, explanations, or markdown. Ensure correct syntax, brackets, commas, and quotes.
 """
+    # --- End of Modified Prompt ---
+
     try:
-        result_text = call_openai_api(prompt=prompt, model=OPENAI_MODEL, temperature=0.5)
+        result_text = call_openai_api(prompt=prompt, model=OPENAI_MODEL, temperature=0.5) # Assume call_openai_api exists
+
+        # Clean potential markdown backticks
         if result_text.strip().startswith("```json"): result_text = result_text.strip()[7:]
         if result_text.strip().endswith("```"): result_text = result_text.strip()[:-3]
-        timeline_data = json.loads(result_text.strip(), strict=False)
-        if "timeline" not in timeline_data or not isinstance(timeline_data.get("timeline"), list):
-             print("Warning: 'timeline' key missing or not a list in OpenAI response.")
-             timeline_data = {"timeline": [], "error": "Generated timeline structure was invalid."}
+
+        # --- Robust JSON Parsing ---
+        timeline_data = {}
+        try:
+            timeline_data = json.loads(result_text.strip(), strict=False)
+        except json.JSONDecodeError as e_inner:
+             print(f"OpenAI timeline JSON decoding error: {e_inner}. Response text (partial): {result_text[:1000]}")
+             # Try to find JSON block if direct parse failed
+             json_start = result_text.find('{')
+             json_end = result_text.rfind('}') + 1
+             if json_start != -1 and json_end != -1 and json_end > json_start:
+                 json_text_extracted = result_text[json_start:json_end].strip()
+                 try:
+                     timeline_data = json.loads(json_text_extracted, strict=False)
+                     print("Successfully parsed JSON after finding block.")
+                 except json.JSONDecodeError as e_retry:
+                     print(f"JSON decoding failed even after extracting block: {e_retry}. Extracted text (partial): {json_text_extracted[:1000]}")
+                     # Set error state if retry fails
+                     timeline_data = {"timeline": [], "error": f"Failed to parse timeline JSON after extraction: {e_retry}"}
+             else:
+                # Set error state if no JSON block found
+                timeline_data = {"timeline": [], "error": f"Failed to parse timeline JSON, no valid block found: {e_inner}"}
+
+        # --- Validation ---
+        if not isinstance(timeline_data, dict) or "timeline" not in timeline_data:
+            print("Error: 'timeline' key missing or root is not an object in OpenAI response.")
+            # Ensure error key exists if structure is wrong
+            timeline_data.setdefault("error", "Generated timeline structure was invalid.")
+            timeline_data["timeline"] = [] # Ensure timeline key exists as list even on error
+        elif not isinstance(timeline_data.get("timeline"), list):
+             print("Warning: 'timeline' key exists but is not a list in OpenAI response.")
+             timeline_data["timeline"] = [] # Reset to list if type is wrong
+             timeline_data.setdefault("error", "'timeline' field was not a list.")
         else:
-            print(f"Dynamic timeline generated successfully ({len(timeline_data['timeline'])} entries).")
+             # Optional: Deeper validation of timeline items
+             for i, day_plan in enumerate(timeline_data["timeline"]):
+                 if not isinstance(day_plan, dict) or "day" not in day_plan or "schedule" not in day_plan or not isinstance(day_plan.get("schedule"), list):
+                     print(f"Warning: Invalid structure for timeline entry at index {i}. Day plan: {day_plan}")
+                     # Could potentially remove invalid entries or mark them
+
+             print(f"Dynamic timeline generated successfully ({len(timeline_data.get('timeline', []))} entries).")
+             # Clear error if validation passes
+             timeline_data.pop("error", None)
+
+        # Ensure estimated_total_hours is handled correctly
+        if "estimated_total_hours" in timeline_data and not isinstance(timeline_data["estimated_total_hours"], int):
+             print(f"Warning: 'estimated_total_hours' is not an integer. Removing.")
+             timeline_data.pop("estimated_total_hours", None)
+
         return timeline_data
-    except json.JSONDecodeError as e:
-        print(f"OpenAI timeline JSON decoding error: {e}. Response text (partial): {result_text[:1000]}")
-        return {"timeline": [], "error": f"Failed to parse timeline JSON: {e}"}
-    except Exception as e:
+
+    except Exception as e: # Catch broader errors
         print(f"Error generating dynamic timeline with OpenAI: {e}")
         traceback.print_exc()
-        return {"timeline": [], "error": f"Failed to generate timeline: {str(e)}"}
+        return {"timeline": [], "error": f"Failed to generate timeline due to exception: {str(e)}"}
 
 # REVISED function in backend.py (keeping interview_type parameter)
 def create_mock_interviewer_prompt(resume_data, job_data, interview_type="general"):
