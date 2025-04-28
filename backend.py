@@ -34,7 +34,7 @@ CLAUDE_MODEL = "claude-3-5-sonnet-20240620"
 CLAUDE_HAIKU_MODEL = "claude-3-haiku-20240307"
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 GEMINI_MODEL = "gemini-1.5-flash-latest"
-OPENAI_MODEL = "gpt-4o"  
+OPENAI_MODEL = "gpt-3.5-turbo"  
 GEMINI_API_URL_BASE = "https://generativelanguage.googleapis.com/v1beta/models/"
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
 OPENAI_TTS_URL = "https://api.openai.com/v1/audio/speech"
@@ -626,7 +626,7 @@ Your response MUST be only the valid JSON object. **DO NOT INCLUDE a 'preparatio
     response_content = ""
     try:
         response_content = call_claude_api(
-            messages=messages, system_prompt=system_prompt, model=CLAUDE_MODEL,
+            messages=messages, system_prompt=system_prompt, model=CLAUDE_HAIKU_MODEL,
             max_tokens=4096, temperature=0.5
         )
         json_start = response_content.find('{')
