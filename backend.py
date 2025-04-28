@@ -34,10 +34,12 @@ CLAUDE_MODEL = "claude-3-5-sonnet-20240620"
 CLAUDE_HAIKU_MODEL = "claude-3-haiku-20240307"
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 GEMINI_MODEL = "gemini-1.5-flash-latest"
+OPENAI_MODEL = "gpt-3.5-turbo"  
 GEMINI_API_URL_BASE = "https://generativelanguage.googleapis.com/v1beta/models/"
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
 OPENAI_TTS_URL = "https://api.openai.com/v1/audio/speech"
 OPENAI_STT_URL = "https://api.openai.com/v1/audio/transcriptions"
+OPENAI_COMPLETIONS_URL = "https://api.openai.com/v1/chat/completions"
 MISTRAL_API_KEY = os.environ.get("MISTRAL_API_KEY") # Added based on original code
 MISTRAL_API_URL = "https://api.mistral.ai/v1/chat/completions" # Added based on original code
 AWS_DEFAULT_REGION = os.environ.get("AWS_DEFAULT_REGION")
@@ -298,26 +300,36 @@ def get_gemini_url(model_name):
     if not GEMINI_API_KEY: raise ValueError("Gemini API Key not configured.")
     return f"{GEMINI_API_URL_BASE}{model_name}:generateContent?key={GEMINI_API_KEY}"
 
-def call_gemini_api(prompt, model=GEMINI_MODEL, temperature=0.4, response_mime_type=None):
-    if not GEMINI_API_KEY: raise ValueError("Gemini API Key is not configured.")
-    generation_config = {"temperature": temperature}
-    if response_mime_type: generation_config["response_mime_type"] = response_mime_type
-    payload = {"contents": [{"parts": [{"text": prompt}]}], "generationConfig": generation_config}
+def call_openai_api(prompt, model="OPENAI_MODEL", temperature=0.4):
+    if not OPENAI_API_KEY: raise ValueError("OpenAI API Key not configured.")
+    
+    payload = {
+        "model": model,
+        "messages": [{"role": "user", "content": prompt}],
+        "temperature": temperature,
+        "max_tokens": 2048
+    }
+    
     try:
-        gemini_url = get_gemini_url(model)
-        response = requests.post(gemini_url, headers={"Content-Type": "application/json"}, json=payload, timeout=90) # Increased timeout
+        response = requests.post(
+            "https://api.openai.com/v1/chat/completions",
+            headers={
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {OPENAI_API_KEY}"
+            },
+            json=payload,
+            timeout=90  # Increased timeout
+        )
         response.raise_for_status()
         data = response.json()
-        candidates = data.get("candidates")
-        content = candidates[0].get("content") if candidates else None
-        parts = content.get("parts") if content else None
-        if not parts: raise Exception("Gemini API response missing required structure ('candidates'/'content'/'parts').")
-        return parts[0].get("text")
+        return data["choices"][0]["message"]["content"]
     except requests.exceptions.RequestException as e:
-        print(f"Gemini API request error: {e}")
-        raise Exception(f"Gemini API request failed: {e}") from e
+        print(f"OpenAI API request error: {e}")
+        if hasattr(e, 'response') and e.response is not None: 
+            print(f"Status: {e.response.status_code}, Body: {e.response.text[:500]}")
+        raise Exception(f"OpenAI API request failed: {e}") from e
     except Exception as e:
-        print(f"Gemini API Error: {e}")
+        print(f"OpenAI API Error: {e}")
         raise
 
 def generate_speech_polly(text, voice_id="Kajal", region_name=None):
@@ -453,10 +465,10 @@ If a field is not found, use null, "", or []. Ensure name, email, phoneNumber ar
         print(f"Claude resume parsing error: {e}")
         raise
 
-def match_resume_jd_with_gemini(resume_data, job_description):
-    """Matches resume (JSON) with job description using Gemini to produce specific, actionable improvements."""
-    print("--- Matching Resume/JD with Gemini (Requesting Specific Improvements) ---")
-    if not GEMINI_API_KEY: raise ValueError("Gemini API Key is not configured.")
+def match_resume_jd_with_openai(resume_data, job_description):
+    """Matches resume (JSON) with job description using OpenAI to produce specific, actionable improvements."""
+    print("--- Matching Resume/JD with OpenAI (Requesting Specific Improvements) ---")
+    if not OPENAI_API_KEY: raise ValueError("OpenAI API Key is not configured.")
     resume_data_str = json.dumps(resume_data, indent=2) if isinstance(resume_data, dict) else str(resume_data)
     
     # Create sections overview for easier reference
@@ -537,7 +549,7 @@ Format as VALID JSON only. No markdown, no explanations outside the JSON structu
 """
 
     try:
-        result_text = call_gemini_api(prompt=prompt, model=GEMINI_MODEL, temperature=0.2, response_mime_type="application/json")
+        result_text = call_openai_api(prompt=prompt, model="OPENAI_MODEL", temperature=0.2)
         # Clean potential markdown backticks
         if result_text.strip().startswith("```json"): result_text = result_text.strip()[7:]
         if result_text.strip().endswith("```"): result_text = result_text.strip()[:-3]
@@ -571,13 +583,13 @@ Format as VALID JSON only. No markdown, no explanations outside the JSON structu
             improvement.setdefault("improvedVersion", "")
             improvement.setdefault("explanation", "")
         
-        print(f"Gemini analysis complete. Match Score: {match_result_obj.get('matchScore')}, Improvements: {len(match_result_obj.get('resumeImprovements', []))}")
+        print(f"OpenAI analysis complete. Match Score: {match_result_obj.get('matchScore')}, Improvements: {len(match_result_obj.get('resumeImprovements', []))}")
         return match_result_obj
     except json.JSONDecodeError as e:
-        print(f"Gemini analysis JSON decoding error: {e}. Response text (partial): {result_text[:1000]}")
-        return {"error": "Invalid JSON from Gemini analysis", "matchScore": 0, "matchAnalysis": f"[Error: {e}]", "keyStrengths": [], "skillGaps": [], "jobRequirements": {}, "resumeImprovements": []}
+        print(f"OpenAI analysis JSON decoding error: {e}. Response text (partial): {result_text[:1000]}")
+        return {"error": "Invalid JSON from OpenAI analysis", "matchScore": 0, "matchAnalysis": f"[Error: {e}]", "keyStrengths": [], "skillGaps": [], "jobRequirements": {}, "resumeImprovements": []}
     except Exception as e:
-        print(f"Gemini analysis error: {e}")
+        print(f"OpenAI analysis error: {e}")
         traceback.print_exc()
         return {"error": str(e), "matchScore": 0, "matchAnalysis": f"[Error: {e}]", "keyStrengths": [], "skillGaps": [], "jobRequirements": {}, "resumeImprovements": []}
 
@@ -645,10 +657,10 @@ Your response MUST be only the valid JSON object. **DO NOT INCLUDE a 'preparatio
         traceback.print_exc()
         raise Exception(f"Failed to generate prep plan: {str(e)}") from e
 
-def generate_dynamic_timeline_with_gemini(session_data, days):
-    """Generates a dynamic, day-by-day interview prep timeline using Gemini."""
-    print(f"--- Generating Dynamic Timeline with Gemini ({days} days) ---")
-    if not GEMINI_API_KEY: raise ValueError("Gemini API Key is not configured.")
+def generate_dynamic_timeline_with_openai(session_data, days):
+    """Generates a dynamic, day-by-day interview prep timeline using OpenAI."""
+    print(f"--- Generating Dynamic Timeline with OpenAI ({days} days) ---")
+    if not OPENAI_API_KEY: raise ValueError("OpenAI API Key is not configured.")
     if not session_data: raise ValueError("Session data is required to generate timeline.")
     prep_plan = session_data.get('results', {}).get('prep_plan', {})
     match_results = session_data.get('results', {}).get('match_results', {})
@@ -685,21 +697,21 @@ Instructions:
 Strictly follow JSON format. No extra text or markdown.
 """
     try:
-        result_text = call_gemini_api(prompt=prompt, model=GEMINI_MODEL, temperature=0.5, response_mime_type="application/json")
+        result_text = call_openai_api(prompt=prompt, model="OPENAI_MODEL", temperature=0.5)
         if result_text.strip().startswith("```json"): result_text = result_text.strip()[7:]
         if result_text.strip().endswith("```"): result_text = result_text.strip()[:-3]
         timeline_data = json.loads(result_text.strip(), strict=False)
         if "timeline" not in timeline_data or not isinstance(timeline_data.get("timeline"), list):
-             print("Warning: 'timeline' key missing or not a list in Gemini response.")
+             print("Warning: 'timeline' key missing or not a list in OpenAI response.")
              timeline_data = {"timeline": [], "error": "Generated timeline structure was invalid."}
         else:
             print(f"Dynamic timeline generated successfully ({len(timeline_data['timeline'])} entries).")
         return timeline_data
     except json.JSONDecodeError as e:
-        print(f"Gemini timeline JSON decoding error: {e}. Response text (partial): {result_text[:1000]}")
+        print(f"OpenAI timeline JSON decoding error: {e}. Response text (partial): {result_text[:1000]}")
         return {"timeline": [], "error": f"Failed to parse timeline JSON: {e}"}
     except Exception as e:
-        print(f"Error generating dynamic timeline with Gemini: {e}")
+        print(f"Error generating dynamic timeline with OpenAI: {e}")
         traceback.print_exc()
         return {"timeline": [], "error": f"Failed to generate timeline: {str(e)}"}
 
@@ -1530,7 +1542,6 @@ def analyze_resume():
         # --- End User Profile Update ---
 
         # --- Define background task ---
-        # (Keep the existing process_resume_background function definition as is)
         def process_resume_background(current_session_id, resume_local_path, jd, associated_user_id):
             session_status = 'failed'; error_list = []
             try:
@@ -1543,7 +1554,8 @@ def analyze_resume():
                 parsed_resume = parse_resume_with_claude(resume_text)
                 if not parsed_resume or not parsed_resume.get("name"): raise ValueError("Failed to parse resume.")
                 update_session_data(current_session_id, {'progress': 50, 'status_detail': 'Matching resume/JD'})
-                match_results = match_resume_jd_with_gemini(parsed_resume, jd)
+                # CHANGED LINE - Using OpenAI instead of Gemini
+                match_results = match_resume_jd_with_openai(parsed_resume, jd)
                 if match_results.get("error"): raise ValueError(f"JD matching failed: {match_results['error']}")
                 match_results['parsedResume'] = parsed_resume # Add parsed data here for context
                 update_session_data(current_session_id, {'progress': 80, 'status_detail': 'Generating prep plan'})
@@ -1572,7 +1584,6 @@ def analyze_resume():
 
         print(f"[{session_id}] /analyze-resume request completed in {time.time() - start_time:.2f}s (background running).")
 
-        # *** CORRECTED RETURN VALUE ***
         # Return the latest usage info obtained from increment_result
         return jsonify({
             'sessionId': session_id,
@@ -1684,7 +1695,9 @@ def generate_dynamic_timeline_route():
              return jsonify({'error': 'Completed analysis with prep plan required first'}), 400
 
         print(f"[{session_id}] Request received for dynamic timeline: {days} days")
-        timeline_result = generate_dynamic_timeline_with_gemini(session_data, days)
+        # CHANGE THIS LINE
+        timeline_result = generate_dynamic_timeline_with_openai(session_data, days)
+        # END OF CHANGE
         if "error" in timeline_result:
              error_msg = timeline_result.get('error', 'Timeline generation failed.')
              print(f"[{session_id}] Error generating dynamic timeline: {error_msg}")
