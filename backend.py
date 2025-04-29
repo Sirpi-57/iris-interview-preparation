@@ -1289,11 +1289,7 @@ def get_duration(start_time_str, end_time_str):
 
 
 def get_user_usage(user_id):
-    """
-    Retrieves user profile including usage data from Firestore.
-    Dynamically applies current plan limits based on get_package_limit.
-    Ensures default usage structure exists if missing (but doesn't save fixes here).
-    """
+    """Retrieves user profile including usage data from Firestore. Ensures default structure exists."""
     if not db or not user_id:
         return None
 
@@ -1303,35 +1299,59 @@ def get_user_usage(user_id):
 
         if user_doc.exists:
             user_data = user_doc.to_dict()
-            current_plan = user_data.get('plan', 'free') # Get the user's current plan
+            needs_update = False
 
-            # Ensure 'usage' map exists in the retrieved data (or create temporarily)
+            # Ensure 'plan' exists, default to 'free'
+            if 'plan' not in user_data:
+                user_data['plan'] = 'free'
+                # Note: We might not want to update the plan here,
+                # just use 'free' for limit calculation.
+                # Let's assume plan exists or is handled during user creation.
+
+            current_plan = user_data.get('plan', 'free')
+
+            # Ensure 'usage' map exists
             if 'usage' not in user_data:
                 user_data['usage'] = {}
+                needs_update = True
 
-            # Iterate through defined features and apply CURRENT limits
-            features = ['resumeAnalyses', 'mockInterviews', 'pdfDownloads', 'aiEnhance']
-            for feature in features:
-                # Ensure feature map exists in usage (or create temporarily)
-                if feature not in user_data['usage']:
-                    user_data['usage'][feature] = {'used': 0} # Default used to 0 if missing
+            # Ensure 'resumeAnalyses' structure exists
+            if 'resumeAnalyses' not in user_data['usage']:
+                user_data['usage']['resumeAnalyses'] = {'used': 0, 'limit': get_package_limit(current_plan, 'resumeAnalyses')}
+                needs_update = True
+            elif 'used' not in user_data['usage']['resumeAnalyses'] or 'limit' not in user_data['usage']['resumeAnalyses']:
+                # If partially missing, reset it based on current plan
+                user_data['usage']['resumeAnalyses'] = {
+                    'used': user_data['usage']['resumeAnalyses'].get('used', 0), # Keep existing used count if possible
+                    'limit': get_package_limit(current_plan, 'resumeAnalyses')
+                }
+                needs_update = True
 
-                # Get the CURRENT limit from the central function
-                current_limit = get_package_limit(current_plan, feature)
+            # Ensure 'mockInterviews' structure exists
+            if 'mockInterviews' not in user_data['usage']:
+                 user_data['usage']['mockInterviews'] = {'used': 0, 'limit': get_package_limit(current_plan, 'mockInterviews')}
+                 needs_update = True
+            elif 'used' not in user_data['usage']['mockInterviews'] or 'limit' not in user_data['usage']['mockInterviews']:
+                 user_data['usage']['mockInterviews'] = {
+                     'used': user_data['usage']['mockInterviews'].get('used', 0),
+                     'limit': get_package_limit(current_plan, 'mockInterviews')
+                 }
+                 needs_update = True
 
-                # *** Overwrite the limit in the data to be returned ***
-                user_data['usage'][feature]['limit'] = current_limit
+            # If the structure needed fixing, update the document in Firestore
+            if needs_update:
+                print(f"[{user_id}] Initializing/Fixing usage structure in Firestore.")
+                try:
+                    user_ref.update({'usage': user_data['usage']})
+                except Exception as update_err:
+                     print(f"[{user_id}] WARNING: Failed to update usage structure: {update_err}")
+                     # Proceed with potentially stale data, or return None?
+                     # For now, proceed. The increment might still fail if update failed.
 
-                # Ensure 'used' field exists, default to 0 if missing
-                if 'used' not in user_data['usage'][feature]:
-                     user_data['usage'][feature]['used'] = 0
-
-            # Note: This function now ONLY reads and applies current limits.
-            # It does not write back to Firestore here if the structure was missing/fixed locally.
-            # The structure fix logic was moved to where it's needed (e.g., first access check).
             return user_data
         else:
             print(f"User {user_id} not found in Firestore")
+            # If user doc doesn't exist, should we create it? No, auth should handle that.
             return None
 
     except Exception as e:
@@ -1371,113 +1391,83 @@ def get_package_limit(package_name, feature_type):
 
 
 def check_feature_access(user_id, feature_type):
-    """
-    Checks if a user has access to a specific feature based on their plan.
-    Uses the CURRENT limit defined in get_package_limit for comparison.
-    """
+    """Checks if a user has access to a specific feature based on their plan."""
     if not db or not user_id:
         return {'allowed': False, 'error': 'Database or user ID not available'}
-
+    
     try:
-        # get_user_usage now returns data with the CURRENT limits applied
         user_data = get_user_usage(user_id)
-
+        
         if not user_data:
             return {'allowed': False, 'error': 'User profile not found'}
-
-        current_plan = user_data.get('plan', 'free')
-        usage = user_data.get('usage', {}).get(feature_type)
-
-        # Handle case where usage data for the feature might still be missing entirely
-        if usage is None:
-             print(f"Warning: Usage data for feature '{feature_type}' missing for user {user_id}. Denying access.")
-             # Optionally try to initialize the structure here if critical
-             # For now, deny access if structure is missing
-             return {
-                 'allowed': False,
-                 'error': f'Usage data structure missing for {feature_type}',
-                 'used': 0,
-                 'limit': get_package_limit(current_plan, feature_type), # Show what the limit *should* be
-                 'plan': current_plan
-             }
-
+        
+        if 'usage' not in user_data or feature_type not in user_data['usage']:
+            return {'allowed': False, 'error': 'Usage data not found'}
+        
+        usage = user_data['usage'][feature_type]
         currently_used = usage.get('used', 0)
-        # *** Get the CURRENT limit dynamically ***
-        current_limit = get_package_limit(current_plan, feature_type)
-
-        # *** Compare against the CURRENT limit ***
-        if currently_used >= current_limit:
+        limit = usage.get('limit', 0)
+        
+        # Check if user has used all their available resources
+        if currently_used >= limit:
             return {
                 'allowed': False,
                 'error': f"Usage limit reached for {feature_type}",
                 'used': currently_used,
-                'limit': current_limit, # Return the current limit
-                'plan': current_plan
+                'limit': limit,
+                'plan': user_data.get('plan', 'free')
             }
-
-        # If allowed, return info including the current limit
+        
         return {
             'allowed': True,
             'used': currently_used,
-            'limit': current_limit, # Return the current limit
-            'plan': current_plan
+            'limit': limit,
+            'plan': user_data.get('plan', 'free')
         }
-
+        
     except Exception as e:
         print(f"Error checking feature access for {user_id} ({feature_type}): {e}")
         traceback.print_exc()
-        return {'allowed': False, 'error': f'Server error checking access: {str(e)}'}
+        return {'allowed': False, 'error': f'Server error: {str(e)}'}
 
 
 def increment_usage_counter(user_id, feature_type):
-    """
-    Increments usage counter for a specific feature.
-    Returns status including the CURRENT limit and remaining count.
-    """
+    """Increments usage counter for a specific feature."""
     if not db or not user_id:
         return {'success': False, 'error': 'Database or user ID not available'}
-
+    
     try:
-        # Validate feature type early
-        valid_features = ['resumeAnalyses', 'mockInterviews', 'pdfDownloads', 'aiEnhance']
-        if feature_type not in valid_features:
-            return {'success': False, 'error': f'Invalid feature type: {feature_type}'}
-
         user_ref = db.collection('users').document(user_id)
-
-        # Perform the increment using atomic operation
+        
+        # Check if user exists
+        user_doc = user_ref.get()
+        if not user_doc.exists:
+            return {'success': False, 'error': 'User profile not found'}
+        
+        # Increment counter using atomic operation
         update_field = f'usage.{feature_type}.used'
+        
+        # Perform the increment
         user_ref.update({
             update_field: firestore.Increment(1)
         })
-
-        # Get updated user data to determine current state
-        # Use get_user_usage which now overlays the CURRENT limit
-        updated_user_data = get_user_usage(user_id)
-
-        if not updated_user_data:
-             # This shouldn't happen if increment worked, but handle defensively
-             print(f"Error: Failed to get user data immediately after increment for {user_id}")
-             return {'success': False, 'error': 'Failed to verify usage update'}
-
-        current_plan = updated_user_data.get('plan', 'free')
-        updated_usage_data = updated_user_data.get('usage', {}).get(feature_type, {})
-
-        current_used = updated_usage_data.get('used', 0) # Should reflect the increment
-        # *** Get the CURRENT limit dynamically ***
-        current_limit = get_package_limit(current_plan, feature_type)
-
+        
+        # Get updated count
+        updated_user = user_ref.get().to_dict()
+        current_usage = updated_user.get('usage', {}).get(feature_type, {}).get('used', 0)
+        usage_limit = updated_user.get('usage', {}).get(feature_type, {}).get('limit', 0)
+        
         return {
             'success': True,
-            'used': current_used,
-            'limit': current_limit, # Return the CURRENT limit
-            'remaining': max(0, current_limit - current_used) # Calculate remaining based on CURRENT limit
+            'used': current_usage,
+            'limit': usage_limit,
+            'remaining': max(0, usage_limit - current_usage)
         }
-
+        
     except Exception as e:
         print(f"Error incrementing usage counter for {user_id} ({feature_type}): {e}")
         traceback.print_exc()
-        return {'success': False, 'error': f'Server error incrementing usage: {str(e)}'}
+        return {'success': False, 'error': f'Server error: {str(e)}'}
 
 # Helper function to sanitize strings for JSON embedding
 def sanitize_string_for_json(text):
@@ -1561,32 +1551,34 @@ def get_package_limit(package_name, feature_type):
         'free': {
             'resumeAnalyses': 2,
             'mockInterviews': 0,
-            'pdfDownloads': 5,      # Ensure these are correct
-            'aiEnhance': 5          # Ensure these are correct
+            'pdfDownloads': 5,
+            'aiEnhance': 5
         },
         'starter': {
             'resumeAnalyses': 5,
             'mockInterviews': 1,
-            'pdfDownloads': 20,     # Ensure these are correct
-            'aiEnhance': 20         # Ensure these are correct
+            'pdfDownloads': 20,
+            'aiEnhance': 20
         },
         'standard': {
             'resumeAnalyses': 10,
             'mockInterviews': 3,
-            'pdfDownloads': 50,     # Ensure these are correct
-            'aiEnhance': 50         # Ensure these are correct
+            'pdfDownloads': 50,
+            'aiEnhance': 50
         },
         'pro': {
             'resumeAnalyses': 20,
             'mockInterviews': 5,
-            'pdfDownloads': 100,    # Ensure these are correct
-            'aiEnhance': 100        # Ensure these are correct
+            'pdfDownloads': 100,
+            'aiEnhance': 100
         }
     }
+    
     # Default to free package if not found
     if not package_name or package_name not in limits:
-        # print(f"Warning: Unknown package '{package_name}', defaulting to free") # Optional logging
+        print(f"Warning: Unknown package '{package_name}', defaulting to free")
         package_name = 'free'
+    
     # Return the limit for the feature, or 0 if feature not found
     return limits[package_name].get(feature_type, 0)
 
