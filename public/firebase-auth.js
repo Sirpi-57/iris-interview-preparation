@@ -69,6 +69,10 @@ function handleAuthStateChanged(user) {
                 console.log("Profile load attempt finished. Current profile state:", authState.userProfile);
                 showAppView(); // Show the app view
                 updateUserProfileUI(user); // Update UI with basic auth info
+                // Add the stopCountdown call right here
+                if (window.stopCountdown) {
+                    window.stopCountdown();
+                }
                 // Initialize app logic *after* profile attempt and showing view
                 if (typeof initializeIRISApp === 'function') {
                     initializeIRISApp(); // Now safe to check authState.userProfile
