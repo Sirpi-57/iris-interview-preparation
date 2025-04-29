@@ -9,6 +9,63 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <!-- Application Styles -->
     <link rel="stylesheet" href="styles.css">
+    <style>
+        .launch-offer-banner {
+            background: linear-gradient(135deg, #6e8efb, #a777e3);
+            color: white;
+            padding: 2rem 1rem;
+            border-radius: 0.5rem;
+            margin-bottom: 2.5rem;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            position: relative;
+            overflow: hidden;
+        }
+        .launch-offer-banner h2 {
+            font-weight: bold;
+            margin-bottom: 0.5rem;
+        }
+        .launch-offer-banner p {
+            font-size: 1.1rem;
+            margin-bottom: 0;
+        }
+        .launch-offer-banner::before {
+            content: "\f005"; /* Font Awesome star icon */
+            font-family: "Font Awesome 6 Free";
+            font-weight: 900;
+            position: absolute;
+            top: -20px;
+            right: -20px;
+            font-size: 100px;
+            color: rgba(255, 255, 255, 0.15);
+            transform: rotate(15deg);
+        }
+        .pricing-card .original-price {
+            text-decoration: line-through;
+            color: #6c757d; /* Bootstrap muted color */
+            font-size: 0.9em;
+            margin-left: 0.5rem;
+        }
+        .pricing-card .current-price {
+            color: #0d6efd; /* Bootstrap primary color */
+        }
+         /* Ensure cards stretch to the same height */
+        .pricing-card {
+            display: flex;
+            flex-direction: column;
+            height: 100%; /* Make card take full height of its container */
+        }
+        .pricing-card .card-body {
+            flex-grow: 1; /* Allow body to grow */
+            display: flex;
+            flex-direction: column; /* Stack elements vertically */
+        }
+        .pricing-card ul {
+            flex-grow: 1; /* Allow list to take up remaining space */
+        }
+        .pricing-card .plan-select-btn {
+            margin-top: auto; /* Push button to the bottom */
+        }
+    </style>
 </head>
 <body>
     <!-- Error Messages Container -->
@@ -505,6 +562,11 @@
             <!-- Pricing Tab -->
             <div id="pricing-tab" class="public-tab">
                 <div class="container py-5">
+                    <div class="launch-offer-banner text-center">
+                        <h2 class="display-5">Exclusive Launch Offer!</h2>
+                        <p class="lead mb-3">Craft Your Perfect Resume, Conquer Your Interviews, Claim Your Dream Position!</p>
+                        <p>Get interview-ready with our limited-time launch prices!</p>
+                    </div>
                     <h1 class="text-center mb-5">Choose Your Preparation Pack</h1>
                     <p class="text-center text-muted mb-5">One-time purchases designed for students. Get interview-ready without recurring subscriptions.</p>
 
@@ -539,7 +601,10 @@
                                      <h3 class="my-0 font-weight-normal">Starter Pack</h3>
                                  </div>
                                  <div class="card-body d-flex flex-column">
-                                     <h2 class="card-title pricing-card-title text-center">₹399</h2>
+                                     <h2 class="card-title pricing-card-title text-center">
+                                         <span class="current-price">₹199</span>
+                                         <span class="original-price">₹399</span>
+                                     </h2>
                                      <ul class="list-unstyled mt-3 mb-4 flex-grow-1">
                                          <li><i class="fas fa-check text-success me-2"></i> AI Resume Builder (Full)</li>
                                          <li><i class="fas fa-check text-success me-2"></i> 20 AI Enhancements</li>
@@ -563,7 +628,10 @@
                                      <span class="badge bg-warning text-dark position-absolute top-0 start-50 translate-middle mt-2">Popular</span>
                                  </div>
                                  <div class="card-body d-flex flex-column">
-                                     <h2 class="card-title pricing-card-title text-center">₹599</h2>
+                                     <h2 class="card-title pricing-card-title text-center">
+                                         <span class="current-price">₹399</span>
+                                         <span class="original-price">₹599</span>
+                                     </h2>
                                      <ul class="list-unstyled mt-3 mb-4 flex-grow-1">
                                          <li><i class="fas fa-check text-success me-2"></i> AI Resume Builder (Full)</li>
                                          <li><i class="fas fa-check text-success me-2"></i> 50 AI Enhancements</li>
@@ -586,7 +654,10 @@
                                      <h3 class="my-0 font-weight-normal">Pro Pack</h3>
                                  </div>
                                  <div class="card-body d-flex flex-column">
-                                     <h2 class="card-title pricing-card-title text-center">₹999</h2>
+                                     <h2 class="card-title pricing-card-title text-center">
+                                         <span class="current-price">₹799</span>
+                                         <span class="original-price">₹999</span>
+                                     </h2>
                                      <ul class="list-unstyled mt-3 mb-4 flex-grow-1">
                                         <li><i class="fas fa-check text-success me-2"></i> AI Resume Builder (Unlimited Access)</li>
                                         <li><i class="fas fa-check text-success me-2"></i> 100 AI Enhancements</li>
@@ -595,7 +666,7 @@
                                         <li><i class="fas fa-check text-success me-2"></i> Dynamic Timeline Generator</li>
                                         <li><i class="fas fa-check text-success me-2"></i> Detailed Prep Plan</li>
                                         <li><i class="fas fa-check text-success me-2"></i> 5 Full Mock Interviews</li>
-                                        <li><i class="fas fa-check text-success me-2"></i> Detailed Performance Reports</li>                                         
+                                        <li><i class="fas fa-check text-success me-2"></i> Detailed Performance Reports</li>
                                         <li><i class="fas fa-check text-success me-2"></i> Suggested Answers Library</li>
                                      </ul>
                                      <button type="button" class="btn btn-lg btn-block btn-primary w-100 mt-auto plan-select-btn" data-plan="pro">Go Pro</button>
@@ -603,19 +674,19 @@
                              </div>
                          </div>
 
-                    </div> <div class="text-center mt-4 text-muted">
+                    </div>
+                    <div class="text-center mt-4 text-muted">
                         <p><small>Need just a bit more? Individual add-ons available after signup:
                             <br> Mock Interviews (₹89) | Resume Analyses (₹19) | AI Resume Enhancements (₹9 per 10 uses) | PDF Downloads (₹9 per 10 downloads)
                         </small></p>
                     </div>
-
-                   <div class="mt-5 pt-5 border-top text-center">
+                    <div class="mt-5 pt-5 border-top text-center">
                         <h2>For Colleges & Institutions</h2>
                         <p class="lead">Partner with IRIS to provide comprehensive placement preparation for your students.</p>
                         <p>Offer includes bulk access to the full Pro Pack features (including AI Resume Builder, 10 Resume Analyses, 5 Mock Interviews, Unlimited PDF Downloads & AI Enhancements per student) at special institutional pricing (Starting at ₹899 per student for 300+).</p>
                         <button type="button" class="btn btn-lg btn-outline-primary" onclick="window.location.href='mailto:info@irisapp.co?subject=Institutional Partnership Inquiry'">Contact Us for Bulk Pricing</button>
                     </div>
-               </div> 
+               </div>
             </div>
         </div>
 
