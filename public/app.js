@@ -3756,7 +3756,7 @@ function showExistingUpgradeModal(featureType) {
                                 <div class="card-body">
                                     <h2 class="card-title pricing-card-title text-center">₹899</h2>
                                     <ul class="list-unstyled mt-3 mb-4">
-                                        <li><i class="fas fa-check text-success me-2"></i> <strong>10 Resume Analyses</strong></li>
+                                        <li><i class="fas fa-check text-success me-2"></i> <strong>20 Resume Analyses</strong></li>
                                         <li><i class="fas fa-check text-success me-2"></i> <strong>5 Mock Interviews</strong></li>
                                         <li><i class="fas fa-check text-success me-2"></i> Detailed Prep Plan</li>
                                         <li><i class="fas fa-check text-success me-2"></i> Detailed Performance Reports</li>
@@ -5344,14 +5344,14 @@ function showResumeBuilderUpgradeModal(featureType) {
                                             <td>5</td>
                                             <td>20</td>
                                             <td>50</td>
-                                            <td>Unlimited</td>
+                                            <td>100</td>
                                         </tr>
                                         <tr>
                                             <td>AI Enhancements</td>
                                             <td>5</td>
                                             <td>20</td>
                                             <td>50</td>
-                                            <td>Unlimited</td>
+                                            <td>100</td>
                                         </tr>
                                     </tbody>
                                 </table>
@@ -5407,9 +5407,9 @@ function showResumeBuilderUpgradeModal(featureType) {
                                     <div class="card-body">
                                         <h2 class="card-title pricing-card-title text-center">₹899</h2>
                                         <ul class="list-unstyled mt-3 mb-4">
-                                            <li><i class="fas fa-check text-success me-2"></i> <strong>Unlimited PDF Downloads</strong></li>
-                                            <li><i class="fas fa-check text-success me-2"></i> <strong>Unlimited AI Enhancements</strong></li>
-                                            <li><i class="fas fa-check text-success me-2"></i> <strong>10 Resume Analyses</strong></li>
+                                            <li><i class="fas fa-check text-success me-2"></i> <strong>100 PDF Downloads</strong></li>
+                                            <li><i class="fas fa-check text-success me-2"></i> <strong>100 AI Enhancements</strong></li>
+                                            <li><i class="fas fa-check text-success me-2"></i> <strong>20 Resume Analyses</strong></li>
                                             <li><i class="fas fa-check text-success me-2"></i> <strong>5 Mock Interviews</strong></li>
                                         </ul>
                                         <button type="button" class="btn btn-lg btn-block ${recommendedPlan === 'pro' ? 'btn-primary' : 'btn-outline-primary'} w-100 plan-select-btn" data-plan="pro">Go Pro</button>
