@@ -518,28 +518,6 @@
                                 </h2>
                                 <p class="lead mb-3">Get interview-ready with our exclusive launch prices!</p>
                                 <h4 class="text-danger mb-4">Craft Your Perfect Resume, Conquer Your Interviews, Claim Your Dream Position!</h4>
-                                
-                                <div class="countdown-container mb-3">
-                                    <p class="countdown-label">Hurry! Offer ends in:</p>
-                                    <div class="countdown-timer">
-                                        <div class="countdown-unit">
-                                            <span id="countdown-days">14</span>
-                                            <div class="countdown-label">Days</div>
-                                        </div>
-                                        <div class="countdown-unit">
-                                            <span id="countdown-hours">00</span>
-                                            <div class="countdown-label">Hours</div>
-                                        </div>
-                                        <div class="countdown-unit">
-                                            <span id="countdown-minutes">00</span>
-                                            <div class="countdown-label">Mins</div>
-                                        </div>
-                                        <div class="countdown-unit">
-                                            <span id="countdown-seconds">00</span>
-                                            <div class="countdown-label">Secs</div>
-                                        </div>
-                                    </div>
-                                </div>
                             </div>
                         </div>
                     </div>
@@ -2292,91 +2270,6 @@
               modalTitle.textContent = imgTitle;
             });
           });
-        });
-    </script>
-    <script>
-        // Countdown Timer Script
-        function getEndDate() {
-            // Create a Date object for May 20, 2025 at 11:59 PM in local timezone
-            // Month is 0-indexed (0 = January, 4 = May)
-            const endDate = new Date(2025, 4, 20, 23, 59, 59);
-            return endDate.getTime();
-        }
-
-        const countdownEndDate = getEndDate();
-        let countdown = null; // Declare countdown variable globally
-
-        function updateCountdown() {
-            // Only proceed if we're on the public view
-            if (document.getElementById('public-view').style.display === 'none') {
-                clearInterval(countdown);
-                countdown = null;
-                return;
-            }
-            
-            const now = new Date().getTime();
-            const distance = countdownEndDate - now;
-
-            const daysEl = document.getElementById("countdown-days");
-            const hoursEl = document.getElementById("countdown-hours");
-            const minutesEl = document.getElementById("countdown-minutes");
-            const secondsEl = document.getElementById("countdown-seconds");
-            const bannerEl = document.querySelector('.launch-offer-banner');
-
-            // Check if elements exist before updating
-            if (!daysEl || !hoursEl || !minutesEl || !secondsEl || !bannerEl) {
-                console.warn("Countdown elements not found. Stopping timer.");
-                clearInterval(countdown);
-                countdown = null;
-                return;
-            }
-
-            // If the countdown is finished, hide the banner or show an expired message
-            if (distance < 0) {
-                clearInterval(countdown);
-                bannerEl.style.display = 'none';
-                countdown = null;
-                return; // Stop further calculations
-            }
-
-            // Calculate days, hours, minutes and seconds
-            const days = Math.floor(distance / (1000 * 60 * 60 * 24));
-            const hours = Math.floor((distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-            const minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
-            const seconds = Math.floor((distance % (1000 * 60)) / 1000);
-
-            // Display the result with leading zeros where needed
-            daysEl.innerHTML = days;
-            hoursEl.innerHTML = hours < 10 ? "0" + hours : hours;
-            minutesEl.innerHTML = minutes < 10 ? "0" + minutes : minutes;
-            secondsEl.innerHTML = seconds < 10 ? "0" + seconds : seconds;
-        }
-
-        // Ensure DOM is ready before starting interval
-        document.addEventListener('DOMContentLoaded', function() {
-            // Only start countdown if we're on the public view
-            if (document.getElementById('public-view') && 
-                document.getElementById('public-view').style.display !== 'none') {
-                updateCountdown(); // Run once immediately
-                countdown = setInterval(updateCountdown, 1000); // Run every second
-            }
-        });
-
-        // Add an event listener to stop the countdown when a user signs in
-        document.addEventListener('DOMContentLoaded', function() {
-            // Find all sign-in/sign-up buttons
-            const authButtons = document.querySelectorAll('[data-auth="signin"], [data-auth="signup"]');
-            
-            authButtons.forEach(button => {
-                button.addEventListener('click', function() {
-                    // This is a safety measure to ensure the countdown stops when auth is initiated
-                    if (countdown) {
-                        console.log("Auth initiated, stopping countdown timer");
-                        clearInterval(countdown);
-                        countdown = null;
-                    }
-                });
-            });
         });
     </script>
 </body>
