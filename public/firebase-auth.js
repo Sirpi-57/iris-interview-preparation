@@ -176,7 +176,7 @@ function loadUserProfile(user) {
 function getPackageLimit(feature, packageName) {
   const limits = {
     free: {
-        resumeAnalyses: 2,
+        resumeAnalyses: 1,
         mockInterviews: 0,
         pdfDownloads: 5,     // New: PDF download limits
         aiEnhance: 5         // New: AI enhance limits

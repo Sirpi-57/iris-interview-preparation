@@ -1364,7 +1364,7 @@ def get_package_limit(package_name, feature_type):
     """Returns the limit for a specific feature based on package type."""
     limits = {
         'free': {
-            'resumeAnalyses': 2,
+            'resumeAnalyses': 1,
             'mockInterviews': 0
         },
         'starter': {
