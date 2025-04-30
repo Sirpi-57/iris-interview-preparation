@@ -1,0 +1,590 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IRIS - Admin Dashboard</title>
+    <!-- External Libraries -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Custom Styles -->
+    <style>
+        body {
+            background-color: #f8f9fa;
+        }
+        
+        .admin-sidebar {
+            background-color: #343a40;
+            color: white;
+            height: 100vh;
+            position: fixed;
+            padding-top: 20px;
+        }
+        
+        .admin-sidebar .nav-link {
+            color: rgba(255, 255, 255, 0.7);
+            margin-bottom: 5px;
+        }
+        
+        .admin-sidebar .nav-link:hover,
+        .admin-sidebar .nav-link.active {
+            color: white;
+            background-color: rgba(255, 255, 255, 0.1);
+        }
+        
+        .admin-content {
+            margin-left: 250px;
+            padding: 20px;
+        }
+        
+        .admin-header {
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #dee2e6;
+        }
+        
+        .card-stats {
+            transition: transform 0.3s;
+        }
+        
+        .card-stats:hover {
+            transform: translateY(-5px);
+        }
+        
+        @media (max-width: 768px) {
+            .admin-sidebar {
+                width: 100%;
+                height: auto;
+                position: relative;
+            }
+            
+            .admin-content {
+                margin-left: 0;
+            }
+        }
+        
+        .job-card {
+            margin-bottom: 15px;
+            transition: transform 0.2s;
+        }
+        
+        .job-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        
+        .job-actions {
+            display: flex;
+            gap: 5px;
+        }
+        
+        /* Tag styles */
+        .tag-container {
+            margin: 10px 0;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 5px;
+        }
+        
+        .tag {
+            display: inline-flex;
+            align-items: center;
+            background-color: #e9ecef;
+            padding: 5px 10px;
+            border-radius: 25px;
+            margin-right: 5px;
+            margin-bottom: 5px;
+        }
+        
+        .tag button {
+            background: none;
+            border: none;
+            color: #dc3545;
+            font-size: 12px;
+            margin-left: 5px;
+            cursor: pointer;
+        }
+        
+        #error-messages {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 1050;
+        }
+    </style>
+</head>
+<body>
+    <!-- Error Messages Container -->
+    <div id="error-messages" class="position-fixed top-0 end-0 p-3" style="z-index: 11000;"></div>
+
+    <!-- Admin Dashboard Layout -->
+    <div class="container-fluid">
+        <div class="row">
+            <!-- Sidebar -->
+            <div class="col-md-3 col-lg-2 admin-sidebar d-md-block collapse" id="sidebar">
+                <div class="text-center mb-4">
+                    <i class="fas fa-comments fa-2x mb-2"></i>
+                    <h5>IRIS Admin</h5>
+                </div>
+                
+                <ul class="nav flex-column">
+                    <li class="nav-item">
+                        <a href="#dashboard" class="nav-link active" data-section="dashboard">
+                            <i class="fas fa-tachometer-alt me-2"></i>Dashboard
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="#jobs" class="nav-link" data-section="jobs">
+                            <i class="fas fa-briefcase me-2"></i>Job Listings
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="#add-job" class="nav-link" data-section="add-job">
+                            <i class="fas fa-plus-circle me-2"></i>Add New Job
+                        </a>
+                    </li>
+                </ul>
+                
+                <hr class="mt-3 mb-3">
+                
+                <div class="px-3 mb-3">
+                    <div class="text-secondary mb-2">
+                        <small>Logged in as:</small>
+                    </div>
+                    <div class="d-flex align-items-center">
+                        <img src="https://i.stack.imgur.com/34AD2.jpg" alt="Admin" class="user-avatar rounded-circle me-2" style="width: 32px; height: 32px;">
+                        <div>
+                            <div class="user-display-name">Admin User</div>
+                            <small class="user-email text-light-emphasis">admin@example.com</small>
+                        </div>
+                    </div>
+                </div>
+                
+                <button class="btn btn-outline-light btn-sm w-100 mt-2 signout-button">
+                    <i class="fas fa-sign-out-alt me-2"></i>Sign Out
+                </button>
+            </div>
+
+            <!-- Main Content -->
+            <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 admin-content">
+                <!-- Dashboard Section -->
+                <div id="dashboard-section" class="admin-section active-section">
+                    <div class="admin-header d-flex justify-content-between align-items-center">
+                        <h2><i class="fas fa-tachometer-alt me-2"></i>Dashboard</h2>
+                        <div class="btn-toolbar">
+                            <div class="btn-group me-2">
+                                <button type="button" class="btn btn-sm btn-outline-secondary" id="refresh-dashboard">
+                                    <i class="fas fa-sync-alt me-1"></i>Refresh
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row mt-4">
+                        <div class="col-md-4 mb-4">
+                            <div class="card card-stats bg-primary text-white">
+                                <div class="card-body">
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <div>
+                                            <h5 class="card-title">Total Jobs</h5>
+                                            <h2 class="display-4" id="total-jobs-count">0</h2>
+                                        </div>
+                                        <div>
+                                            <i class="fas fa-briefcase fa-3x opacity-50"></i>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4 mb-4">
+                            <div class="card card-stats bg-success text-white">
+                                <div class="card-body">
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <div>
+                                            <h5 class="card-title">Active Jobs</h5>
+                                            <h2 class="display-4" id="active-jobs-count">0</h2>
+                                        </div>
+                                        <div>
+                                            <i class="fas fa-check-circle fa-3x opacity-50"></i>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4 mb-4">
+                            <div class="card card-stats bg-warning text-white">
+                                <div class="card-body">
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <div>
+                                            <h5 class="card-title">Mock Interviews</h5>
+                                            <h2 class="display-4" id="interview-count">0</h2>
+                                        </div>
+                                        <div>
+                                            <i class="fas fa-users fa-3x opacity-50"></i>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row mt-2">
+                        <div class="col-md-6 mb-4">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h5>Recent Job Postings</h5>
+                                </div>
+                                <div class="card-body">
+                                    <div id="recent-jobs">
+                                        <p class="text-center py-3 text-muted">Loading recent jobs...</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6 mb-4">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h5>Job Categories</h5>
+                                </div>
+                                <div class="card-body">
+                                    <canvas id="job-categories-chart" height="250"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Job Listings Section -->
+                <div id="jobs-section" class="admin-section" style="display: none;">
+                    <div class="admin-header d-flex justify-content-between align-items-center">
+                        <h2><i class="fas fa-briefcase me-2"></i>Job Listings</h2>
+                        <div class="btn-toolbar">
+                            <div class="input-group me-2">
+                                <input type="text" class="form-control form-control-sm" id="job-search" placeholder="Search jobs...">
+                                <button class="btn btn-sm btn-outline-secondary" type="button">
+                                    <i class="fas fa-search"></i>
+                                </button>
+                            </div>
+                            <div class="btn-group me-2">
+                                <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                                    <i class="fas fa-filter me-1"></i>Filter
+                                </button>
+                                <ul class="dropdown-menu">
+                                    <li><a class="dropdown-item" href="#" data-filter="all">All Jobs</a></li>
+                                    <li><a class="dropdown-item" href="#" data-filter="active">Active Jobs</a></li>
+                                    <li><a class="dropdown-item" href="#" data-filter="expired">Expired Jobs</a></li>
+                                    <li><hr class="dropdown-divider"></li>
+                                    <li><a class="dropdown-item" href="#" data-filter="full-time">Full-time</a></li>
+                                    <li><a class="dropdown-item" href="#" data-filter="intern">Internship</a></li>
+                                </ul>
+                            </div>
+                            <button type="button" class="btn btn-sm btn-primary" id="add-job-btn">
+                                <i class="fas fa-plus me-1"></i>Add New Job
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="alert alert-info mt-3" role="alert">
+                        <i class="fas fa-info-circle me-2"></i>
+                        Job listings displayed here will appear on the user-facing mock interview application. Expired jobs will be automatically hidden from users.
+                    </div>
+
+                    <div class="card mt-3">
+                        <div class="card-body">
+                            <div class="table-responsive">
+                                <table class="table table-hover">
+                                    <thead>
+                                        <tr>
+                                            <th>Job Title</th>
+                                            <th>Company</th>
+                                            <th>Category</th>
+                                            <th>Posted Date</th>
+                                            <th>Deadline</th>
+                                            <th>Status</th>
+                                            <th>Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="jobs-table-body">
+                                        <tr>
+                                            <td colspan="7" class="text-center text-muted py-4">Loading job listings...</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Add New Job Section -->
+                <div id="add-job-section" class="admin-section" style="display: none;">
+                    <div class="admin-header">
+                        <h2><i class="fas fa-plus-circle me-2"></i>Add New Job</h2>
+                    </div>
+
+                    <div class="alert alert-info mb-4" role="alert">
+                        <i class="fas fa-info-circle me-2"></i>
+                        Complete the form below to add a new job listing. More detailed job information will result in better quality mock interviews.
+                    </div>
+
+                    <form id="add-job-form" class="row g-3">
+                        <!-- Basic Information -->
+                        <div class="col-12">
+                            <div class="card mb-4">
+                                <div class="card-header">
+                                    <h5 class="mb-0">Basic Information</h5>
+                                </div>
+                                <div class="card-body">
+                                    <div class="row g-3">
+                                        <div class="col-md-6">
+                                            <label for="job-title" class="form-label">Job Title<span class="text-danger">*</span></label>
+                                            <input type="text" class="form-control" id="job-title" required>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label for="company-name" class="form-label">Company Name<span class="text-danger">*</span></label>
+                                            <input type="text" class="form-control" id="company-name" required>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <label for="job-category" class="form-label">Category<span class="text-danger">*</span></label>
+                                            <select class="form-select" id="job-category" required>
+                                                <option value="" selected disabled>Select category</option>
+                                                <option value="data-analyst">Data Analyst</option>
+                                                <option value="data-scientist">Data Scientist</option>
+                                                <option value="full-stack-developer">Full Stack Developer</option>
+                                                <option value="cloud-engineer">Cloud Engineer</option>
+                                                <option value="ai-ml-engineer">AI/ML Engineer</option>
+                                                <option value="sales">Sales</option>
+                                                <option value="hr-recruiter">HR Recruiter</option>
+                                                <option value="other">Other</option>
+                                            </select>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <label for="job-experience" class="form-label">Experience Level<span class="text-danger">*</span></label>
+                                            <select class="form-select" id="job-experience" required>
+                                                <option value="" selected disabled>Select experience</option>
+                                                <option value="internship">Internship</option>
+                                                <option value="entry-level">Entry Level (0-1 years)</option>
+                                                <option value="junior">Junior (1-3 years)</option>
+                                                <option value="mid-level">Mid-Level (3-5 years)</option>
+                                                <option value="senior">Senior (5+ years)</option>
+                                                <option value="lead">Lead/Principal</option>
+                                            </select>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <label for="job-type" class="form-label">Job Type<span class="text-danger">*</span></label>
+                                            <select class="form-select" id="job-type" required>
+                                                <option value="" selected disabled>Select type</option>
+                                                <option value="full-time">Full-time</option>
+                                                <option value="part-time">Part-time</option>
+                                                <option value="contract">Contract</option>
+                                                <option value="internship">Internship</option>
+                                            </select>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label for="application-deadline" class="form-label">Application Deadline<span class="text-danger">*</span></label>
+                                            <input type="date" class="form-control" id="application-deadline" required>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label for="salary-range" class="form-label">Salary Range</label>
+                                            <input type="text" class="form-control" id="salary-range" placeholder="e.g., ₹5-8 LPA or $60,000-$80,000">
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label for="location" class="form-label">Location<span class="text-danger">*</span></label>
+                                            <input type="text" class="form-control" id="location" required placeholder="e.g., Bangalore, India">
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label for="education" class="form-label">Education Requirements</label>
+                                            <input type="text" class="form-control" id="education" placeholder="e.g., Bachelor's in Computer Science">
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Skills & Requirements -->
+                        <div class="col-12">
+                            <div class="card mb-4">
+                                <div class="card-header">
+                                    <h5 class="mb-0">Skills & Requirements</h5>
+                                </div>
+                                <div class="card-body">
+                                    <div class="row g-3">
+                                        <div class="col-12">
+                                            <label for="must-have-skills" class="form-label">Must-Have Skills<span class="text-danger">*</span></label>
+                                            <div class="input-group mb-2">
+                                                <input type="text" class="form-control" id="must-have-skills-input" placeholder="Enter a skill and press Enter or Add">
+                                                <button class="btn btn-outline-secondary" type="button" id="add-must-have-skill">Add</button>
+                                            </div>
+                                            <div id="must-have-skills-container" class="tag-container"></div>
+                                            <input type="hidden" id="must-have-skills" required>
+                                            <div class="form-text">Enter key skills required for the position. These will be used for matching candidates and generating appropriate interview questions.</div>
+                                        </div>
+                                        
+                                        <div class="col-12">
+                                            <label for="nice-to-have-skills" class="form-label">Nice-to-Have Skills</label>
+                                            <div class="input-group mb-2">
+                                                <input type="text" class="form-control" id="nice-to-have-skills-input" placeholder="Enter a skill and press Enter or Add">
+                                                <button class="btn btn-outline-secondary" type="button" id="add-nice-to-have-skill">Add</button>
+                                            </div>
+                                            <div id="nice-to-have-skills-container" class="tag-container"></div>
+                                            <input type="hidden" id="nice-to-have-skills">
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Job Description -->
+                        <div class="col-12">
+                            <div class="card mb-4">
+                                <div class="card-header">
+                                    <h5 class="mb-0">Job Description</h5>
+                                </div>
+                                <div class="card-body">
+                                    <div class="row g-3">
+                                        <div class="col-12">
+                                            <label for="job-description" class="form-label">Full Job Description<span class="text-danger">*</span></label>
+                                            <textarea class="form-control" id="job-description" rows="8" required></textarea>
+                                            <div class="form-text">Paste the full job description here. This will be used to create tailored interview questions.</div>
+                                        </div>
+                                        <div class="col-12">
+                                            <label for="responsibilities" class="form-label">Key Responsibilities</label>
+                                            <textarea class="form-control" id="responsibilities" rows="4"></textarea>
+                                            <div class="form-text">List the main responsibilities for this role, if not already included in job description.</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Application Details & Previous Questions -->
+                        <div class="col-12">
+                            <div class="card mb-4">
+                                <div class="card-header">
+                                    <h5 class="mb-0">Additional Information</h5>
+                                </div>
+                                <div class="card-body">
+                                    <div class="row g-3">
+                                        <div class="col-md-6">
+                                            <label for="job-link" class="form-label">Job Posting URL</label>
+                                            <input type="url" class="form-control" id="job-link" placeholder="https://...">
+                                            <div class="form-text">Link to the original job posting.</div>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label for="num-openings" class="form-label">Number of Openings</label>
+                                            <input type="number" class="form-control" id="num-openings" min="1" value="1">
+                                        </div>
+                                        <div class="col-12">
+                                            <label for="previous-questions" class="form-label">Previous Interview Questions (if available)</label>
+                                            <textarea class="form-control" id="previous-questions" rows="4" placeholder="List any known interview questions for this company/role. One question per line."></textarea>
+                                            <div class="form-text">These questions will be incorporated into the mock interview.</div>
+                                        </div>
+                                        <div class="col-12">
+                                            <label for="glassdoor-info" class="form-label">Glassdoor/Reviews Information</label>
+                                            <textarea class="form-control" id="glassdoor-info" rows="3" placeholder="Any insights from company reviews that might help with interview preparation."></textarea>
+                                        </div>
+                                        <div class="col-12">
+                                            <label for="additional-notes" class="form-label">Additional Notes</label>
+                                            <textarea class="form-control" id="additional-notes" rows="3"></textarea>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-12 d-flex justify-content-between">
+                            <button type="button" class="btn btn-secondary" id="reset-form">Reset Form</button>
+                            <div>
+                                <button type="button" class="btn btn-outline-primary me-2" id="preview-job">Preview</button>
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="fas fa-save me-1"></i>Save Job Posting
+                                </button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <!-- Job Preview Modal -->
+    <div class="modal fade" id="job-preview-modal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Job Posting Preview</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div id="job-preview-content">
+                        <!-- Job preview will be populated here -->
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    <button type="button" class="btn btn-primary" id="preview-submit">Looks Good, Submit</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Job Details Modal -->
+    <div class="modal fade" id="job-details-modal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Job Details</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div id="job-details-content">
+                        <!-- Job details will be populated here -->
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    <button type="button" class="btn btn-warning" id="edit-job-btn">Edit Job</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Delete Confirmation Modal -->
+    <div class="modal fade" id="delete-job-modal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Confirm Delete</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p>Are you sure you want to delete this job posting?</p>
+                    <p><strong>Title:</strong> <span id="delete-job-title"></span></p>
+                    <p><strong>Company:</strong> <span id="delete-job-company"></span></p>
+                    <div class="alert alert-danger">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        This action cannot be undone. All associated data will be permanently removed.
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-danger" id="confirm-delete-job">Delete</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-analytics-compat.js"></script>
+    
+    <!-- External Libraries -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <!-- Application Scripts -->
+    <script src="firebase-auth.js"></script>
+    <script src="admin-app.js"></script>
+</body>
+</html>
