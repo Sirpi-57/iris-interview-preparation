@@ -58,39 +58,86 @@ function initializeFirebase() {
 }
 
 function handleAuthStateChanged(user) {
-    console.log('Auth state changed:', user ? `User ${user.email} signed in` : 'User signed out');
-    authState.user = user;
+  console.log('Auth state changed:', user ? `User ${user.email} signed in` : 'User signed out');
+  authState.user = user;
 
-    if (user) {
-        // User is signed in - Load profile FIRST, then initialize app state
-        loadUserProfile(user) // loadUserProfile already handles success/failure internally
-            .finally(() => {
-                // This block runs *after* loadUserProfile finishes or fails
-                console.log("Profile load attempt finished. Current profile state:", authState.userProfile);
-                showAppView(); // Show the app view
-                updateUserProfileUI(user); // Update UI with basic auth info
-                // Initialize app logic *after* profile attempt and showing view
-                if (typeof initializeIRISApp === 'function') {
-                    initializeIRISApp(); // Now safe to check authState.userProfile
-                }
-            });
-    } else {
-        // User is signed out
-        authState.userProfile = null;
-        // Remove localStorage item if it was ever used (belt-and-suspenders, though we stopped setting it)
-        // localStorage.removeItem('irisSessionId');
-        // Reset form fields
-        const resumeInput = document.getElementById('resumeFile');
-        const jobDescriptionInput = document.getElementById('jobDescription');
-        if (resumeInput) resumeInput.value = null;
-        if (jobDescriptionInput) jobDescriptionInput.value = '';
-        const progressContainer = document.getElementById('uploadProgress');
-        if (progressContainer) { /* ... reset progress bar ... */ }
-        // Reset other app state if needed
-        // resetAppState();
-        showPublicView();
-        clearUserProfileUI();
-    }
+  if (user) {
+      // User is signed in - Load profile FIRST, then initialize app state
+      
+      // Check if there was a pending plan selection or addon purchase
+      const pendingPlan = localStorage.getItem('pendingPlanSelection');
+      const pendingAddonStr = localStorage.getItem('pendingAddonPurchase');
+      
+      // Load user profile first regardless of pending actions
+      loadUserProfile(user) 
+          .finally(() => {
+              // This block runs *after* loadUserProfile finishes or fails
+              console.log("Profile load attempt finished. Current profile state:", authState.userProfile);
+              showAppView(); // Show the app view
+              updateUserProfileUI(user); // Update UI with basic auth info
+              
+              // Initialize app logic *after* profile attempt and showing view
+              if (typeof initializeIRISApp === 'function') {
+                  initializeIRISApp(); // Now safe to check authState.userProfile
+                  
+                  // After initialization is complete, check for pending actions
+                  if (pendingPlan) {
+                      // Clear the pending plan to prevent loops
+                      localStorage.removeItem('pendingPlanSelection');
+                      
+                      // Give a moment for everything to fully initialize
+                      setTimeout(() => {
+                          console.log(`Continuing with pending plan selection: ${pendingPlan}`);
+                          // Trigger plan selection with payment
+                          if (typeof selectPlanFixed === 'function') {
+                              selectPlanFixed(pendingPlan);
+                          } else {
+                              console.warn("selectPlanFixed function not found. Cannot process pending plan.");
+                              showMessage("Unable to continue with plan selection. Please try again from your profile.", "warning");
+                          }
+                      }, 1500);
+                  } else if (pendingAddonStr) {
+                      // Process addon purchase if there's no pending plan
+                      try {
+                          const pendingAddon = JSON.parse(pendingAddonStr);
+                          localStorage.removeItem('pendingAddonPurchase');
+                          
+                          setTimeout(() => {
+                              console.log(`Continuing with pending addon purchase:`, pendingAddon);
+                              if (typeof purchaseAddonItem === 'function') {
+                                  purchaseAddonItem(pendingAddon.featureType, pendingAddon.quantity);
+                              } else {
+                                  console.warn("purchaseAddonItem function not found. Cannot process pending addon.");
+                                  showMessage("Unable to continue with add-on purchase. Please try again from your profile.", "warning");
+                              }
+                          }, 1500);
+                      } catch (e) {
+                          console.error("Error parsing pending addon data:", e);
+                          localStorage.removeItem('pendingAddonPurchase');
+                      }
+                  }
+              }
+          });
+  } else {
+      // User is signed out
+      authState.userProfile = null;
+      // Reset form fields
+      const resumeInput = document.getElementById('resumeFile');
+      const jobDescriptionInput = document.getElementById('jobDescription');
+      if (resumeInput) resumeInput.value = null;
+      if (jobDescriptionInput) jobDescriptionInput.value = '';
+      const progressContainer = document.getElementById('uploadProgress');
+      if (progressContainer) { 
+          progressContainer.style.display = 'none';
+      }
+      
+      // Clear any pending purchase actions if user signs out
+      localStorage.removeItem('pendingPlanSelection');
+      localStorage.removeItem('pendingAddonPurchase');
+      
+      showPublicView();
+      clearUserProfileUI();
+  }
 }
 
 
@@ -211,98 +258,98 @@ function getPackageLimit(feature, packageName) {
   return limits[packageName][feature] || 0;
 }
 
-// --- New function to update user profile with plan change ---
-function updateUserPlan(planName, expiresAt = null) {
-  const user = firebase.auth().currentUser;
-  if (!user || !firebase.firestore) {
-      console.error("Cannot update plan: user not logged in or Firestore not available");
-      return Promise.reject(new Error("Authentication or database error"));
-  }
+// // --- New function to update user profile with plan change ---
+// function updateUserPlan(planName, expiresAt = null) {
+//   const user = firebase.auth().currentUser;
+//   if (!user || !firebase.firestore) {
+//       console.error("Cannot update plan: user not logged in or Firestore not available");
+//       return Promise.reject(new Error("Authentication or database error"));
+//   }
   
-  const db = firebase.firestore();
+//   const db = firebase.firestore();
   
-  // Calculate new usage limits based on the plan
-  const resumeLimit = getPackageLimit('resumeAnalyses', planName);
-  const interviewLimit = getPackageLimit('mockInterviews', planName);
+//   // Calculate new usage limits based on the plan
+//   const resumeLimit = getPackageLimit('resumeAnalyses', planName);
+//   const interviewLimit = getPackageLimit('mockInterviews', planName);
   
-  // Keep track of current usage
-  let currentResumeUsage = 0;
-  let currentInterviewUsage = 0;
+//   // Keep track of current usage
+//   let currentResumeUsage = 0;
+//   let currentInterviewUsage = 0;
   
-  if (authState.userProfile && authState.userProfile.usage) {
-      currentResumeUsage = authState.userProfile.usage.resumeAnalyses.used || 0;
-      currentInterviewUsage = authState.userProfile.usage.mockInterviews.used || 0;
-  }
+//   if (authState.userProfile && authState.userProfile.usage) {
+//       currentResumeUsage = authState.userProfile.usage.resumeAnalyses.used || 0;
+//       currentInterviewUsage = authState.userProfile.usage.mockInterviews.used || 0;
+//   }
   
-  // Update profile with new plan and limits
-  const planUpdate = {
-    plan: planName,
-    planPurchasedAt: new Date().toISOString(),
-    planExpiresAt: expiresAt, // null for free/no expiration
-    'usage.resumeAnalyses.limit': resumeLimit,
-    'usage.resumeAnalyses.used': currentResumeUsage,
-    'usage.mockInterviews.limit': interviewLimit, 
-    'usage.mockInterviews.used': currentInterviewUsage,
-    'usage.pdfDownloads.limit': getPackageLimit('pdfDownloads', planName),
-    'usage.pdfDownloads.used': authState.userProfile?.usage?.pdfDownloads?.used || 0,
-    'usage.aiEnhance.limit': getPackageLimit('aiEnhance', planName),
-    'usage.aiEnhance.used': authState.userProfile?.usage?.aiEnhance?.used || 0
-  };
+//   // Update profile with new plan and limits
+//   const planUpdate = {
+//     plan: planName,
+//     planPurchasedAt: new Date().toISOString(),
+//     planExpiresAt: expiresAt, // null for free/no expiration
+//     'usage.resumeAnalyses.limit': resumeLimit,
+//     'usage.resumeAnalyses.used': currentResumeUsage,
+//     'usage.mockInterviews.limit': interviewLimit, 
+//     'usage.mockInterviews.used': currentInterviewUsage,
+//     'usage.pdfDownloads.limit': getPackageLimit('pdfDownloads', planName),
+//     'usage.pdfDownloads.used': authState.userProfile?.usage?.pdfDownloads?.used || 0,
+//     'usage.aiEnhance.limit': getPackageLimit('aiEnhance', planName),
+//     'usage.aiEnhance.used': authState.userProfile?.usage?.aiEnhance?.used || 0
+//   };
   
-  return db.collection('users').doc(user.uid).update(planUpdate)
-      .then(() => {
-          // Update local state
-          if (authState.userProfile) {
-              authState.userProfile.plan = planName;
-              authState.userProfile.planPurchasedAt = planUpdate.planPurchasedAt;
-              authState.userProfile.planExpiresAt = expiresAt;
+//   return db.collection('users').doc(user.uid).update(planUpdate)
+//       .then(() => {
+//           // Update local state
+//           if (authState.userProfile) {
+//               authState.userProfile.plan = planName;
+//               authState.userProfile.planPurchasedAt = planUpdate.planPurchasedAt;
+//               authState.userProfile.planExpiresAt = expiresAt;
               
-              // Ensure usage object exists
-              if (!authState.userProfile.usage) {
-                  authState.userProfile.usage = {};
-              }
+//               // Ensure usage object exists
+//               if (!authState.userProfile.usage) {
+//                   authState.userProfile.usage = {};
+//               }
               
-              // Update usage limits
-              if (!authState.userProfile.usage.resumeAnalyses) {
-                  authState.userProfile.usage.resumeAnalyses = { used: currentResumeUsage, limit: resumeLimit };
-              } else {
-                  authState.userProfile.usage.resumeAnalyses.limit = resumeLimit;
-              }
+//               // Update usage limits
+//               if (!authState.userProfile.usage.resumeAnalyses) {
+//                   authState.userProfile.usage.resumeAnalyses = { used: currentResumeUsage, limit: resumeLimit };
+//               } else {
+//                   authState.userProfile.usage.resumeAnalyses.limit = resumeLimit;
+//               }
               
-              if (!authState.userProfile.usage.mockInterviews) {
-                  authState.userProfile.usage.mockInterviews = { used: currentInterviewUsage, limit: interviewLimit };
-              } else {
-                  authState.userProfile.usage.mockInterviews.limit = interviewLimit;
-              }
+//               if (!authState.userProfile.usage.mockInterviews) {
+//                   authState.userProfile.usage.mockInterviews = { used: currentInterviewUsage, limit: interviewLimit };
+//               } else {
+//                   authState.userProfile.usage.mockInterviews.limit = interviewLimit;
+//               }
 
-              if (!authState.userProfile.usage.pdfDownloads) {
-                authState.userProfile.usage.pdfDownloads = { 
-                    used: authState.userProfile?.usage?.pdfDownloads?.used || 0, 
-                    limit: getPackageLimit('pdfDownloads', planName) 
-                };
-              } else {
-                  authState.userProfile.usage.pdfDownloads.limit = getPackageLimit('pdfDownloads', planName);
-              }
+//               if (!authState.userProfile.usage.pdfDownloads) {
+//                 authState.userProfile.usage.pdfDownloads = { 
+//                     used: authState.userProfile?.usage?.pdfDownloads?.used || 0, 
+//                     limit: getPackageLimit('pdfDownloads', planName) 
+//                 };
+//               } else {
+//                   authState.userProfile.usage.pdfDownloads.limit = getPackageLimit('pdfDownloads', planName);
+//               }
               
-              if (!authState.userProfile.usage.aiEnhance) {
-                  authState.userProfile.usage.aiEnhance = { 
-                      used: authState.userProfile?.usage?.aiEnhance?.used || 0, 
-                      limit: getPackageLimit('aiEnhance', planName) 
-                  };
-              } else {
-                  authState.userProfile.usage.aiEnhance.limit = getPackageLimit('aiEnhance', planName);
-              }
-          }
+//               if (!authState.userProfile.usage.aiEnhance) {
+//                   authState.userProfile.usage.aiEnhance = { 
+//                       used: authState.userProfile?.usage?.aiEnhance?.used || 0, 
+//                       limit: getPackageLimit('aiEnhance', planName) 
+//                   };
+//               } else {
+//                   authState.userProfile.usage.aiEnhance.limit = getPackageLimit('aiEnhance', planName);
+//               }
+//           }
           
-          // Update UI elements
-          updateUserProfileUI(user);
-          return { success: true, plan: planName };
-      })
-      .catch(error => {
-          console.error("Error updating user plan:", error);
-          return Promise.reject(error);
-      });
-}
+//           // Update UI elements
+//           updateUserProfileUI(user);
+//           return { success: true, plan: planName };
+//       })
+//       .catch(error => {
+//           console.error("Error updating user plan:", error);
+//           return Promise.reject(error);
+//       });
+// }
 
 // --- New function to increment usage counter ---
 function incrementUsageCounter(featureType) {
@@ -681,6 +728,61 @@ function showAuthModal(mode = 'signin') {
   // Show modal
   const modalInstance = new bootstrap.Modal(modal);
   modalInstance.show();
+  
+  // If there's a pending plan selection, add a message to the signup form
+  if (mode === 'signup') {
+    // Remove any existing message first
+    const existingMessage = document.getElementById('signup-pending-message');
+    if (existingMessage) {
+      existingMessage.remove();
+    }
+    
+    // Check for pending plan
+    const pendingPlan = localStorage.getItem('pendingPlanSelection');
+    if (pendingPlan) {
+      // Create a new message element
+      const messageEl = document.createElement('div');
+      messageEl.id = 'signup-pending-message';
+      messageEl.className = 'alert alert-info mb-3';
+      messageEl.innerHTML = `<i class="fas fa-info-circle me-2"></i>You'll be upgrading to the <strong>${pendingPlan.charAt(0).toUpperCase() + pendingPlan.slice(1)} Plan</strong> after creating your account.`;
+      
+      // Insert at the top of the form
+      const signupForm = document.getElementById('signup-form');
+      signupForm.insertBefore(messageEl, signupForm.firstChild);
+    }
+    
+    // Check for pending addon purchase
+    const pendingAddonStr = localStorage.getItem('pendingAddonPurchase');
+    if (pendingAddonStr) {
+      try {
+        const pendingAddon = JSON.parse(pendingAddonStr);
+        const featureType = pendingAddon.featureType;
+        const quantity = pendingAddon.quantity || 1;
+        
+        // Create feature display name mapping
+        const featureNames = {
+          'resumeAnalyses': 'Resume Analysis',
+          'mockInterviews': 'Mock Interview',
+          'pdfDownloads': 'PDF Downloads',
+          'aiEnhance': 'AI Enhancements'
+        };
+        
+        const featureName = featureNames[featureType] || featureType;
+        
+        // Create a new message element
+        const messageEl = document.createElement('div');
+        messageEl.id = 'signup-pending-message';
+        messageEl.className = 'alert alert-info mb-3';
+        messageEl.innerHTML = `<i class="fas fa-info-circle me-2"></i>You'll be purchasing <strong>${quantity} ${featureName}${quantity > 1 ? 's' : ''}</strong> after creating your account.`;
+        
+        // Insert at the top of the form
+        const signupForm = document.getElementById('signup-form');
+        signupForm.insertBefore(messageEl, signupForm.firstChild);
+      } catch (e) {
+        console.error("Error parsing pending addon data:", e);
+      }
+    }
+  }
 }
 
 function hideAuthModal() {
@@ -691,6 +793,11 @@ function hideAuthModal() {
   if (modalInstance) {
     modalInstance.hide();
   }
+}
+
+// Convenience function for showing sign up modal specifically
+function showSignUpModal() {
+  showAuthModal('signup');
 }
 
 function showErrorMessage(message, duration = 5000) {
@@ -718,54 +825,67 @@ function showErrorMessage(message, duration = 5000) {
 }
 
 /// --- New function to purchase an addon ---
+// function purchaseAddon(featureType, quantity = 1) {
+//   const user = firebase.auth().currentUser;
+//   if (!user) {
+//     showMessage('Please sign in to purchase add-ons', 'warning');
+//     return Promise.reject(new Error("Authentication error"));
+//   }
+  
+//   // Define API_BASE_URL if not already defined
+//   const API_BASE_URL = 'https://iris-ai-backend.onrender.com'; // Update this URL to match your backend
+  
+//   return fetch(`${API_BASE_URL}/purchase-addon`, {
+//     method: 'POST',
+//     headers: { 'Content-Type': 'application/json' },
+//     body: JSON.stringify({
+//       userId: user.uid,
+//       feature: featureType,
+//       quantity: quantity
+//       // In a real implementation, you would add payment token here
+//     })
+//   })
+//   .then(response => {
+//     // Check if the response is JSON
+//     const contentType = response.headers.get('content-type');
+//     if (!contentType || !contentType.includes('application/json')) {
+//       // Handle non-JSON response (like HTML error page)
+//       return response.text().then(text => {
+//         console.error("Received non-JSON response:", text.substring(0, 200) + "...");
+//         throw new Error("The server returned an invalid response. Please try again later.");
+//       });
+//     }
+    
+//     // For JSON responses, check if it's successful
+//     if (!response.ok) {
+//       return response.json().then(errData => {
+//         throw new Error(errData.error || `Request failed (${response.status})`);
+//       });
+//     }
+    
+//     return response.json();
+//   })
+//   .then(data => {
+//     // Update local state to reflect new limits
+//     if (authState && authState.userProfile && authState.userProfile.usage && authState.userProfile.usage[featureType]) {
+//       authState.userProfile.usage[featureType].limit = data.newLimit;
+//     }
+    
+//     // Return purchase data
+//     return data;
+//   });
+// }
+
 function purchaseAddon(featureType, quantity = 1) {
-  const user = firebase.auth().currentUser;
-  if (!user) {
-    showMessage('Please sign in to purchase add-ons', 'warning');
-    return Promise.reject(new Error("Authentication error"));
-  }
+  // This function should now trigger the Razorpay flow instead of direct DB update
+  // It will be called from app.js purchaseAddonItem function
   
-  // Define API_BASE_URL if not already defined
-  const API_BASE_URL = 'https://iris-ai-backend.onrender.com'; // Update this URL to match your backend
-  
-  return fetch(`${API_BASE_URL}/purchase-addon`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      userId: user.uid,
-      feature: featureType,
-      quantity: quantity
-      // In a real implementation, you would add payment token here
-    })
-  })
-  .then(response => {
-    // Check if the response is JSON
-    const contentType = response.headers.get('content-type');
-    if (!contentType || !contentType.includes('application/json')) {
-      // Handle non-JSON response (like HTML error page)
-      return response.text().then(text => {
-        console.error("Received non-JSON response:", text.substring(0, 200) + "...");
-        throw new Error("The server returned an invalid response. Please try again later.");
-      });
-    }
-    
-    // For JSON responses, check if it's successful
-    if (!response.ok) {
-      return response.json().then(errData => {
-        throw new Error(errData.error || `Request failed (${response.status})`);
-      });
-    }
-    
-    return response.json();
-  })
-  .then(data => {
-    // Update local state to reflect new limits
-    if (authState && authState.userProfile && authState.userProfile.usage && authState.userProfile.usage[featureType]) {
-      authState.userProfile.usage[featureType].limit = data.newLimit;
-    }
-    
-    // Return purchase data
-    return data;
+  // We now return a promise that resolves when the purchase is initiated
+  // The actual purchase completion will be handled by the verify-razorpay-payment endpoint
+  return Promise.resolve({
+    initiated: true,
+    feature: featureType,
+    quantity: quantity
   });
 }
 
@@ -834,7 +954,10 @@ window.irisAuth = {
   // Add new functions to the exported object
   canUseFeature,
   incrementUsageCounter,
-  updateUserPlan,
+  updateUserPlan: (planName) => {
+    console.log(`Plan update for ${planName} will be processed after payment`);
+    return Promise.resolve({ initiated: true, plan: planName });
+  },
   getPackageLimit,
   purchaseAddon
 };

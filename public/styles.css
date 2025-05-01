@@ -2227,3 +2227,73 @@ overflow: hidden; /* Ensures iframe respects rounded corners */
         margin-top: 1rem; /* Add space above heading when stacked */
     }
 }
+
+.addon-quick-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 10px;
+    margin-top: 10px;
+}
+
+.pricing-section-addon-btn {
+    transition: all 0.2s ease;
+    border-radius: 20px;
+    padding: 5px 15px;
+}
+
+.pricing-section-addon-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
+
+/* Contact section in footer */
+.public-footer .fas {
+    width: 20px;
+    text-align: center;
+    margin-right: 5px;
+}
+
+/* About page styling */
+.divider {
+    position: relative;
+    text-align: center;
+    height: 1px;
+    background-color: rgba(0, 0, 0, 0.1);
+}
+
+.divider span {
+    background-color: #fff;
+    padding: 0 15px;
+    position: relative;
+    top: -10px;
+}
+
+.icon-circle {
+    width: 70px;
+    height: 70px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #6e8efb, #a777e3);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto;
+    color: white;
+    font-size: 24px;
+}
+
+.team-avatar img {
+    width: 150px;
+    height: 150px;
+    object-fit: cover;
+    border: 5px solid rgba(110, 142, 251, 0.2);
+}
+
+.team-card .social-icons a {
+    color: #6e8efb;
+    font-size: 18px;
+}
+
+.team-card .social-icons a:hover {
+    color: #a777e3;
+}

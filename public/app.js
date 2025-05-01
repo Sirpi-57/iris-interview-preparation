@@ -591,7 +591,7 @@ function initNavigation() {
 }
 
 function initButtons() {
-    // --- General Navigation --- [Keep existing code]
+    // --- General Navigation --- 
     document.getElementById('getStartedBtn')?.addEventListener('click', () => navigateTo('upload'));
     document.getElementById('viewPrepPlanBtn')?.addEventListener('click', () => navigateTo('prep-plan'));
     document.getElementById('startInterviewBtn')?.addEventListener('click', () => {
@@ -617,7 +617,7 @@ function initButtons() {
         }
     });
 
-    // --- Mock Interview Controls --- [Keep existing code]
+    // --- Mock Interview Controls ---
     document.getElementById('endInterviewBtn')?.addEventListener('click', endInterview);
 
     const interviewTypeButtons = document.querySelectorAll('#interviewTypeSelector button');
@@ -647,9 +647,83 @@ function initButtons() {
     if(voiceReplyBtn) voiceReplyBtn.style.display = 'none';
     if(stopRecordingBtn) stopRecordingBtn.style.display = 'none';
     
-    // --- Add new event listener for Upgrade Plan button ---
+    // --- Add Upgrade Plan button event listener ---
     document.getElementById('upgradePlanBtn')?.addEventListener('click', showPaymentModal);
     document.getElementById('fullscreenBtn')?.addEventListener('click', toggleFullscreen);
+    
+    // --- Add event listeners for pricing section buttons ---
+    // These are the buttons in the public pricing section
+    document.querySelectorAll('.pricing-plan-btn').forEach(button => {
+        button.addEventListener('click', function() {
+            const planName = this.getAttribute('data-plan');
+            
+            // Check if user is logged in
+            if (firebase.auth().currentUser) {
+                // User is logged in, proceed to payment
+                selectPlanFixed(planName);
+            } else {
+                // User is not logged in, show auth modal first
+                // Store selected plan in localStorage to retrieve after login
+                localStorage.setItem('pendingPlanSelection', planName);
+                
+                // Show sign up modal
+                if (typeof irisAuth !== 'undefined' && typeof irisAuth.showSignUpModal === 'function') {
+                    irisAuth.showSignUpModal(); // Preferably signup, not signin
+                }
+            }
+        });
+    });
+    
+    // --- Handlers for plan buttons inside the upgrade modal ---
+    document.querySelectorAll('.plan-select-btn').forEach(button => {
+        // Skip free plan button which is handled by auth system
+        if (button.getAttribute('data-plan') === 'free' && button.hasAttribute('data-auth')) {
+            return;
+        }
+        
+        button.addEventListener('click', function() {
+            const planName = this.getAttribute('data-plan');
+            
+            // For paid plans inside modals, always use the new payment flow
+            if (planName !== 'free') {
+                // Hide any parent modal first
+                const parentModal = this.closest('.modal');
+                if (parentModal && bootstrap.Modal.getInstance(parentModal)) {
+                    bootstrap.Modal.getInstance(parentModal).hide();
+                }
+                
+                // Start payment process
+                setTimeout(() => {
+                    selectPlanFixed(planName);
+                }, 300); // Short delay to allow modal to hide
+            }
+        });
+    });
+    
+    // --- Add-on purchase from pricing page ---
+    document.querySelectorAll('.pricing-section-addon-btn').forEach(button => {
+        button.addEventListener('click', function() {
+            const featureType = this.getAttribute('data-feature');
+            const quantity = parseInt(this.getAttribute('data-quantity') || '1');
+            
+            // Check if user is logged in
+            if (firebase.auth().currentUser) {
+                // User is logged in, proceed to payment
+                purchaseAddonItem(featureType, quantity);
+            } else {
+                // User is not logged in, show auth modal first
+                localStorage.setItem('pendingAddonPurchase', JSON.stringify({
+                    featureType: featureType,
+                    quantity: quantity
+                }));
+                
+                // Show sign up modal
+                if (typeof irisAuth !== 'undefined' && typeof irisAuth.showSignUpModal === 'function') {
+                    irisAuth.showSignUpModal();
+                }
+            }
+        });
+    });
 }
 
 function initForms() {
@@ -5570,7 +5644,6 @@ function updateAddonPrice(featureType, quantity) {
     }
 }
 
-// Function to purchase an add-on
 function purchaseAddonItem(featureType, quantity) {
     if (!firebase.auth().currentUser) {
         showMessage('Please sign in to purchase add-ons', 'warning');
@@ -5579,88 +5652,235 @@ function purchaseAddonItem(featureType, quantity) {
     }
     
     // Check if irisAuth is available
-    if (!window.irisAuth || typeof window.irisAuth.purchaseAddon !== 'function') {
-        showMessage('Payment system is not available. Please refresh the page and try again.', 'danger');
+    if (!window.irisAuth) {
+        showMessage('Authentication system is not available. Please refresh the page and try again.', 'danger');
         safelyCloseModal('addonPurchaseModal');
         return;
     }
     
-    // Show processing payment modal
-    const processingModal = new bootstrap.Modal(document.getElementById('paymentProcessingModal'));
-    const progressBar = document.getElementById('payment-progress-bar');
-    const processingMessage = document.getElementById('paymentProcessingMessage');
+    // Get user
+    const user = firebase.auth().currentUser;
     
-    // First close the addon purchase modal safely
-    safelyCloseModal('addonPurchaseModal');
+    // Calculate addon price
+    const addonPrices = {
+        'resumeAnalyses': 19,  // ₹19 per analysis
+        'mockInterviews': 89,  // ₹89 per interview
+        'pdfDownloads': 9,     // ₹9 per 10 downloads
+        'aiEnhance': 9         // ₹9 per 5 enhancements
+    };
+    
+    // Calculate how many units the user actually gets
+    const quantityMultipliers = {
+        'pdfDownloads': 10,  // 10 downloads per unit
+        'aiEnhance': 5       // 5 enhancements per unit
+    };
+    
+    // Get price and effective quantity
+    const basePrice = addonPrices[featureType] || 0;
+    const totalPrice = basePrice * quantity;
+    const effectiveQuantity = quantity * (quantityMultipliers[featureType] || 1);
     
     // Show processing modal
-    processingMessage.textContent = `Processing your purchase of ${quantity} ${getFeatureDisplayName(featureType)} add-on(s)...`;
-    progressBar.style.width = '0%';
+    // First safely close the addon purchase modal if open
+    safelyCloseModal('addonPurchaseModal');
+    
+    // Create processing modal
+    const processingModalContent = document.createElement('div');
+    processingModalContent.className = 'modal fade dynamic-modal';
+    processingModalContent.id = 'paymentProcessingModal';
+    processingModalContent.setAttribute('tabindex', '-1');
+    processingModalContent.setAttribute('aria-hidden', 'true');
+    processingModalContent.setAttribute('data-bs-backdrop', 'static');
+    
+    processingModalContent.innerHTML = `
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Processing Payment</h5>
+                </div>
+                <div class="modal-body text-center">
+                    <div class="spinner-border text-primary mb-3" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <p id="paymentProcessingMessage">Processing your purchase of ${quantity} ${getFeatureDisplayName(featureType)} add-on(s)...</p>
+                    <div class="progress mt-3">
+                        <div id="payment-progress-bar" class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 30%"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    // Append and show processing modal
+    document.body.appendChild(processingModalContent);
+    const processingModal = new bootstrap.Modal(processingModalContent, {
+        backdrop: 'static',
+        keyboard: false
+    });
     processingModal.show();
     
-    // Simulate progress
-    let progress = 0;
-    const progressInterval = setInterval(() => {
-        progress += 5;
-        progressBar.style.width = `${progress}%`;
-        
-        if (progress >= 90) {
-            clearInterval(progressInterval);
+    // Prepare order data for backend
+    const orderData = {
+        featureType: featureType,
+        quantity: quantity,
+        effectiveQuantity: effectiveQuantity,
+        amount: totalPrice * 100, // Amount in paise
+        currency: "INR",
+        userId: user.uid,
+        userEmail: user.email,
+        userName: user.displayName || user.email.split('@')[0],
+        orderType: 'addon'
+    };
+    
+    // Call backend to create order
+    fetch(`${API_BASE_URL}/create-razorpay-order`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(orderData)
+    })
+    .then(response => {
+        if (!response.ok) {
+            return response.json().then(errData => {
+                throw new Error(errData.error || `Order creation failed (${response.status})`);
+            });
         }
-    }, 100);
-    
-    // Define constants with default values in case not defined elsewhere
-    const API_BASE_URL = window.API_BASE_URL || 'https://iris-ai-backend.onrender.com'; // Update with your backend URL
-    
-    // Call the actual purchase function
-    window.irisAuth.purchaseAddon(featureType, quantity)
-        .then(result => {
-            console.log('Add-on purchase successful:', result);
-            
-            // Complete progress
-            clearInterval(progressInterval);
-            progressBar.style.width = '100%';
-            
-            setTimeout(() => {
-                // Close processing modal safely
-                safelyCloseModal('paymentProcessingModal');
-                
-                // Show success modal with updated limits
-                const successModal = new bootstrap.Modal(document.getElementById('paymentSuccessModal'));
-                document.getElementById('paymentSuccessMessage').textContent = 
-                    `You've successfully purchased ${quantity} ${getFeatureDisplayName(featureType)} add-on(s). Your limit has been increased.`;
-                
-                // Set new limits in success modal using the more flexible function
-                setSuccessModalLimits(featureType, result.newLimit);
-                
-                successModal.show();
-                
-                // Update local profile data to reflect new limits
-                if (authState && authState.userProfile && authState.userProfile.usage && authState.userProfile.usage[featureType]) {
-                    authState.userProfile.usage[featureType].limit = result.newLimit;
+        return response.json();
+    })
+    .then(orderResponse => {
+        // Update progress bar
+        const progressBar = document.getElementById('payment-progress-bar');
+        if (progressBar) progressBar.style.width = '60%';
+        
+        // Initialize Razorpay options
+        const options = {
+            key: orderResponse.key_id,
+            amount: orderResponse.amount,
+            currency: orderResponse.currency,
+            name: "IRIS",
+            description: `${quantity} ${getFeatureDisplayName(featureType)} Add-on${quantity > 1 ? 's' : ''}`,
+            order_id: orderResponse.razorpay_order_id,
+            prefill: {
+                name: orderData.userName,
+                email: orderData.userEmail,
+                contact: ""
+            },
+            theme: {
+                color: "#4A6FDC"
+            },
+            modal: {
+                ondismiss: function() {
+                    safelyCloseModal('paymentProcessingModal');
+                    showMessage("Add-on purchase cancelled.", "warning");
                 }
+            },
+            handler: function(response) {
+                // This function runs after successful payment
+                progressBar.style.width = '90%';
                 
-                // Update UI to show new limits
-                updateUsageDisplay();
-            }, 500);
-        })
-        .catch(error => {
-            console.error('Error purchasing add-on:', error);
-            
-            // Stop progress animation
-            clearInterval(progressInterval);
-            
-            // Hide processing modal safely
+                // Verify payment with backend
+                verifyAddonPayment(response, orderResponse.razorpay_order_id, featureType, quantity, effectiveQuantity);
+            }
+        };
+        
+        // Initialize Razorpay
+        const rzp = new Razorpay(options);
+        rzp.open();
+        
+        // Add event handler for payment failure
+        rzp.on('payment.failed', function(response) {
             safelyCloseModal('paymentProcessingModal');
+            showMessage(`Payment failed: ${response.error.description}`, "danger");
             
-            // Show error message with more user-friendly text
-            let errorMessage = error.message;
-            if (errorMessage.includes('JSON') || errorMessage.includes('Unexpected token')) {
-                errorMessage = "The server returned an invalid response. Please try again later.";
+            // Record failure for analytics
+            fetch(`${API_BASE_URL}/record-payment-failure`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    userId: user.uid,
+                    orderId: orderResponse.razorpay_order_id,
+                    reason: response.error.description
+                })
+            }).catch(err => console.error("Error recording payment failure:", err));
+        });
+    })
+    .catch(error => {
+        console.error("Addon order creation error:", error);
+        safelyCloseModal('paymentProcessingModal');
+        showMessage(`Error initiating payment: ${error.message}`, "danger");
+    });
+}
+
+// Function to verify addon payment
+function verifyAddonPayment(paymentResponse, orderId, featureType, quantity, effectiveQuantity) {
+    const verificationData = {
+        razorpay_order_id: orderId,
+        razorpay_payment_id: paymentResponse.razorpay_payment_id,
+        razorpay_signature: paymentResponse.razorpay_signature,
+        userId: firebase.auth().currentUser.uid,
+        featureType: featureType,
+        quantity: quantity,
+        effectiveQuantity: effectiveQuantity,
+        orderType: 'addon'
+    };
+    
+    fetch(`${API_BASE_URL}/verify-razorpay-payment`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(verificationData)
+    })
+    .then(response => {
+        if (!response.ok) {
+            return response.json().then(errData => {
+                throw new Error(errData.error || `Payment verification failed (${response.status})`);
+            });
+        }
+        return response.json();
+    })
+    .then(data => {
+        // Update progress bar
+        const progressBar = document.getElementById('payment-progress-bar');
+        if (progressBar) progressBar.style.width = '100%';
+        
+        // Close processing modal
+        safelyCloseModal('paymentProcessingModal');
+        
+        if (data.success) {
+            // Show success message
+            showMessage(`Successfully purchased ${quantity} ${getFeatureDisplayName(featureType)} add-on${quantity > 1 ? 's' : ''}!`, 'success');
+            
+            // Update local state
+            if (authState && authState.userProfile && authState.userProfile.usage && authState.userProfile.usage[featureType]) {
+                authState.userProfile.usage[featureType].limit = data.newLimit;
             }
             
-            showMessage(`Add-on purchase failed: ${errorMessage}`, 'danger');
-        });
+            // Update UI
+            updateUsageDisplay();
+            updateResumeBuilderUsageUI();
+            
+            // Show success modal
+            const successModal = new bootstrap.Modal(document.getElementById('paymentSuccessModal'));
+            document.getElementById('paymentSuccessMessage').textContent = 
+                `You've successfully purchased ${quantity} ${getFeatureDisplayName(featureType)} add-on${quantity > 1 ? 's' : ''}. Your limit has been increased.`;
+            
+            // Set new limits in success modal
+            setSuccessModalLimits(featureType, data.newLimit);
+            
+            successModal.show();
+        } else {
+            showMessage(`Add-on purchase verification failed: ${data.error || 'Unknown error'}`, 'danger');
+        }
+    })
+    .catch(error => {
+        console.error("Addon payment verification error:", error);
+        safelyCloseModal('paymentProcessingModal');
+        showMessage(`Error verifying payment: ${error.message}`, "danger");
+    });
 }
 
 // Helper function to update usage display for a specific feature
@@ -6003,7 +6223,31 @@ function selectPlanFixed(planName) {
     safelyCloseModal('paymentProcessingModal');
     safelyCloseModal('paymentSuccessModal');
     
-    // Create payment processing modal with proper structure
+    // Get plan pricing based on planName
+    const planPrices = {
+        'starter': 199,
+        'standard': 399,
+        'pro': 799
+    };
+    
+    const planPrice = planPrices[planName] || 0;
+    if (planPrice === 0) {
+        console.error(`Invalid plan selected: ${planName}`);
+        showMessage("Error processing payment: Invalid plan", "danger");
+        return;
+    }
+    
+    // Get user data
+    const user = firebase.auth().currentUser;
+    if (!user) {
+        showMessage("Please sign in to upgrade your plan", "warning");
+        if (typeof irisAuth !== 'undefined' && typeof irisAuth.showSignInModal === 'function') {
+            irisAuth.showSignInModal();
+        }
+        return;
+    }
+    
+    // Create payment processing modal for visual feedback
     const processingModalContent = document.createElement('div');
     processingModalContent.className = 'modal fade dynamic-modal';
     processingModalContent.id = 'paymentProcessingModal';
@@ -6021,9 +6265,9 @@ function selectPlanFixed(planName) {
                     <div class="spinner-border text-primary mb-3" role="status">
                         <span class="visually-hidden">Loading...</span>
                     </div>
-                    <p>Processing your upgrade to the ${planName.charAt(0).toUpperCase() + planName.slice(1)} plan...</p>
+                    <p id="paymentProcessingMessage">Initializing payment for the ${planName.charAt(0).toUpperCase() + planName.slice(1)} plan...</p>
                     <div class="progress mt-3">
-                        <div id="payment-progress-bar" class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 0%"></div>
+                        <div id="payment-progress-bar" class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 30%"></div>
                     </div>
                 </div>
             </div>
@@ -6033,47 +6277,252 @@ function selectPlanFixed(planName) {
     // Append and show processing modal
     document.body.appendChild(processingModalContent);
     const processingModal = new bootstrap.Modal(processingModalContent, {
-        backdrop: 'static', // Prevent closing by clicking outside
-        keyboard: false     // Prevent closing with keyboard
+        backdrop: 'static',
+        keyboard: false
     });
     processingModal.show();
     
-    // Simulate payment processing (for testing)
-    const progressBar = document.getElementById('payment-progress-bar');
-    let progress = 0;
+    // Prepare order data for backend
+    const orderData = {
+        planName: planName,
+        amount: planPrice * 100, // Amount in paise
+        currency: "INR",
+        userId: user.uid,
+        userEmail: user.email,
+        userName: user.displayName || user.email.split('@')[0],
+        orderType: 'plan'
+    };
     
-    const progressInterval = setInterval(() => {
-        progress += 10;
-        if (progressBar) progressBar.style.width = `${progress}%`;
-        
-        if (progress >= 100) {
-            clearInterval(progressInterval);
-            setTimeout(() => {
-                // Simulate successful payment
-                safelyCloseModal('paymentProcessingModal');
-                
-                // Update the user's plan
-                irisAuth.updateUserPlan(planName)
-                    .then(() => {
-                        showMessage(`Successfully upgraded to ${planName.charAt(0).toUpperCase() + planName.slice(1)} plan!`, 'success');
-                        updateUsageDisplay();
-                        
-                        // Remove the modal element from DOM
-                        if (processingModalContent.parentNode) {
-                            processingModalContent.parentNode.removeChild(processingModalContent);
-                        }
-                    })
-                    .catch(error => {
-                        showMessage(`Error upgrading plan: ${error.message}`, 'danger');
-                        
-                        // Remove the modal element from DOM
-                        if (processingModalContent.parentNode) {
-                            processingModalContent.parentNode.removeChild(processingModalContent);
-                        }
-                    });
-            }, 1000);
+    // Call backend to create order
+    fetch(`${API_BASE_URL}/create-razorpay-order`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(orderData)
+    })
+    .then(response => {
+        if (!response.ok) {
+            return response.json().then(errData => {
+                throw new Error(errData.error || `Order creation failed (${response.status})`);
+            });
         }
-    }, 300);
+        return response.json();
+    })
+    .then(orderResponse => {
+        // Update progress bar
+        const progressBar = document.getElementById('payment-progress-bar');
+        if (progressBar) progressBar.style.width = '60%';
+        
+        // Initialize Razorpay options
+        const options = {
+            key: orderResponse.key_id, // Get from backend response
+            amount: orderResponse.amount,
+            currency: orderResponse.currency,
+            name: "IRIS",
+            description: `${planName.charAt(0).toUpperCase() + planName.slice(1)} Plan Subscription`,
+            order_id: orderResponse.razorpay_order_id,
+            prefill: {
+                name: orderData.userName,
+                email: orderData.userEmail,
+                contact: "" // You could add phone number here if available
+            },
+            theme: {
+                color: "#4A6FDC" // Match your app's primary color
+            },
+            modal: {
+                ondismiss: function() {
+                    // Handle dismissal
+                    safelyCloseModal('paymentProcessingModal');
+                    showMessage("Payment cancelled. Your plan was not upgraded.", "warning");
+                }
+            },
+            handler: function(response) {
+                // This function runs after successful payment
+                // Update progress bar to 90%
+                if (progressBar) progressBar.style.width = '90%';
+                
+                // Verify payment with backend
+                verifyPayment(response, orderResponse.razorpay_order_id, planName);
+            }
+        };
+        
+        // Initialize Razorpay
+        const rzp = new Razorpay(options);
+        rzp.open();
+        
+        // Add event handler for payment failure
+        rzp.on('payment.failed', function(response) {
+            safelyCloseModal('paymentProcessingModal');
+            showMessage(`Payment failed: ${response.error.description}`, "danger");
+            
+            // Record failure for analytics
+            fetch(`${API_BASE_URL}/record-payment-failure`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    userId: user.uid,
+                    orderId: orderResponse.razorpay_order_id,
+                    reason: response.error.description
+                })
+            }).catch(err => console.error("Error recording payment failure:", err));
+        });
+    })
+    .catch(error => {
+        console.error("Order creation error:", error);
+        safelyCloseModal('paymentProcessingModal');
+        showMessage(`Error initiating payment: ${error.message}`, "danger");
+    });
+}
+
+// Function to verify plan payment
+function verifyPayment(paymentResponse, orderId, planName) {
+    const verificationData = {
+        razorpay_order_id: orderId,
+        razorpay_payment_id: paymentResponse.razorpay_payment_id,
+        razorpay_signature: paymentResponse.razorpay_signature,
+        userId: firebase.auth().currentUser.uid,
+        planName: planName,
+        orderType: 'plan'
+    };
+    
+    fetch(`${API_BASE_URL}/verify-razorpay-payment`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(verificationData)
+    })
+    .then(response => {
+        if (!response.ok) {
+            return response.json().then(errData => {
+                throw new Error(errData.error || `Payment verification failed (${response.status})`);
+            });
+        }
+        return response.json();
+    })
+    .then(data => {
+        // Update progress bar to 100%
+        const progressBar = document.getElementById('payment-progress-bar');
+        if (progressBar) progressBar.style.width = '100%';
+        
+        // Close processing modal
+        safelyCloseModal('paymentProcessingModal');
+        
+        if (data.success) {
+            // Show success message
+            showMessage(`Successfully upgraded to ${planName.charAt(0).toUpperCase() + planName.slice(1)} plan!`, 'success');
+            
+            // Update local user profile to reflect new plan
+            if (authState && authState.userProfile) {
+                authState.userProfile.plan = planName;
+                
+                // Update limits based on the new plan
+                updateLocalPlanLimits(planName);
+            }
+            
+            // Update UI
+            updateUsageDisplay();
+            
+            // Show success modal with updated limits
+            showPaymentSuccessModal(planName, data);
+        } else {
+            showMessage(`Payment verification failed: ${data.error || 'Unknown error'}`, 'danger');
+        }
+    })
+    .catch(error => {
+        console.error("Payment verification error:", error);
+        safelyCloseModal('paymentProcessingModal');
+        showMessage(`Error verifying payment: ${error.message}`, "danger");
+    });
+}
+
+// Helper function to update local plan limits (continued)
+function updateLocalPlanLimits(planName) {
+    if (!authState || !authState.userProfile || !authState.userProfile.usage) return;
+    
+    const resumeLimit = getPackageLimit(planName, 'resumeAnalyses');
+    const interviewLimit = getPackageLimit(planName, 'mockInterviews');
+    const pdfLimit = getPackageLimit(planName, 'pdfDownloads');
+    const aiLimit = getPackageLimit(planName, 'aiEnhance');
+    
+    // Keep current usage, update limits
+    if (authState.userProfile.usage.resumeAnalyses) {
+        authState.userProfile.usage.resumeAnalyses.limit = resumeLimit;
+    } else {
+        authState.userProfile.usage.resumeAnalyses = { used: 0, limit: resumeLimit };
+    }
+    
+    if (authState.userProfile.usage.mockInterviews) {
+        authState.userProfile.usage.mockInterviews.limit = interviewLimit;
+    } else {
+        authState.userProfile.usage.mockInterviews = { used: 0, limit: interviewLimit };
+    }
+    
+    if (authState.userProfile.usage.pdfDownloads) {
+        authState.userProfile.usage.pdfDownloads.limit = pdfLimit;
+    } else {
+        authState.userProfile.usage.pdfDownloads = { used: 0, limit: pdfLimit };
+    }
+    
+    if (authState.userProfile.usage.aiEnhance) {
+        authState.userProfile.usage.aiEnhance.limit = aiLimit;
+    } else {
+        authState.userProfile.usage.aiEnhance = { used: 0, limit: aiLimit };
+    }
+}
+
+// Show success modal with updated limits
+function showPaymentSuccessModal(planName, data) {
+    // Remove existing modal if present
+    const existingModal = document.getElementById('paymentSuccessModal');
+    if (existingModal) {
+        existingModal.remove();
+    }
+    
+    // Create modal HTML
+    const modalContent = document.createElement('div');
+    modalContent.innerHTML = `
+        <div class="modal fade" id="paymentSuccessModal" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header bg-success text-white">
+                        <h5 class="modal-title"><i class="fas fa-check-circle me-2"></i> Payment Successful</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body text-center">
+                        <div class="checkmark-circle">
+                            <i class="fas fa-check"></i>
+                        </div>
+                        <h4 class="mt-4">Thank You!</h4>
+                        <p id="paymentSuccessMessage">Your upgrade to the ${planName.charAt(0).toUpperCase() + planName.slice(1)} plan was successful.</p>
+                        <div class="alert alert-info">
+                            <strong>New limits:</strong>
+                            <ul class="mb-0 mt-2 text-start">
+                                <li>Resume Analyses: <span id="newResumeLimit">${getPackageLimit(planName, 'resumeAnalyses')}</span></li>
+                                <li>Mock Interviews: <span id="newInterviewLimit">${getPackageLimit(planName, 'mockInterviews')}</span></li>
+                                <li>PDF Downloads: <span id="newPdfLimit">${getPackageLimit(planName, 'pdfDownloads')}</span></li>
+                                <li>AI Enhancements: <span id="newAiLimit">${getPackageLimit(planName, 'aiEnhance')}</span></li>
+                            </ul>
+                        </div>
+                        <p class="text-muted mt-3">Order ID: ${data.orderId || 'N/A'}<br>Payment ID: ${data.paymentId || 'N/A'}</p>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-primary" data-bs-dismiss="modal">Continue</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    // Add modal to DOM
+    document.body.appendChild(modalContent.firstChild);
+    
+    // Show the modal
+    const modal = new bootstrap.Modal(document.getElementById('paymentSuccessModal'));
+    modal.show();
 }
 
 function patchAddonPurchaseModal() {

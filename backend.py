@@ -18,6 +18,9 @@ import shutil
 from dotenv import load_dotenv
 import anthropic
 import traceback
+import razorpay
+from hmac import compare_digest
+import hashlib
 
 # --- Add Firebase Imports ---
 import firebase_admin
@@ -43,6 +46,8 @@ OPENAI_COMPLETIONS_URL = "https://api.openai.com/v1/chat/completions"
 MISTRAL_API_KEY = os.environ.get("MISTRAL_API_KEY") # Added based on original code
 MISTRAL_API_URL = "https://api.mistral.ai/v1/chat/completions" # Added based on original code
 AWS_DEFAULT_REGION = os.environ.get("AWS_DEFAULT_REGION")
+RAZORPAY_KEY_ID = os.environ.get("RAZORPAY_KEY_ID")
+RAZORPAY_KEY_SECRET = os.environ.get("RAZORPAY_KEY_SECRET")
 # AWS Keys might be needed if IAM role on Render doesn't work for Polly
 # AWS_ACCESS_KEY_ID = os.environ.get("AWS_ACCESS_KEY_ID")
 # AWS_SECRET_ACCESS_KEY = os.environ.get("AWS_SECRET_ACCESS_KEY")
@@ -127,6 +132,18 @@ app = Flask(__name__, static_folder=STATIC_FOLDER_PATH, static_url_path='')
 allowed_origin = "*" # Use Render URL or custom domain later: os.environ.get("FRONTEND_URL", "*")
 CORS(app, origins=[allowed_origin], supports_credentials=True)
 # --- End Flask App Setup ---
+
+# Initialize Razorpay client
+razorpay_client = None
+if RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET:
+    try:
+        razorpay_client = razorpay.Client(auth=(RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET))
+        print("Razorpay client initialized successfully.")
+    except Exception as e:
+        print(f"Error initializing Razorpay client: {e}")
+        traceback.print_exc()
+else:
+    print("WARNING: Razorpay credentials not set. Payment processing will not work.")
 
 
 # === Firestore Helper Functions ===
@@ -1603,10 +1620,13 @@ def test_route():
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     db_status = "OK" if db else "Unavailable"
     bucket_status = "OK" if bucket else "Unavailable"
+    razorpay_status = "OK" if razorpay_client else "Unavailable"
+    
     config_status = {
         "firebase_admin_sdk": "OK" if firebase_admin._DEFAULT_APP_NAME in firebase_admin._apps else "Not Initialized",
         "firestore_client": db_status,
         "storage_client": bucket_status,
+        "razorpay_client": razorpay_status,
         "claude_ok": bool(CLAUDE_API_KEY),
         "gemini_ok": bool(GEMINI_API_KEY),
         "openai_ok": bool(OPENAI_API_KEY),
@@ -2745,6 +2765,402 @@ def get_addon_purchase_history(user_id):
         print(f"Error in /get-addon-purchase-history: {e}")
         traceback.print_exc()
         return jsonify({'error': f'Server error: {str(e)}'}), 500
+
+# Create Razorpay order
+@app.route('/create-razorpay-order', methods=['POST'])
+def create_razorpay_order():
+    """Creates a Razorpay order for plan upgrade or addon purchase."""
+    try:
+        if not razorpay_client:
+            return jsonify({'error': 'Payment gateway not configured'}), 503
+            
+        data = request.get_json()
+        if not data:
+            return jsonify({'error': 'Invalid JSON payload'}), 400
+            
+        # Required fields
+        user_id = data.get('userId')
+        amount = data.get('amount')  # In paise
+        order_type = data.get('orderType', 'plan')  # 'plan' or 'addon'
+        
+        if not user_id:
+            return jsonify({'error': 'User ID required'}), 400
+        if not amount or not isinstance(amount, (int, float)) or amount <= 0:
+            return jsonify({'error': 'Valid amount required'}), 400
+            
+        # Validate user exists
+        if not db:
+            return jsonify({'error': 'Database unavailable'}), 503
+            
+        user_ref = db.collection('users').document(user_id)
+        user_doc = user_ref.get()
+        if not user_doc.exists:
+            return jsonify({'error': 'User not found'}), 404
+            
+        # Prepare order data
+        order_data = {
+            'amount': int(amount),  # Ensure integer
+            'currency': data.get('currency', 'INR'),
+            'receipt': f"order_{user_id}_{int(time.time())}",
+            'payment_capture': 1,  # Auto-capture
+            'notes': {
+                'user_id': user_id,
+                'order_type': order_type
+            }
+        }
+        
+        # Add specific notes based on order type
+        if order_type == 'plan':
+            plan_name = data.get('planName')
+            if not plan_name:
+                return jsonify({'error': 'Plan name required for plan orders'}), 400
+                
+            order_data['notes']['plan_name'] = plan_name
+            
+        elif order_type == 'addon':
+            feature_type = data.get('featureType')
+            quantity = data.get('quantity')
+            effective_quantity = data.get('effectiveQuantity')
+            
+            if not feature_type:
+                return jsonify({'error': 'Feature type required for addon orders'}), 400
+            if not quantity or not isinstance(quantity, (int, float)) or quantity <= 0:
+                return jsonify({'error': 'Valid quantity required for addon orders'}), 400
+                
+            order_data['notes']['feature_type'] = feature_type
+            order_data['notes']['quantity'] = str(quantity)
+            order_data['notes']['effective_quantity'] = str(effective_quantity)
+            
+        # Create order in Razorpay
+        order = razorpay_client.order.create(data=order_data)
+        
+        # Store order reference in Firestore
+        order_ref = db.collection('payment_orders').document(order['id'])
+        order_data_to_store = {
+            'orderId': order['id'],
+            'userId': user_id,
+            'amount': order['amount'],
+            'currency': order['currency'],
+            'order_type': order_type,
+            'notes': order_data['notes'],
+            'status': 'created',
+            'created_at': datetime.now().isoformat(),
+            'payment_id': None,
+            'signature': None,
+            'payment_status': None
+        }
+        
+        # Add plan-specific data
+        if order_type == 'plan':
+            order_data_to_store['plan_name'] = plan_name
+            
+        # Add addon-specific data
+        elif order_type == 'addon':
+            order_data_to_store['feature_type'] = feature_type
+            order_data_to_store['quantity'] = quantity
+            order_data_to_store['effective_quantity'] = effective_quantity
+            
+        order_ref.set(order_data_to_store)
+        
+        # Return order details to client for Razorpay initialization
+        return jsonify({
+            'key_id': RAZORPAY_KEY_ID,
+            'amount': order['amount'],
+            'currency': order['currency'],
+            'razorpay_order_id': order['id']
+        })
+        
+    except razorpay.errors.BadRequestError as e:
+        print(f"Razorpay Bad Request Error: {e}")
+        return jsonify({'error': f'Payment gateway error: {str(e)}'}), 400
+    except Exception as e:
+        print(f"Error creating Razorpay order: {e}")
+        traceback.print_exc()
+        return jsonify({'error': f'Server error: {str(e)}'}), 500
+
+# Verify Razorpay payment
+@app.route('/verify-razorpay-payment', methods=['POST'])
+def verify_razorpay_payment():
+    """Verifies Razorpay payment signature and updates user plan or addon limit."""
+    try:
+        if not razorpay_client:
+            return jsonify({'error': 'Payment gateway not configured'}), 503
+            
+        data = request.get_json()
+        if not data:
+            return jsonify({'error': 'Invalid JSON payload'}), 400
+            
+        # Required fields
+        razorpay_order_id = data.get('razorpay_order_id')
+        razorpay_payment_id = data.get('razorpay_payment_id')
+        razorpay_signature = data.get('razorpay_signature')
+        user_id = data.get('userId')
+        order_type = data.get('orderType', 'plan')
+        
+        if not razorpay_order_id or not razorpay_payment_id or not razorpay_signature:
+            return jsonify({'error': 'Missing required Razorpay verification parameters'}), 400
+        if not user_id:
+            return jsonify({'error': 'User ID required'}), 400
+            
+        # Verify database connection
+        if not db:
+            return jsonify({'error': 'Database unavailable'}), 503
+            
+        # Verify signature
+        params_dict = {
+            'razorpay_order_id': razorpay_order_id,
+            'razorpay_payment_id': razorpay_payment_id,
+            'razorpay_signature': razorpay_signature
+        }
+        
+        try:
+            razorpay_client.utility.verify_payment_signature(params_dict)
+        except Exception as sig_error:
+            print(f"Signature verification failed: {sig_error}")
+            return jsonify({'success': False, 'error': 'Invalid payment signature'}), 400
+            
+        # Get order from Firestore
+        order_ref = db.collection('payment_orders').document(razorpay_order_id)
+        order_doc = order_ref.get()
+        if not order_doc.exists:
+            return jsonify({'success': False, 'error': 'Order not found in database'}), 404
+            
+        order_data = order_doc.to_dict()
+        if order_data.get('payment_status') == 'completed':
+            # Payment already processed, return success with stored data
+            return jsonify({
+                'success': True,
+                'orderId': razorpay_order_id,
+                'paymentId': order_data.get('payment_id'),
+                'message': 'Payment was already processed successfully'
+            })
+            
+        # Update order with payment details
+        order_ref.update({
+            'payment_id': razorpay_payment_id,
+            'signature': razorpay_signature,
+            'payment_status': 'completed',
+            'completed_at': datetime.now().isoformat()
+        })
+        
+        # Get user reference
+        user_ref = db.collection('users').document(user_id)
+        
+        # Handle plan upgrade
+        if order_type == 'plan':
+            plan_name = data.get('planName') or order_data.get('plan_name')
+            if not plan_name:
+                return jsonify({'success': False, 'error': 'Plan name not found'}), 400
+                
+            # Calculate new limits based on the plan
+            resume_limit = get_package_limit(plan_name, 'resumeAnalyses')
+            interview_limit = get_package_limit(plan_name, 'mockInterviews')
+            pdf_limit = get_package_limit(plan_name, 'pdfDownloads')
+            ai_limit = get_package_limit(plan_name, 'aiEnhance')
+            
+            # Get current usage to preserve
+            user_data = get_user_usage(user_id)
+            if not user_data:
+                return jsonify({'success': False, 'error': 'User profile not found'}), 404
+                
+            current_resume_used = user_data.get('usage', {}).get('resumeAnalyses', {}).get('used', 0)
+            current_interview_used = user_data.get('usage', {}).get('mockInterviews', {}).get('used', 0)
+            current_pdf_used = user_data.get('usage', {}).get('pdfDownloads', {}).get('used', 0)
+            current_ai_used = user_data.get('usage', {}).get('aiEnhance', {}).get('used', 0)
+            
+            # Update user profile with new plan
+            update_data = {
+                'plan': plan_name,
+                'planPurchasedAt': datetime.now().isoformat(),
+                'planExpiresAt': None,  # No expiration for now
+                'usage.resumeAnalyses.limit': resume_limit,
+                'usage.resumeAnalyses.used': current_resume_used,
+                'usage.mockInterviews.limit': interview_limit,
+                'usage.mockInterviews.used': current_interview_used,
+                'usage.pdfDownloads.limit': pdf_limit,
+                'usage.pdfDownloads.used': current_pdf_used,
+                'usage.aiEnhance.limit': ai_limit,
+                'usage.aiEnhance.used': current_ai_used,
+                'last_updated': firestore.SERVER_TIMESTAMP
+            }
+            
+            # Record the payment in payments collection
+            payment_data = {
+                'userId': user_id,
+                'orderId': razorpay_order_id,
+                'paymentId': razorpay_payment_id,
+                'amount': order_data.get('amount', 0) / 100,  # Convert from paise to rupees
+                'currency': order_data.get('currency', 'INR'),
+                'type': 'plan_upgrade',
+                'planName': plan_name,
+                'status': 'completed',
+                'timestamp': datetime.now().isoformat()
+            }
+            
+            # Create a transaction to update multiple documents atomically
+            transaction = db.transaction()
+            
+            @firestore.transactional
+            def update_in_transaction(transaction, user_ref, payment_data):
+                # Update user plan
+                transaction.update(user_ref, update_data)
+                
+                # Add payment record
+                payment_ref = db.collection('payments').document()
+                transaction.set(payment_ref, payment_data)
+                
+                return payment_ref.id
+                
+            payment_id = update_in_transaction(transaction, user_ref, payment_data)
+            
+            return jsonify({
+                'success': True,
+                'plan': plan_name,
+                'orderId': razorpay_order_id,
+                'paymentId': razorpay_payment_id,
+                'resumeLimit': resume_limit,
+                'interviewLimit': interview_limit,
+                'pdfLimit': pdf_limit,
+                'aiLimit': ai_limit
+            })
+            
+        # Handle addon purchase
+        elif order_type == 'addon':
+            feature_type = data.get('featureType') or order_data.get('feature_type')
+            quantity = int(data.get('quantity') or order_data.get('quantity', 1))
+            effective_quantity = int(data.get('effectiveQuantity') or order_data.get('effective_quantity', quantity))
+            
+            if not feature_type:
+                return jsonify({'success': False, 'error': 'Feature type not found'}), 400
+                
+            # Get current usage
+            user_data = get_user_usage(user_id)
+            if not user_data:
+                return jsonify({'success': False, 'error': 'User profile not found'}), 404
+                
+            # Get current limit and used values
+            usage = user_data.get('usage', {}).get(feature_type, {})
+            current_limit = usage.get('limit', 0)
+            current_used = usage.get('used', 0)
+            
+            # Calculate new limit
+            new_limit = current_limit + effective_quantity
+            
+            # Update user's limit
+            update_data = {
+                f'usage.{feature_type}.limit': new_limit,
+                'last_updated': firestore.SERVER_TIMESTAMP
+            }
+            
+            # Record addon purchase
+            addon_purchase = {
+                'userId': user_id,
+                'orderId': razorpay_order_id,
+                'paymentId': razorpay_payment_id,
+                'feature': feature_type,
+                'quantity': quantity,
+                'effectiveQuantity': effective_quantity,
+                'unitPrice': order_data.get('amount', 0) / quantity / 100,  # Convert from paise to rupees
+                'totalPrice': order_data.get('amount', 0) / 100,  # Convert from paise to rupees
+                'currency': order_data.get('currency', 'INR'),
+                'purchaseDate': datetime.now().isoformat(),
+                'previousLimit': current_limit,
+                'newLimit': new_limit,
+                'usedAtPurchase': current_used
+            }
+            
+            # Create a transaction
+            transaction = db.transaction()
+            
+            @firestore.transactional
+            def update_addon_in_transaction(transaction, user_ref, addon_purchase):
+                # Update user limits
+                transaction.update(user_ref, update_data)
+                
+                # Add purchase record
+                purchase_ref = db.collection('addonPurchases').document()
+                transaction.set(purchase_ref, addon_purchase)
+                
+                # Add payment record
+                payment_data = {
+                    'userId': user_id,
+                    'orderId': razorpay_order_id,
+                    'paymentId': razorpay_payment_id,
+                    'amount': addon_purchase['totalPrice'],
+                    'currency': addon_purchase['currency'],
+                    'type': 'addon_purchase',
+                    'featureType': feature_type,
+                    'quantity': quantity,
+                    'effectiveQuantity': effective_quantity,
+                    'status': 'completed',
+                    'timestamp': datetime.now().isoformat()
+                }
+                payment_ref = db.collection('payments').document()
+                transaction.set(payment_ref, payment_data)
+                
+                return purchase_ref.id
+                
+            purchase_id = update_addon_in_transaction(transaction, user_ref, addon_purchase)
+            
+            return jsonify({
+                'success': True,
+                'purchaseId': purchase_id,
+                'orderId': razorpay_order_id,
+                'paymentId': razorpay_payment_id,
+                'feature': feature_type,
+                'quantityPurchased': quantity,
+                'effectiveQuantity': effective_quantity,
+                'previousLimit': current_limit,
+                'newLimit': new_limit,
+                'currentUsage': current_used
+            })
+            
+        else:
+            return jsonify({'success': False, 'error': f'Unknown order type: {order_type}'}), 400
+            
+    except Exception as e:
+        print(f"Error verifying Razorpay payment: {e}")
+        traceback.print_exc()
+        return jsonify({'success': False, 'error': f'Server error: {str(e)}'}), 500
+
+# Add a route to record payment failure for analytics
+@app.route('/record-payment-failure', methods=['POST'])
+def record_payment_failure():
+    """Records payment failure reasons for analytics."""
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({'error': 'Invalid JSON payload'}), 400
+            
+        user_id = data.get('userId')
+        order_id = data.get('orderId')
+        reason = data.get('reason')
+        
+        if not user_id or not order_id:
+            return jsonify({'error': 'User ID and order ID required'}), 400
+            
+        if not db:
+            return jsonify({'error': 'Database unavailable'}), 503
+            
+        # Record failure
+        failure_data = {
+            'userId': user_id,
+            'orderId': order_id,
+            'reason': reason,
+            'timestamp': datetime.now().isoformat(),
+            'userAgent': request.headers.get('User-Agent'),
+            'ipAddress': request.remote_addr
+        }
+        
+        db.collection('payment_failures').add(failure_data)
+        
+        return jsonify({'success': True})
+        
+    except Exception as e:
+        print(f"Error recording payment failure: {e}")
+        return jsonify({'error': f'Server error: {str(e)}'}), 500
+
+
 
 
 
