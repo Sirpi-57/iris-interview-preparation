@@ -5990,26 +5990,27 @@ function safelyCloseModal(modalId) {
         if (modalInstance) {
             // Close the modal properly
             modalInstance.hide();
-        }
-        
-        // Remove any lingering backdrops immediately
-        document.querySelectorAll('.modal-backdrop').forEach(backdrop => {
-            backdrop.classList.remove('show');
-            backdrop.remove(); // Force immediate removal
-        });
-        
-        // Force cleanup of modal-related body classes
-        document.body.classList.remove('modal-open');
-        document.body.style.removeProperty('padding-right');
-        document.body.style.removeProperty('overflow');
-        
-        // For dynamically created modals, remove from DOM after a short delay
-        if (modalElement.classList.contains('dynamic-modal')) {
-            setTimeout(() => {
-                if (modalElement.parentNode) {
-                    modalElement.parentNode.removeChild(modalElement);
-                }
-            }, 300);
+            
+            // Wait for the modal to finish hiding
+            modalElement.addEventListener('hidden.bs.modal', function() {
+                // Remove any lingering backdrops
+                document.querySelectorAll('.modal-backdrop').forEach(backdrop => {
+                    backdrop.remove();
+                });
+                
+                // Reset body classes
+                document.body.classList.remove('modal-open');
+                document.body.style.removeProperty('padding-right');
+                document.body.style.removeProperty('overflow');
+            }, { once: true });
+        } else {
+            // If no modal instance, still clean up
+            document.querySelectorAll('.modal-backdrop').forEach(backdrop => {
+                backdrop.remove();
+            });
+            document.body.classList.remove('modal-open');
+            document.body.style.removeProperty('padding-right');
+            document.body.style.removeProperty('overflow');
         }
     } catch (error) {
         console.error(`Error safely closing modal ${modalId}:`, error);
@@ -6408,35 +6409,39 @@ function verifyPayment(paymentResponse, orderId, planName) {
         const progressBar = document.getElementById('payment-progress-bar');
         if (progressBar) progressBar.style.width = '100%';
         
-        // Close processing modal
-        safelyCloseModal('paymentProcessingModal');
-        
-        if (data.success) {
-            // Show success message
-            showMessage(`Successfully upgraded to ${planName.charAt(0).toUpperCase() + planName.slice(1)} plan!`, 'success');
-            
-            // Update local user profile to reflect new plan
-            if (authState && authState.userProfile) {
-                authState.userProfile.plan = planName;
-                
-                // Update limits based on the new plan
-                updateLocalPlanLimits(planName);
+        // Close processing modal PROPERLY
+        setTimeout(() => {
+            // Use a timeout to allow the progress bar to reach 100%
+            const processingModal = bootstrap.Modal.getInstance(document.getElementById('paymentProcessingModal'));
+            if (processingModal) {
+                processingModal.hide();
+                // Ensure backdrop and modal-related classes are removed
+                document.querySelectorAll('.modal-backdrop').forEach(el => el.remove());
+                document.body.classList.remove('modal-open');
+                document.body.style.removeProperty('padding-right');
             }
             
-            // Update UI
-            updateUsageDisplay();
-            
-            // Show success modal with updated limits
-            showPaymentSuccessModal(planName, data);
-        } else {
-            showMessage(`Payment verification failed: ${data.error || 'Unknown error'}`, 'danger');
-        }
+            // Only show success modal AFTER processing modal is fully hidden
+            setTimeout(() => {
+                // Show success message
+                showMessage(`Successfully upgraded to ${planName.charAt(0).toUpperCase() + planName.slice(1)} plan!`, 'success');
+                
+                // Update local user profile to reflect new plan
+                if (authState && authState.userProfile) {
+                    authState.userProfile.plan = planName;
+                    
+                    // Update limits based on the new plan
+                    updateLocalPlanLimits(planName);
+                }
+                
+                // Update UI
+                updateUsageDisplay();
+                
+                // Show success modal with updated limits
+                showPaymentSuccessModal(planName, data);
+            }, 300); // Wait for modal to fully hide
+        }, 500); // Wait for progress bar animation
     })
-    .catch(error => {
-        console.error("Payment verification error:", error);
-        safelyCloseModal('paymentProcessingModal');
-        showMessage(`Error verifying payment: ${error.message}`, "danger");
-    });
 }
 
 // Helper function to update local plan limits (continued)
