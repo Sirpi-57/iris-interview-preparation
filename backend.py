@@ -2801,7 +2801,7 @@ def create_razorpay_order():
         order_data = {
             'amount': int(amount),  # Ensure integer
             'currency': data.get('currency', 'INR'),
-            'receipt': f"order_{user_id}_{int(time.time())}",
+            'receipt': f"o_{user_id[:10]}_{int(time.time())}",
             'payment_capture': 1,  # Auto-capture
             'notes': {
                 'user_id': user_id,
