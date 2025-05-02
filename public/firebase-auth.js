@@ -240,47 +240,50 @@ function loadUserProfile(user) {
 
 function getPackageLimit(feature, packageName) {
   const limits = {
-    free: {
-        resumeAnalyses: 1,
-        mockInterviews: 0,
-        pdfDownloads: 5,
-        aiEnhance: 5
-    },
-    starter: {
-        resumeAnalyses: 5,
-        mockInterviews: 1,
-        pdfDownloads: 20,
-        aiEnhance: 20
-    },
-    standard: {
-        resumeAnalyses: 10,
-        mockInterviews: 3,
-        pdfDownloads: 50,
-        aiEnhance: 50
-    },
-    pro: {
-        resumeAnalyses: 20,
-        mockInterviews: 5,
-        pdfDownloads: 100,
-        aiEnhance: 100
-    }
+      'free': {
+          'resumeAnalyses': 2,
+          'mockInterviews': 0,
+          'pdfDownloads': 5,
+          'aiEnhance': 5
+      },
+      'starter': {
+          'resumeAnalyses': 5,
+          'mockInterviews': 1,
+          'pdfDownloads': 20,
+          'aiEnhance': 20
+      },
+      'standard': {
+          'resumeAnalyses': 10,
+          'mockInterviews': 3,
+          'pdfDownloads': 50,
+          'aiEnhance': 50
+      },
+      'pro': {
+          'resumeAnalyses': 20,
+          'mockInterviews': 5,
+          'pdfDownloads': 100,
+          'aiEnhance': 100
+      }
   };
   
-  // Default to free package limits if package not found
-  if (!packageName || !limits[packageName.toLowerCase()]) {
-      console.warn(`Unknown package: ${packageName}, defaulting to free`);
-      packageName = 'free';
-  } else {
-      // Ensure lowercase package name
+  // Make packageName lowercase for case-insensitivity 
+  if (packageName) {
       packageName = packageName.toLowerCase();
   }
   
-  // Return the limit for the specified feature, or 0 if feature not found
+  // Default to free package if not found
+  if (!packageName || !limits[packageName]) {
+      console.warn(`Unknown package: ${packageName}, defaulting to free`);
+      packageName = 'free';
+  }
+  
+  // Check if feature exists in the package
   if (!limits[packageName][feature]) {
-      console.warn(`Unknown feature: ${feature} for package ${packageName}, returning 0`);
+      console.warn(`Unknown package: ${feature}, defaulting to free`);
       return 0;
   }
   
+  // Return the limit for the feature
   return limits[packageName][feature];
 }
 

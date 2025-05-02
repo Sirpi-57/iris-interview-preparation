@@ -5980,61 +5980,111 @@ function showLimitReachedModal(featureType) {
 }
 
 function safelyCloseModal(modalId) {
+    console.log(`[MODAL_DEBUG] Attempting to safely close modal: ${modalId}`);
+    
     try {
         // Get the modal element
         const modalElement = document.getElementById(modalId);
+        console.log(`[MODAL_DEBUG] Modal element exists: ${!!modalElement}`);
+        
         if (!modalElement) {
-            console.log(`Modal element with ID '${modalId}' not found for closing.`);
+            console.log(`[MODAL_DEBUG] Modal ${modalId} not found in DOM. Nothing to close.`);
             return;
         }
         
+        // Check if modal has bootstrap data
+        const hasBootstrapData = modalElement.classList.contains('modal') && 
+                              typeof bootstrap !== 'undefined' && 
+                              typeof bootstrap.Modal !== 'undefined';
+        
+        console.log(`[MODAL_DEBUG] Modal has Bootstrap data: ${hasBootstrapData}`);
+        
         // Get the Bootstrap modal instance
         let modalInstance = null;
-        try {
-            modalInstance = bootstrap.Modal.getInstance(modalElement);
-        } catch (e) {
-            console.warn(`Error getting Bootstrap modal instance for ${modalId}:`, e);
+        
+        if (hasBootstrapData) {
+            try {
+                modalInstance = bootstrap.Modal.getInstance(modalElement);
+                console.log(`[MODAL_DEBUG] Bootstrap modal instance exists: ${!!modalInstance}`);
+            } catch (instanceError) {
+                console.error(`[MODAL_DEBUG] Error getting modal instance:`, instanceError);
+            }
         }
         
-        // Try to close the modal if instance exists
         if (modalInstance) {
-            try {
-                modalInstance.hide();
-            } catch (e) {
-                console.warn(`Error hiding modal ${modalId}:`, e);
-            }
+            // Close the modal properly
+            console.log(`[MODAL_DEBUG] Calling bootstrap hide() method on modal`);
+            modalInstance.hide();
+        } else {
+            console.log(`[MODAL_DEBUG] No Bootstrap instance found, will rely on DOM cleanup only`);
         }
         
-        // Always do a thorough cleanup regardless of above results
+        // Check for modal-open class on body
+        const bodyHasModalOpenClass = document.body.classList.contains('modal-open');
+        console.log(`[MODAL_DEBUG] Body has modal-open class: ${bodyHasModalOpenClass}`);
+        
+        // Check for backdrop elements
+        const backdropElements = document.querySelectorAll('.modal-backdrop');
+        console.log(`[MODAL_DEBUG] Found ${backdropElements.length} backdrop elements`);
+        
+        // Remove any lingering backdrops immediately
+        console.log(`[MODAL_DEBUG] Setting timeout to clean up DOM`);
         setTimeout(() => {
-            try {
-                // Remove any lingering backdrops
-                document.querySelectorAll('.modal-backdrop').forEach(backdrop => {
-                    backdrop.parentNode?.removeChild(backdrop);
-                });
-                
-                // Reset body classes
+            console.log(`[MODAL_DEBUG] Executing DOM cleanup for modal ${modalId}`);
+            
+            // Re-check backdrop elements
+            const remainingBackdrops = document.querySelectorAll('.modal-backdrop');
+            console.log(`[MODAL_DEBUG] Found ${remainingBackdrops.length} backdrop elements during cleanup`);
+            
+            remainingBackdrops.forEach((backdrop, index) => {
+                console.log(`[MODAL_DEBUG] Removing backdrop #${index}`);
+                backdrop.classList.remove('show');
+                backdrop.remove(); // Force immediate removal
+            });
+            
+            // Force cleanup of modal-related body classes
+            if (document.body.classList.contains('modal-open')) {
+                console.log(`[MODAL_DEBUG] Removing modal-open class from body`);
                 document.body.classList.remove('modal-open');
-                document.body.style.removeProperty('padding-right');
-                document.body.style.removeProperty('overflow');
-                
-                // If modal was dynamically created, remove it
-                if (modalElement.classList.contains('dynamic-modal') && modalElement.parentNode) {
-                    modalElement.parentNode.removeChild(modalElement);
-                }
-            } catch (cleanupError) {
-                console.warn(`Error during modal cleanup for ${modalId}:`, cleanupError);
             }
-        }, 300);
+            
+            // Clean up padding-right style (added by Bootstrap)
+            if (document.body.style.paddingRight) {
+                console.log(`[MODAL_DEBUG] Removing padding-right style from body`);
+                document.body.style.removeProperty('padding-right');
+            }
+            
+            // Clean up overflow style (added by Bootstrap)
+            if (document.body.style.overflow) {
+                console.log(`[MODAL_DEBUG] Removing overflow style from body`);
+                document.body.style.removeProperty('overflow');
+            }
+            
+            // For dynamically created modals, remove from DOM
+            if (modalElement.classList.contains('dynamic-modal')) {
+                console.log(`[MODAL_DEBUG] Modal is dynamic, removing from DOM`);
+                if (modalElement.parentNode) {
+                    modalElement.parentNode.removeChild(modalElement);
+                    console.log(`[MODAL_DEBUG] Dynamic modal removed from DOM`);
+                } else {
+                    console.log(`[MODAL_DEBUG] Dynamic modal has no parent, cannot remove`);
+                }
+            }
+            
+            console.log(`[MODAL_DEBUG] DOM cleanup complete for modal ${modalId}`);
+        }, 100);
     } catch (error) {
-        console.error(`Error safely closing modal ${modalId}:`, error);
+        console.error(`[MODAL_DEBUG] Error safely closing modal ${modalId}:`, error);
         // Emergency cleanup
+        console.log(`[MODAL_DEBUG] Performing emergency cleanup`);
         document.querySelectorAll('.modal-backdrop').forEach(el => {
-            try { el.parentNode?.removeChild(el); } catch(e) {}
+            console.log(`[MODAL_DEBUG] Emergency removal of backdrop element`);
+            el.remove();
         });
         document.body.classList.remove('modal-open');
         document.body.style.removeProperty('padding-right');
         document.body.style.removeProperty('overflow');
+        console.log(`[MODAL_DEBUG] Emergency cleanup complete`);
     }
 }
 
@@ -6234,9 +6284,10 @@ function enhanceUpgradeModal() {
 }
 
 function selectPlanFixed(planName) {
-    console.log(`Selected plan: ${planName}`);
+    console.log(`[PLAN_DEBUG] Selected plan: ${planName}`);
     
     // First, clean up any existing modals
+    console.log("[PLAN_DEBUG] Cleaning up existing modals");
     safelyCloseModal('paymentProcessingModal');
     safelyCloseModal('paymentSuccessModal');
     
@@ -6248,15 +6299,20 @@ function selectPlanFixed(planName) {
     };
     
     const planPrice = planPrices[planName] || 0;
+    console.log(`[PLAN_DEBUG] Plan price: ${planPrice} INR`);
+    
     if (planPrice === 0) {
-        console.error(`Invalid plan selected: ${planName}`);
+        console.error(`[PLAN_DEBUG] Invalid plan selected: ${planName}`);
         showMessage("Error processing payment: Invalid plan", "danger");
         return;
     }
     
     // Get user data
     const user = firebase.auth().currentUser;
+    console.log(`[PLAN_DEBUG] Current user: ${user ? user.email : 'not logged in'}`);
+    
     if (!user) {
+        console.warn("[PLAN_DEBUG] User not logged in");
         showMessage("Please sign in to upgrade your plan", "warning");
         if (typeof irisAuth !== 'undefined' && typeof irisAuth.showSignInModal === 'function') {
             irisAuth.showSignInModal();
@@ -6264,10 +6320,22 @@ function selectPlanFixed(planName) {
         return;
     }
     
-    // Create payment processing modal for visual feedback
+    // Create processing modal with better error handling
+    const processingModalId = 'paymentProcessingModal';
+    let processingModal = document.getElementById(processingModalId);
+    console.log(`[PLAN_DEBUG] Processing modal exists: ${!!processingModal}`);
+    
+    // Remove existing modal if present (clean slate approach)
+    if (processingModal) {
+        console.log("[PLAN_DEBUG] Removing existing processing modal");
+        processingModal.remove();
+    }
+    
+    // Create new modal
+    console.log("[PLAN_DEBUG] Creating new processing modal");
     const processingModalContent = document.createElement('div');
     processingModalContent.className = 'modal fade dynamic-modal';
-    processingModalContent.id = 'paymentProcessingModal';
+    processingModalContent.id = processingModalId;
     processingModalContent.setAttribute('tabindex', '-1');
     processingModalContent.setAttribute('aria-hidden', 'true');
     processingModalContent.setAttribute('data-bs-backdrop', 'static');
@@ -6276,7 +6344,7 @@ function selectPlanFixed(planName) {
         <div class="modal-dialog">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title">Processing Payment</h5>
+                    <h5 class="modal-title"><i class="fas fa-cog fa-spin me-2"></i> Processing Payment</h5>
                 </div>
                 <div class="modal-body text-center">
                     <div class="spinner-border text-primary mb-3" role="status">
@@ -6292,12 +6360,24 @@ function selectPlanFixed(planName) {
     `;
     
     // Append and show processing modal
+    console.log("[PLAN_DEBUG] Appending processing modal to body");
     document.body.appendChild(processingModalContent);
-    const processingModal = new bootstrap.Modal(processingModalContent, {
-        backdrop: 'static',
-        keyboard: false
-    });
-    processingModal.show();
+    processingModal = document.getElementById(processingModalId);
+    console.log(`[PLAN_DEBUG] Processing modal after creation: ${!!processingModal}`);
+    
+    try {
+        console.log("[PLAN_DEBUG] Initializing Bootstrap modal");
+        const processingModalInstance = new bootstrap.Modal(processingModal, {
+            backdrop: 'static',
+            keyboard: false
+        });
+        console.log("[PLAN_DEBUG] Showing processing modal");
+        processingModalInstance.show();
+        console.log("[PLAN_DEBUG] Processing modal shown successfully");
+    } catch (modalError) {
+        console.error("[PLAN_DEBUG] Error showing processing modal:", modalError);
+        // Continue anyway, we'll handle errors in the payment flow
+    }
     
     // Prepare order data for backend
     const orderData = {
@@ -6309,89 +6389,169 @@ function selectPlanFixed(planName) {
         userName: user.displayName || user.email.split('@')[0],
         orderType: 'plan'
     };
+    console.log("[PLAN_DEBUG] Order data prepared:", orderData);
     
-    // Call backend to create order
-    fetch(`${API_BASE_URL}/create-razorpay-order`, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(orderData)
-    })
-    .then(response => {
-        if (!response.ok) {
-            return response.json().then(errData => {
-                throw new Error(errData.error || `Order creation failed (${response.status})`);
-            });
-        }
-        return response.json();
-    })
-    .then(orderResponse => {
-        // Update progress bar
+    // Add retry mechanism and better error handling
+    let retryCount = 0;
+    const maxRetries = 2;
+    
+    const createOrder = () => {
+        // Update progress message
+        const progressMessage = document.getElementById('paymentProcessingMessage');
         const progressBar = document.getElementById('payment-progress-bar');
-        if (progressBar) progressBar.style.width = '60%';
         
-        // Initialize Razorpay options
-        const options = {
-            key: orderResponse.key_id, // Get from backend response
-            amount: orderResponse.amount,
-            currency: orderResponse.currency,
-            name: "IRIS",
-            description: `${planName.charAt(0).toUpperCase() + planName.slice(1)} Plan Subscription`,
-            order_id: orderResponse.razorpay_order_id,
-            prefill: {
-                name: orderData.userName,
-                email: orderData.userEmail,
-                contact: "" // You could add phone number here if available
-            },
-            theme: {
-                color: "#4A6FDC" // Match your app's primary color
-            },
-            modal: {
-                ondismiss: function() {
-                    // Handle dismissal
-                    safelyCloseModal('paymentProcessingModal');
-                    showMessage("Payment cancelled. Your plan was not upgraded.", "warning");
-                }
-            },
-            handler: function(response) {
-                // This function runs after successful payment
-                // Update progress bar to 90%
-                if (progressBar) progressBar.style.width = '90%';
-                
-                // Verify payment with backend
-                verifyPayment(response, orderResponse.razorpay_order_id, planName);
+        if (progressMessage) {
+            if (retryCount > 0) {
+                progressMessage.textContent = `Retrying payment initialization (attempt ${retryCount+1})...`;
+            } else {
+                progressMessage.textContent = `Initializing payment for the ${planName.charAt(0).toUpperCase() + planName.slice(1)} plan...`;
             }
-        };
+        }
         
-        // Initialize Razorpay
-        const rzp = new Razorpay(options);
-        rzp.open();
+        // Log the API URL being used
+        const apiUrl = `${API_BASE_URL}/create-razorpay-order`;
+        console.log(`[PLAN_DEBUG] Calling API: ${apiUrl}`);
+        console.log(`[PLAN_DEBUG] Request body: ${JSON.stringify(orderData)}`);
         
-        // Add event handler for payment failure
-        rzp.on('payment.failed', function(response) {
-            safelyCloseModal('paymentProcessingModal');
-            showMessage(`Payment failed: ${response.error.description}`, "danger");
+        // Call backend to create order
+        fetch(apiUrl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(orderData)
+        })
+        .then(response => {
+            console.log(`[PLAN_DEBUG] API response status: ${response.status}`);
+            console.log(`[PLAN_DEBUG] API response headers: ${JSON.stringify([...response.headers])}`);
             
-            // Record failure for analytics
-            fetch(`${API_BASE_URL}/record-payment-failure`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
+            if (!response.ok) {
+                return response.text().then(text => {
+                    try {
+                        // Try to parse as JSON
+                        const errorData = JSON.parse(text);
+                        console.error(`[PLAN_DEBUG] API error response (JSON): ${JSON.stringify(errorData)}`);
+                        throw new Error(errorData.error || `Order creation failed (${response.status})`);
+                    } catch (parseError) {
+                        // If parsing fails, use the raw text
+                        console.error(`[PLAN_DEBUG] API error response (text): ${text}`);
+                        throw new Error(`Order creation failed (${response.status}): ${text.substring(0, 100)}...`);
+                    }
+                });
+            }
+            
+            return response.json();
+        })
+        .then(orderResponse => {
+            console.log(`[PLAN_DEBUG] Order created successfully. Order ID: ${orderResponse.razorpay_order_id}`);
+            
+            // Update progress bar
+            if (progressBar) {
+                progressBar.style.width = '60%';
+                console.log("[PLAN_DEBUG] Updated progress bar to 60%");
+            }
+            
+            // Initialize Razorpay options with better error handling
+            console.log("[PLAN_DEBUG] Preparing Razorpay options");
+            const options = {
+                key: orderResponse.key_id,
+                amount: orderResponse.amount,
+                currency: orderResponse.currency,
+                name: "IRIS",
+                description: `${planName.charAt(0).toUpperCase() + planName.slice(1)} Plan Subscription`,
+                order_id: orderResponse.razorpay_order_id,
+                prefill: {
+                    name: orderData.userName,
+                    email: orderData.userEmail,
+                    contact: "" // You could add phone number here if available
                 },
-                body: JSON.stringify({
-                    userId: user.uid,
-                    orderId: orderResponse.razorpay_order_id,
-                    reason: response.error.description
-                })
-            }).catch(err => console.error("Error recording payment failure:", err));
+                theme: {
+                    color: "#4A6FDC" // Match your app's primary color
+                },
+                modal: {
+                    ondismiss: function() {
+                        // Handle dismissal
+                        console.log("[PLAN_DEBUG] Razorpay modal dismissed by user");
+                        safelyCloseModal(processingModalId);
+                        showMessage("Payment cancelled. Your plan was not upgraded.", "warning");
+                    }
+                },
+                handler: function(response) {
+                    // This function runs after successful payment
+                    console.log("[PLAN_DEBUG] Razorpay payment successful:", response);
+                    
+                    // Update progress bar to 90%
+                    if (progressBar) {
+                        progressBar.style.width = '90%';
+                        console.log("[PLAN_DEBUG] Updated progress bar to 90%");
+                    }
+                    
+                    // Verify payment with backend
+                    verifyPayment(response, orderResponse.razorpay_order_id, planName);
+                }
+            };
+            
+            // Initialize Razorpay with error handling
+            try {
+                console.log("[PLAN_DEBUG] Initializing Razorpay instance");
+                const rzp = new Razorpay(options);
+                
+                // Add event handler for payment failure
+                rzp.on('payment.failed', function(response) {
+                    console.error("[PLAN_DEBUG] Razorpay payment failed:", response);
+                    safelyCloseModal(processingModalId);
+                    const errorDesc = response.error?.description || 'Unknown error';
+                    showMessage(`Payment failed: ${errorDesc}`, "danger");
+                    
+                    // Record failure for analytics
+                    console.log("[PLAN_DEBUG] Recording payment failure");
+                    fetch(`${API_BASE_URL}/record-payment-failure`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            userId: user.uid,
+                            orderId: orderResponse.razorpay_order_id,
+                            reason: errorDesc
+                        })
+                    }).catch(err => console.error("[PLAN_DEBUG] Error recording payment failure:", err));
+                });
+                
+                // Open Razorpay checkout
+                console.log("[PLAN_DEBUG] Opening Razorpay checkout");
+                rzp.open();
+                console.log("[PLAN_DEBUG] Razorpay checkout opened");
+            } catch (rzpError) {
+                console.error("[PLAN_DEBUG] Error initializing Razorpay:", rzpError);
+                safelyCloseModal(processingModalId);
+                showMessage(`Error initializing payment gateway: ${rzpError.message}. Please try again later.`, "danger");
+            }
+        })
+        .catch(error => {
+            console.error("[PLAN_DEBUG] Order creation error:", error);
+            
+            // Retry logic
+            if (retryCount < maxRetries) {
+                retryCount++;
+                console.log(`[PLAN_DEBUG] Retry attempt ${retryCount}/${maxRetries}`);
+                const progressMessage = document.getElementById('paymentProcessingMessage');
+                if (progressMessage) {
+                    progressMessage.textContent = `Retrying payment initialization in 2 seconds... (${retryCount}/${maxRetries})`;
+                }
+                setTimeout(createOrder, 2000); // Retry after 2 seconds
+            } else {
+                // Max retries reached
+                console.error("[PLAN_DEBUG] Max retries reached. Giving up.");
+                safelyCloseModal(processingModalId);
+                showMessage(`Error initiating payment: ${error.message}. Please try again later.`, "danger");
+            }
         });
-    })
-    .catch(error => {
-        console.error("Order creation error:", error);
-        safelyCloseModal('paymentProcessingModal');
-        showMessage(`Error initiating payment: ${error.message}`, "danger");
-    });
+    };
+    
+    // Start the order creation process
+    console.log("[PLAN_DEBUG] Starting order creation process");
+    createOrder();
 }
 
 function verifyPayment(paymentResponse, orderId, planName) {
@@ -6539,74 +6699,137 @@ function updateLocalPlanLimits(planName) {
 
 // Show success modal with updated limits
 function showPaymentSuccessModal(planName, data) {
-    // Make sure to properly clean up any existing modals first
+    console.log(`[PAYMENT_DEBUG] Showing payment success modal for plan: ${planName}`, data);
+    
+    // Ensure any existing modal is properly closed first
+    console.log("[PAYMENT_DEBUG] Attempting to safely close processing modal first");
     safelyCloseModal('paymentProcessingModal');
     
-    // Remove existing modal if present to prevent duplicate IDs
-    const existingModal = document.getElementById('paymentSuccessModal');
-    if (existingModal) {
-        const instance = bootstrap.Modal.getInstance(existingModal);
-        if (instance) instance.dispose();
-        existingModal.remove();
-    }
+    // Get or create the modal element
+    let modalElement = document.getElementById('paymentSuccessModal');
+    console.log(`[PAYMENT_DEBUG] Success modal exists: ${!!modalElement}`);
     
-    // Create modal HTML
-    const modalContent = document.createElement('div');
-    modalContent.className = 'modal fade';
-    modalContent.id = 'paymentSuccessModal';
-    modalContent.setAttribute('tabindex', '-1');
-    modalContent.setAttribute('aria-hidden', 'true');
-    
-    modalContent.innerHTML = `
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header bg-success text-white">
-                    <h5 class="modal-title"><i class="fas fa-check-circle me-2"></i> Payment Successful</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <div class="modal-body text-center">
-                    <div class="checkmark-circle">
-                        <i class="fas fa-check"></i>
+    if (!modalElement) {
+        console.log("[PAYMENT_DEBUG] Creating new success modal element");
+        // Create the modal if it doesn't exist
+        const modalContent = document.createElement('div');
+        modalContent.innerHTML = `
+            <div class="modal fade" id="paymentSuccessModal" tabindex="-1" aria-hidden="true">
+                <div class="modal-dialog">
+                    <div class="modal-content">
+                        <div class="modal-header bg-success text-white">
+                            <h5 class="modal-title"><i class="fas fa-check-circle me-2"></i> Payment Successful</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <div class="modal-body text-center">
+                            <div class="checkmark-circle">
+                                <i class="fas fa-check"></i>
+                            </div>
+                            <h4 class="mt-4">Thank You!</h4>
+                            <p id="paymentSuccessMessage">Your upgrade to the ${planName.charAt(0).toUpperCase() + planName.slice(1)} plan was successful.</p>
+                            <div class="alert alert-info">
+                                <strong>New limits:</strong>
+                                <ul class="mb-0 mt-2 text-start">
+                                    <li>Resume Analyses: <span id="newResumeLimit">${getPackageLimit(planName, 'resumeAnalyses')}</span></li>
+                                    <li>Mock Interviews: <span id="newInterviewLimit">${getPackageLimit(planName, 'mockInterviews')}</span></li>
+                                    <li>PDF Downloads: <span id="newPdfLimit">${getPackageLimit(planName, 'pdfDownloads')}</span></li>
+                                    <li>AI Enhancements: <span id="newAiLimit">${getPackageLimit(planName, 'aiEnhance')}</span></li>
+                                </ul>
+                            </div>
+                            <p class="text-muted mt-3">Order ID: ${data?.orderId || 'N/A'}<br>Payment ID: ${data?.paymentId || 'N/A'}</p>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-primary" data-bs-dismiss="modal">Continue</button>
+                        </div>
                     </div>
-                    <h4 class="mt-4">Thank You!</h4>
-                    <p id="paymentSuccessMessage">Your upgrade to the ${planName.charAt(0).toUpperCase() + planName.slice(1)} plan was successful.</p>
-                    <div class="alert alert-info">
-                        <strong>New limits:</strong>
-                        <ul class="mb-0 mt-2 text-start">
-                            <li>Resume Analyses: <span id="newResumeLimit">${getPackageLimit('resumeAnalyses', planName)}</span></li>
-                            <li>Mock Interviews: <span id="newInterviewLimit">${getPackageLimit('mockInterviews', planName)}</span></li>
-                            <li>PDF Downloads: <span id="newPdfLimit">${getPackageLimit('pdfDownloads', planName)}</span></li>
-                            <li>AI Enhancements: <span id="newAiLimit">${getPackageLimit('aiEnhance', planName)}</span></li>
-                        </ul>
-                    </div>
-                    <p class="text-muted mt-3">Order ID: ${data.orderId || 'N/A'}<br>Payment ID: ${data.paymentId || 'N/A'}</p>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-primary" data-bs-dismiss="modal">Continue</button>
                 </div>
             </div>
-        </div>
-    `;
+        `;
+        console.log("[PAYMENT_DEBUG] Appending success modal to document body");
+        document.body.appendChild(modalContent.firstElementChild);
+        modalElement = document.getElementById('paymentSuccessModal');
+        console.log(`[PAYMENT_DEBUG] Success modal element after creation: ${!!modalElement}`);
+    }
     
-    // Add modal to DOM
-    document.body.appendChild(modalContent);
+    // Update content if needed
+    const messageEl = document.getElementById('paymentSuccessMessage');
+    if (messageEl) {
+        console.log("[PAYMENT_DEBUG] Updating success message text");
+        messageEl.textContent = `Your upgrade to the ${planName.charAt(0).toUpperCase() + planName.slice(1)} plan was successful.`;
+    } else {
+        console.warn("[PAYMENT_DEBUG] Success message element not found");
+    }
     
-    // Show the modal (with a slight delay to ensure DOM is ready)
-    setTimeout(() => {
-        try {
-            const modal = new bootstrap.Modal(document.getElementById('paymentSuccessModal'), {
-                backdrop: true,
-                keyboard: true,
-                focus: true
-            });
-            modal.show();
-        } catch (error) {
-            console.error("Error showing success modal:", error);
-            // Fallback to simple message
-            showMessage(`Payment successful! You've been upgraded to the ${planName} plan.`, "success");
-        }
-    }, 100);
+    // Set limit values
+    console.log("[PAYMENT_DEBUG] Setting limit values in success modal");
+    setSuccessModalLimits(planName);
+    
+    // Initialize and show the modal safely
+    try {
+        console.log("[PAYMENT_DEBUG] Attempting to initialize Bootstrap modal");
+        const modalInstance = new bootstrap.Modal(modalElement);
+        console.log("[PAYMENT_DEBUG] Showing success modal");
+        modalInstance.show();
+        console.log("[PAYMENT_DEBUG] Success modal shown successfully");
+    } catch (error) {
+        console.error("[PAYMENT_DEBUG] Error showing payment success modal:", error);
+        // Log DOM state for debugging
+        console.log("[PAYMENT_DEBUG] Modal element:", modalElement);
+        console.log("[PAYMENT_DEBUG] Document body children:", document.body.children.length);
+        
+        // Fallback message if modal fails
+        showMessage(`Payment successful! Your plan has been upgraded to ${planName}.`, 'success');
+    }
 }
+
+// Add this function to app.js - Modal fixes section with logging
+function fixSvgAttributes() {
+    console.log("[SVG_DEBUG] Starting SVG attribute fixes");
+    let fixCount = 0;
+    
+    // Find all SVG elements with problematic attributes
+    const svgElements = document.querySelectorAll('svg');
+    console.log(`[SVG_DEBUG] Found ${svgElements.length} SVG elements to check`);
+    
+    svgElements.forEach((svg, index) => {
+        const width = svg.getAttribute('width');
+        const height = svg.getAttribute('height');
+        const viewBox = svg.getAttribute('viewBox');
+        
+        console.log(`[SVG_DEBUG] SVG #${index} - width: ${width}, height: ${height}, viewBox: ${viewBox}`);
+        
+        // Fix width="auto" and height="auto" attributes
+        if (width === 'auto') {
+            svg.setAttribute('width', '100%');
+            console.log(`[SVG_DEBUG] Fixed width="auto" on SVG #${index}`);
+            fixCount++;
+        }
+        
+        if (height === 'auto') {
+            svg.setAttribute('height', '100%');
+            console.log(`[SVG_DEBUG] Fixed height="auto" on SVG #${index}`);
+            fixCount++;
+        }
+        
+        // Ensure viewBox is set for proper scaling
+        if (!viewBox) {
+            // Set a default viewBox if none exists
+            svg.setAttribute('viewBox', '0 0 24 24');
+            console.log(`[SVG_DEBUG] Added missing viewBox to SVG #${index}`);
+            fixCount++;
+        }
+        
+        // Log the parent component for context
+        const parentElement = svg.parentElement;
+        if (parentElement) {
+            console.log(`[SVG_DEBUG] SVG #${index} parent: ${parentElement.tagName}, class: ${parentElement.className}`);
+        }
+    });
+    
+    console.log(`[SVG_DEBUG] Completed SVG fixes. Fixed ${fixCount} attributes.`);
+    return fixCount;
+}
+
 
 function patchAddonPurchaseModal() {
     // Preserve original function
@@ -6674,16 +6897,54 @@ function patchAddonPurchaseModal() {
 
 // Initialize all modal fixes 
 function initModalFixes() {
+    console.log("[INIT_DEBUG] Starting modal and UI fixes initialization");
+    
     // Replace global functions with fixed versions
     window.safelyCloseModal = safelyCloseModal;
     window.showExistingUpgradeModal = showExistingUpgradeModal;
     window.selectPlan = selectPlanFixed; // Replace selectPlan
+    console.log("[INIT_DEBUG] Global function replacements complete");
     
     // Add global cleanup mechanism
     setupGlobalModalCleanup();
+    console.log("[INIT_DEBUG] Global modal cleanup mechanism set up");
     
     // Patch addon purchase modal
     patchAddonPurchaseModal();
+    console.log("[INIT_DEBUG] Addon purchase modal patched");
     
-    console.log("IRIS Modal Fixes initialized successfully!");
+    // Fix SVG attributes
+    const fixCount = fixSvgAttributes();
+    console.log(`[INIT_DEBUG] Initial SVG attribute fixes: ${fixCount}`);
+    
+    // Add observer to fix SVG attributes as they're added
+    console.log("[INIT_DEBUG] Setting up MutationObserver for dynamic SVG fixes");
+    const observer = new MutationObserver(mutations => {
+        let svgNodesAdded = false;
+        
+        mutations.forEach(mutation => {
+            if (mutation.addedNodes.length) {
+                // Check if any SVG elements were added
+                mutation.addedNodes.forEach(node => {
+                    if (node.nodeName === 'svg' || 
+                        (node.nodeType === 1 && node.querySelector('svg'))) {
+                        svgNodesAdded = true;
+                    }
+                });
+            }
+        });
+        
+        if (svgNodesAdded) {
+            console.log("[SVG_DEBUG] New SVG elements detected in DOM");
+            setTimeout(() => {
+                const newFixCount = fixSvgAttributes();
+                console.log(`[SVG_DEBUG] Fixed ${newFixCount} attributes on new SVG elements`);
+            }, 100);
+        }
+    });
+    
+    observer.observe(document.body, { childList: true, subtree: true });
+    console.log("[INIT_DEBUG] MutationObserver started for SVG monitoring");
+    
+    console.log("[INIT_DEBUG] IRIS Modal Fixes initialized successfully!");
 }
