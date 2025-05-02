@@ -62,62 +62,80 @@ function handleAuthStateChanged(user) {
   authState.user = user;
 
   if (user) {
-      // User is signed in - Load profile FIRST, then initialize app state
+      // User is signed in
       
       // Check if there was a pending plan selection or addon purchase
       const pendingPlan = localStorage.getItem('pendingPlanSelection');
       const pendingAddonStr = localStorage.getItem('pendingAddonPurchase');
       
-      // Load user profile first regardless of pending actions
-      loadUserProfile(user) 
-          .finally(() => {
-              // This block runs *after* loadUserProfile finishes or fails
-              console.log("Profile load attempt finished. Current profile state:", authState.userProfile);
-              showAppView(); // Show the app view
-              updateUserProfileUI(user); // Update UI with basic auth info
+      // Check email verification first before loading profile
+      checkEmailVerification(user)
+        .then(isVerified => {
+          // Show warning if email is not verified
+          if (!isVerified) {
+            console.log("Email not verified for user:", user.email);
+            showMessage('Please verify your email address to access all features', 'warning');
+            
+            // Optionally show verification modal if this is a fresh login
+            if (user.metadata && 
+                user.metadata.creationTime && 
+                (new Date().getTime() - new Date(user.metadata.creationTime).getTime() < 300000)) {
+              // If account was created less than 5 minutes ago, show the verification modal
+              showEmailVerificationModal(user.email);
+            }
+          }
+          
+          // Continue with profile loading regardless of verification status
+          return loadUserProfile(user);
+        })
+        .finally(() => {
+          // This block runs *after* loadUserProfile finishes or fails
+          console.log("Profile load attempt finished. Current profile state:", authState.userProfile);
+          showAppView(); // Show the app view
+          updateUserProfileUI(user); // Update UI with basic auth info
+          
+          // Initialize app logic *after* profile attempt and showing view
+          if (typeof initializeIRISApp === 'function') {
+              initializeIRISApp(); // Now safe to check authState.userProfile
               
-              // Initialize app logic *after* profile attempt and showing view
-              if (typeof initializeIRISApp === 'function') {
-                  initializeIRISApp(); // Now safe to check authState.userProfile
+              // After initialization is complete, check for pending actions
+              if (pendingPlan) {
+                  // Clear the pending plan to prevent loops
+                  localStorage.removeItem('pendingPlanSelection');
                   
-                  // After initialization is complete, check for pending actions
-                  if (pendingPlan) {
-                      // Clear the pending plan to prevent loops
-                      localStorage.removeItem('pendingPlanSelection');
+                  // Give a moment for everything to fully initialize
+                  setTimeout(() => {
+                      console.log(`Continuing with pending plan selection: ${pendingPlan}`);
+                      // Trigger plan selection with payment
+                      if (typeof selectPlanFixed === 'function') {
+                          selectPlanFixed(pendingPlan);
+                      } else {
+                          console.warn("selectPlanFixed function not found. Cannot process pending plan.");
+                          showMessage("Unable to continue with plan selection. Please try again from your profile.", "warning");
+                      }
+                  }, 1500);
+              } else if (pendingAddonStr) {
+                  // Process addon purchase if there's no pending plan
+                  try {
+                      const pendingAddon = JSON.parse(pendingAddonStr);
+                      localStorage.removeItem('pendingAddonPurchase');
                       
-                      // Give a moment for everything to fully initialize
                       setTimeout(() => {
-                          console.log(`Continuing with pending plan selection: ${pendingPlan}`);
-                          // Trigger plan selection with payment
-                          if (typeof selectPlanFixed === 'function') {
-                              selectPlanFixed(pendingPlan);
+                          console.log(`Continuing with pending addon purchase:`, pendingAddon);
+                          if (typeof purchaseAddonItem === 'function') {
+                              purchaseAddonItem(pendingAddon.featureType, pendingAddon.quantity);
                           } else {
-                              console.warn("selectPlanFixed function not found. Cannot process pending plan.");
-                              showMessage("Unable to continue with plan selection. Please try again from your profile.", "warning");
+                              console.warn("purchaseAddonItem function not found. Cannot process pending addon.");
+                              showMessage("Unable to continue with add-on purchase. Please try again from your profile.", "warning");
                           }
                       }, 1500);
-                  } else if (pendingAddonStr) {
-                      // Process addon purchase if there's no pending plan
-                      try {
-                          const pendingAddon = JSON.parse(pendingAddonStr);
-                          localStorage.removeItem('pendingAddonPurchase');
-                          
-                          setTimeout(() => {
-                              console.log(`Continuing with pending addon purchase:`, pendingAddon);
-                              if (typeof purchaseAddonItem === 'function') {
-                                  purchaseAddonItem(pendingAddon.featureType, pendingAddon.quantity);
-                              } else {
-                                  console.warn("purchaseAddonItem function not found. Cannot process pending addon.");
-                                  showMessage("Unable to continue with add-on purchase. Please try again from your profile.", "warning");
-                              }
-                          }, 1500);
-                      } catch (e) {
-                          console.error("Error parsing pending addon data:", e);
-                          localStorage.removeItem('pendingAddonPurchase');
-                      }
+                  } catch (e) {
+                      console.error("Error parsing pending addon data:", e);
+                      localStorage.removeItem('pendingAddonPurchase');
                   }
               }
-          });
+          }
+        });
   } else {
       // User is signed out
       authState.userProfile = null;
@@ -632,19 +650,24 @@ function signUpWithEmailPassword(email, password, displayName) {
       console.log('User signed up successfully');
       
       // Set display name if provided
-      if (displayName) {
-        return userCredential.user.updateProfile({
-          displayName: displayName
-        }).then(() => {
-          // Add additional user data to Firestore if needed
+      const updatePromise = displayName ? 
+        userCredential.user.updateProfile({ displayName: displayName }) : 
+        Promise.resolve();
+        
+      return updatePromise
+        .then(() => {
+          // Send verification email
+          return sendEmailVerification(userCredential.user);
+        })
+        .then(() => {
+          // Add additional user data to Firestore
           if (firebase.firestore) {
-            // This might be redundant as loadUserProfile will create the doc,
-            // but we can ensure all fields are set immediately
             const db = firebase.firestore();
             return db.collection('users').doc(userCredential.user.uid).set({
               uid: userCredential.user.uid,
               email: email,
-              displayName: displayName,
+              displayName: displayName || email.split('@')[0],
+              emailVerified: false, // Initially set to false
               role: 'student',
               collegeId: null,
               deptId: null,
@@ -654,27 +677,153 @@ function signUpWithEmailPassword(email, password, displayName) {
               planPurchasedAt: new Date().toISOString(),
               usage: {
                 resumeAnalyses: { used: 0, limit: getPackageLimit('resumeAnalyses', 'free') },
-                mockInterviews: { used: 0, limit: getPackageLimit('mockInterviews', 'free') }
+                mockInterviews: { used: 0, limit: getPackageLimit('mockInterviews', 'free') },
+                pdfDownloads: { used: 0, limit: getPackageLimit('pdfDownloads', 'free') },
+                aiEnhance: { used: 0, limit: getPackageLimit('aiEnhance', 'free') }
               }
             }, { merge: true }).then(() => {
               hideAuthModal();
+              
+              // Show email verification notice
+              showEmailVerificationModal(email);
+              
               return userCredential.user;
             });
           } else {
             hideAuthModal();
+            showEmailVerificationModal(email);
             return userCredential.user;
           }
         });
-      } else {
-        hideAuthModal();
-        return userCredential.user;
-      }
     })
     .catch(error => {
       console.error('Sign up error:', error);
       showErrorMessage(`Sign up failed: ${error.message}`);
       throw error;
     });
+}
+
+// Function to check email verification status
+function checkEmailVerification(user) {
+  if (!user) return Promise.resolve(false);
+  
+  // Force refresh token to get latest emailVerified status
+  return user.reload()
+    .then(() => {
+      const isVerified = user.emailVerified;
+      
+      // Update user profile in Firestore if verified
+      if (isVerified && firebase.firestore) {
+        return firebase.firestore().collection('users').doc(user.uid).update({
+          emailVerified: true
+        })
+        .then(() => {
+          // Update local state
+          if (authState.userProfile) {
+            authState.userProfile.emailVerified = true;
+          }
+          return true;
+        })
+        .catch(error => {
+          console.error('Error updating email verification status:', error);
+          return isVerified; // Still return true if verification status is true
+        });
+      }
+      
+      return isVerified;
+    })
+    .catch(error => {
+      console.error('Error checking email verification:', error);
+      return false;
+    });
+}
+
+// Show email verification modal
+function showEmailVerificationModal(email) {
+  // Create the modal element if it doesn't exist
+  let modalDiv = document.getElementById('email-verification-modal');
+  if (!modalDiv) {
+    modalDiv = document.createElement('div');
+    modalDiv.className = 'modal fade';
+    modalDiv.id = 'email-verification-modal';
+    modalDiv.tabIndex = '-1';
+    modalDiv.setAttribute('aria-hidden', 'true');
+    
+    modalDiv.innerHTML = `
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title">Verify Your Email</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <div class="text-center mb-4">
+              <i class="fas fa-envelope fa-3x text-primary"></i>
+            </div>
+            <p>We've sent a verification email to: <strong id="verification-email-address">${email}</strong></p>
+            <p>Please check your inbox and click the verification link to activate your account.</p>
+            <div class="alert alert-info">
+              <i class="fas fa-info-circle me-2"></i>
+              <strong>Important:</strong> You need to verify your email before you can use all features of IRIS.
+            </div>
+            <p class="small text-muted">Didn't receive the email? Check your spam folder, or click the resend button below.</p>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            <button type="button" class="btn btn-primary" id="resend-verification-btn">Resend Verification</button>
+          </div>
+        </div>
+      </div>
+    `;
+    
+    // Append the modal to the document body
+    document.body.appendChild(modalDiv);
+  } else {
+    // Update the email address if the modal already exists
+    const emailElement = document.getElementById('verification-email-address');
+    if (emailElement) {
+      emailElement.textContent = email;
+    }
+  }
+  
+  // Initialize Bootstrap modal
+  const verificationModal = bootstrap.Modal.getInstance(modalDiv) || 
+                           new bootstrap.Modal(modalDiv);
+  verificationModal.show();
+  
+  // Add event listener for resend button
+  document.getElementById('resend-verification-btn')?.addEventListener('click', function() {
+    const user = firebase.auth().currentUser;
+    if (user) {
+      // Show loading state
+      const btn = this;
+      const originalText = btn.innerHTML;
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Sending...';
+      
+      sendEmailVerification(user)
+        .then(success => {
+          if (success) {
+            showMessage('Verification email resent successfully!', 'success');
+          }
+        })
+        .finally(() => {
+          // Reset button state
+          btn.disabled = false;
+          btn.innerHTML = originalText;
+        });
+    } else {
+      showMessage('You must be logged in to resend verification email', 'warning');
+    }
+  });
+  
+  // Clean up when modal is hidden
+  modalDiv.addEventListener('hidden.bs.modal', function() {
+    // Remove any event listeners to prevent memory leaks
+    document.getElementById('resend-verification-btn')?.replaceWith(
+      document.getElementById('resend-verification-btn').cloneNode(true)
+    );
+  });
 }
 
 function signInWithGoogle() {
@@ -941,8 +1090,25 @@ function attachAuthEventListeners() {
   });
 }
 
+// Send verification email to newly registered users
+function sendEmailVerification(user) {
+  return user.sendEmailVerification()
+    .then(() => {
+      console.log('Verification email sent successfully');
+      showMessage('A verification email has been sent to your email address. Please check your inbox and verify your account.', 'info');
+      return true;
+    })
+    .catch(error => {
+      console.error('Error sending verification email:', error);
+      showMessage(`Failed to send verification email: ${error.message}`, 'danger');
+      return false;
+    });
+}
+
 // Export functions for global use
+// Update your irisAuth exported object to include the new functions
 window.irisAuth = {
+  // Existing functions...
   signIn: signInWithEmailPassword,
   signUp: signUpWithEmailPassword,
   signInWithGoogle,
@@ -951,7 +1117,6 @@ window.irisAuth = {
   getUserProfile: () => authState.userProfile,
   showSignInModal: () => showAuthModal('signin'),
   showSignUpModal: () => showAuthModal('signup'),
-  // Add new functions to the exported object
   canUseFeature,
   incrementUsageCounter,
   updateUserPlan: (planName) => {
@@ -959,5 +1124,10 @@ window.irisAuth = {
     return Promise.resolve({ initiated: true, plan: planName });
   },
   getPackageLimit,
-  purchaseAddon
+  purchaseAddon,
+  
+  // Add new functions
+  sendEmailVerification,
+  checkEmailVerification,
+  showEmailVerificationModal
 };
