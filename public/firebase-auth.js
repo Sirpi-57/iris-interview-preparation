@@ -243,37 +243,45 @@ function getPackageLimit(feature, packageName) {
     free: {
         resumeAnalyses: 1,
         mockInterviews: 0,
-        pdfDownloads: 5,     // New: PDF download limits
-        aiEnhance: 5         // New: AI enhance limits
+        pdfDownloads: 5,
+        aiEnhance: 5
     },
     starter: {
         resumeAnalyses: 5,
         mockInterviews: 1,
-        pdfDownloads: 20,    // New: PDF download limits
-        aiEnhance: 20        // New: AI enhance limits
+        pdfDownloads: 20,
+        aiEnhance: 20
     },
     standard: {
         resumeAnalyses: 10,
         mockInterviews: 3,
-        pdfDownloads: 50,    // New: PDF download limits
-        aiEnhance: 50        // New: AI enhance limits
+        pdfDownloads: 50,
+        aiEnhance: 50
     },
     pro: {
         resumeAnalyses: 20,
         mockInterviews: 5,
-        pdfDownloads: 100,  // Essentially unlimited
-        aiEnhance: 100      // Essentially unlimited
+        pdfDownloads: 100,
+        aiEnhance: 100
     }
   };
   
   // Default to free package limits if package not found
-  if (!packageName || !limits[packageName]) {
+  if (!packageName || !limits[packageName.toLowerCase()]) {
       console.warn(`Unknown package: ${packageName}, defaulting to free`);
       packageName = 'free';
+  } else {
+      // Ensure lowercase package name
+      packageName = packageName.toLowerCase();
   }
   
   // Return the limit for the specified feature, or 0 if feature not found
-  return limits[packageName][feature] || 0;
+  if (!limits[packageName][feature]) {
+      console.warn(`Unknown feature: ${feature} for package ${packageName}, returning 0`);
+      return 0;
+  }
+  
+  return limits[packageName][feature];
 }
 
 // // --- New function to update user profile with plan change ---

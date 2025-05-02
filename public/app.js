@@ -5983,39 +5983,55 @@ function safelyCloseModal(modalId) {
     try {
         // Get the modal element
         const modalElement = document.getElementById(modalId);
-        if (!modalElement) return;
+        if (!modalElement) {
+            console.log(`Modal element with ID '${modalId}' not found for closing.`);
+            return;
+        }
         
         // Get the Bootstrap modal instance
-        const modalInstance = bootstrap.Modal.getInstance(modalElement);
+        let modalInstance = null;
+        try {
+            modalInstance = bootstrap.Modal.getInstance(modalElement);
+        } catch (e) {
+            console.warn(`Error getting Bootstrap modal instance for ${modalId}:`, e);
+        }
+        
+        // Try to close the modal if instance exists
         if (modalInstance) {
-            // Close the modal properly
-            modalInstance.hide();
-            
-            // Wait for the modal to finish hiding
-            modalElement.addEventListener('hidden.bs.modal', function() {
+            try {
+                modalInstance.hide();
+            } catch (e) {
+                console.warn(`Error hiding modal ${modalId}:`, e);
+            }
+        }
+        
+        // Always do a thorough cleanup regardless of above results
+        setTimeout(() => {
+            try {
                 // Remove any lingering backdrops
                 document.querySelectorAll('.modal-backdrop').forEach(backdrop => {
-                    backdrop.remove();
+                    backdrop.parentNode?.removeChild(backdrop);
                 });
                 
                 // Reset body classes
                 document.body.classList.remove('modal-open');
                 document.body.style.removeProperty('padding-right');
                 document.body.style.removeProperty('overflow');
-            }, { once: true });
-        } else {
-            // If no modal instance, still clean up
-            document.querySelectorAll('.modal-backdrop').forEach(backdrop => {
-                backdrop.remove();
-            });
-            document.body.classList.remove('modal-open');
-            document.body.style.removeProperty('padding-right');
-            document.body.style.removeProperty('overflow');
-        }
+                
+                // If modal was dynamically created, remove it
+                if (modalElement.classList.contains('dynamic-modal') && modalElement.parentNode) {
+                    modalElement.parentNode.removeChild(modalElement);
+                }
+            } catch (cleanupError) {
+                console.warn(`Error during modal cleanup for ${modalId}:`, cleanupError);
+            }
+        }, 300);
     } catch (error) {
         console.error(`Error safely closing modal ${modalId}:`, error);
         // Emergency cleanup
-        document.querySelectorAll('.modal-backdrop').forEach(el => el.remove());
+        document.querySelectorAll('.modal-backdrop').forEach(el => {
+            try { el.parentNode?.removeChild(el); } catch(e) {}
+        });
         document.body.classList.remove('modal-open');
         document.body.style.removeProperty('padding-right');
         document.body.style.removeProperty('overflow');
@@ -6378,7 +6394,6 @@ function selectPlanFixed(planName) {
     });
 }
 
-// Function to verify plan payment
 function verifyPayment(paymentResponse, orderId, planName) {
     const verificationData = {
         razorpay_order_id: orderId,
@@ -6388,6 +6403,9 @@ function verifyPayment(paymentResponse, orderId, planName) {
         planName: planName,
         orderType: 'plan'
     };
+    
+    // First, show a message that verification is in progress
+    showMessage("Verifying payment...", "info");
     
     fetch(`${API_BASE_URL}/verify-razorpay-payment`, {
         method: 'POST',
@@ -6400,48 +6418,88 @@ function verifyPayment(paymentResponse, orderId, planName) {
         if (!response.ok) {
             return response.json().then(errData => {
                 throw new Error(errData.error || `Payment verification failed (${response.status})`);
+            }).catch(e => {
+                // Handle case where response is not JSON
+                throw new Error(`Payment verification failed (${response.status}): ${response.statusText}`);
             });
         }
         return response.json();
     })
     .then(data => {
-        // Update progress bar to 100%
+        // Update progress bar to 100% if it exists
         const progressBar = document.getElementById('payment-progress-bar');
         if (progressBar) progressBar.style.width = '100%';
         
-        // Close processing modal PROPERLY
-        setTimeout(() => {
-            // Use a timeout to allow the progress bar to reach 100%
-            const processingModal = bootstrap.Modal.getInstance(document.getElementById('paymentProcessingModal'));
-            if (processingModal) {
-                processingModal.hide();
-                // Ensure backdrop and modal-related classes are removed
-                document.querySelectorAll('.modal-backdrop').forEach(el => el.remove());
-                document.body.classList.remove('modal-open');
-                document.body.style.removeProperty('padding-right');
-            }
+        console.log("Payment verification successful:", data);
+        
+        // Close all existing modals first
+        try {
+            document.querySelectorAll('.modal.show').forEach(modalEl => {
+                const modalInstance = bootstrap.Modal.getInstance(modalEl);
+                if (modalInstance) modalInstance.hide();
+            });
             
-            // Only show success modal AFTER processing modal is fully hidden
-            setTimeout(() => {
-                // Show success message
-                showMessage(`Successfully upgraded to ${planName.charAt(0).toUpperCase() + planName.slice(1)} plan!`, 'success');
+            // Extra cleanup
+            document.querySelectorAll('.modal-backdrop').forEach(el => el.remove());
+            document.body.classList.remove('modal-open');
+            document.body.style.removeProperty('padding-right');
+            document.body.style.removeProperty('overflow');
+        } catch (closeError) {
+            console.warn("Modal cleanup warning:", closeError);
+        }
+        
+        // Give a short delay to ensure DOM is ready
+        setTimeout(() => {
+            // Update local user profile with the new plan
+            if (authState && authState.userProfile) {
+                authState.userProfile.plan = planName;
                 
-                // Update local user profile to reflect new plan
-                if (authState && authState.userProfile) {
-                    authState.userProfile.plan = planName;
-                    
-                    // Update limits based on the new plan
-                    updateLocalPlanLimits(planName);
+                // Update limits based on the new plan
+                if (!authState.userProfile.usage) {
+                    authState.userProfile.usage = {};
                 }
                 
-                // Update UI
+                // Update each feature limit
+                const features = ['resumeAnalyses', 'mockInterviews', 'pdfDownloads', 'aiEnhance'];
+                features.forEach(feature => {
+                    if (!authState.userProfile.usage[feature]) {
+                        authState.userProfile.usage[feature] = { used: 0, limit: 0 };
+                    }
+                    const limit = getPackageLimit(feature, planName);
+                    authState.userProfile.usage[feature].limit = limit;
+                });
+            }
+            
+            // Update UI if function exists
+            if (typeof updateUsageDisplay === 'function') {
                 updateUsageDisplay();
-                
-                // Show success modal with updated limits
+            }
+            
+            // Show success message
+            showMessage(`Successfully upgraded to ${planName.charAt(0).toUpperCase() + planName.slice(1)} plan!`, 'success');
+            
+            // Show success modal with full error handling
+            try {
                 showPaymentSuccessModal(planName, data);
-            }, 300); // Wait for modal to fully hide
-        }, 500); // Wait for progress bar animation
+            } catch (modalError) {
+                console.error("Error showing success modal:", modalError);
+                // We've already shown a success message as fallback
+            }
+        }, 300);
     })
+    .catch(error => {
+        console.error("Payment verification error:", error);
+        
+        // Safely close any processing modals
+        try {
+            safelyCloseModal('paymentProcessingModal');
+        } catch (e) {
+            console.warn("Error closing processing modal:", e);
+        }
+        
+        // Show error message
+        showMessage(`Error verifying payment: ${error.message}`, "danger");
+    });
 }
 
 // Helper function to update local plan limits (continued)
@@ -6481,53 +6539,73 @@ function updateLocalPlanLimits(planName) {
 
 // Show success modal with updated limits
 function showPaymentSuccessModal(planName, data) {
-    // Remove existing modal if present
+    // Make sure to properly clean up any existing modals first
+    safelyCloseModal('paymentProcessingModal');
+    
+    // Remove existing modal if present to prevent duplicate IDs
     const existingModal = document.getElementById('paymentSuccessModal');
     if (existingModal) {
+        const instance = bootstrap.Modal.getInstance(existingModal);
+        if (instance) instance.dispose();
         existingModal.remove();
     }
     
     // Create modal HTML
     const modalContent = document.createElement('div');
+    modalContent.className = 'modal fade';
+    modalContent.id = 'paymentSuccessModal';
+    modalContent.setAttribute('tabindex', '-1');
+    modalContent.setAttribute('aria-hidden', 'true');
+    
     modalContent.innerHTML = `
-        <div class="modal fade" id="paymentSuccessModal" tabindex="-1" aria-hidden="true">
-            <div class="modal-dialog">
-                <div class="modal-content">
-                    <div class="modal-header bg-success text-white">
-                        <h5 class="modal-title"><i class="fas fa-check-circle me-2"></i> Payment Successful</h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-success text-white">
+                    <h5 class="modal-title"><i class="fas fa-check-circle me-2"></i> Payment Successful</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body text-center">
+                    <div class="checkmark-circle">
+                        <i class="fas fa-check"></i>
                     </div>
-                    <div class="modal-body text-center">
-                        <div class="checkmark-circle">
-                            <i class="fas fa-check"></i>
-                        </div>
-                        <h4 class="mt-4">Thank You!</h4>
-                        <p id="paymentSuccessMessage">Your upgrade to the ${planName.charAt(0).toUpperCase() + planName.slice(1)} plan was successful.</p>
-                        <div class="alert alert-info">
-                            <strong>New limits:</strong>
-                            <ul class="mb-0 mt-2 text-start">
-                                <li>Resume Analyses: <span id="newResumeLimit">${getPackageLimit(planName, 'resumeAnalyses')}</span></li>
-                                <li>Mock Interviews: <span id="newInterviewLimit">${getPackageLimit(planName, 'mockInterviews')}</span></li>
-                                <li>PDF Downloads: <span id="newPdfLimit">${getPackageLimit(planName, 'pdfDownloads')}</span></li>
-                                <li>AI Enhancements: <span id="newAiLimit">${getPackageLimit(planName, 'aiEnhance')}</span></li>
-                            </ul>
-                        </div>
-                        <p class="text-muted mt-3">Order ID: ${data.orderId || 'N/A'}<br>Payment ID: ${data.paymentId || 'N/A'}</p>
+                    <h4 class="mt-4">Thank You!</h4>
+                    <p id="paymentSuccessMessage">Your upgrade to the ${planName.charAt(0).toUpperCase() + planName.slice(1)} plan was successful.</p>
+                    <div class="alert alert-info">
+                        <strong>New limits:</strong>
+                        <ul class="mb-0 mt-2 text-start">
+                            <li>Resume Analyses: <span id="newResumeLimit">${getPackageLimit('resumeAnalyses', planName)}</span></li>
+                            <li>Mock Interviews: <span id="newInterviewLimit">${getPackageLimit('mockInterviews', planName)}</span></li>
+                            <li>PDF Downloads: <span id="newPdfLimit">${getPackageLimit('pdfDownloads', planName)}</span></li>
+                            <li>AI Enhancements: <span id="newAiLimit">${getPackageLimit('aiEnhance', planName)}</span></li>
+                        </ul>
                     </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-primary" data-bs-dismiss="modal">Continue</button>
-                    </div>
+                    <p class="text-muted mt-3">Order ID: ${data.orderId || 'N/A'}<br>Payment ID: ${data.paymentId || 'N/A'}</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-primary" data-bs-dismiss="modal">Continue</button>
                 </div>
             </div>
         </div>
     `;
     
     // Add modal to DOM
-    document.body.appendChild(modalContent.firstChild);
+    document.body.appendChild(modalContent);
     
-    // Show the modal
-    const modal = new bootstrap.Modal(document.getElementById('paymentSuccessModal'));
-    modal.show();
+    // Show the modal (with a slight delay to ensure DOM is ready)
+    setTimeout(() => {
+        try {
+            const modal = new bootstrap.Modal(document.getElementById('paymentSuccessModal'), {
+                backdrop: true,
+                keyboard: true,
+                focus: true
+            });
+            modal.show();
+        } catch (error) {
+            console.error("Error showing success modal:", error);
+            // Fallback to simple message
+            showMessage(`Payment successful! You've been upgraded to the ${planName} plan.`, "success");
+        }
+    }, 100);
 }
 
 function patchAddonPurchaseModal() {
