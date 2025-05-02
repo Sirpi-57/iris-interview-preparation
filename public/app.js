@@ -5562,14 +5562,30 @@ function showAddonPurchaseModal(featureType = null) {
 
 // Initialize add-on modal interaction
 function initAddonPurchaseModal() {
-    // Quantity increase/decrease buttons
+    console.log("Initializing add-on purchase modal and buttons");
+    
+    // Buy add-on buttons in profile page
+    document.querySelectorAll('.buy-addon-btn').forEach(button => {
+        console.log("Found buy-addon-btn:", button.getAttribute('data-feature'));
+        // Remove existing listeners by cloning and replacing
+        const newButton = button.cloneNode(true);
+        button.parentNode.replaceChild(newButton, button);
+        
+        // Add new click event listener
+        newButton.addEventListener('click', function() {
+            const featureType = this.getAttribute('data-feature');
+            console.log(`Buy add-on button clicked for: ${featureType}`);
+            showAddonPurchaseModal(featureType);
+        });
+    });
+    
+    // Quantity increase/decrease buttons inside modal
     document.querySelectorAll('.addon-quantity-decrease').forEach(button => {
         button.addEventListener('click', function() {
             const featureType = this.getAttribute('data-feature');
             const input = document.querySelector(`.addon-quantity-input[data-feature="${featureType}"]`);
-            const priceElement = this.closest('.card-body').querySelector('.addon-price');
             
-            if (input && priceElement) {
+            if (input) {
                 const currentValue = parseInt(input.value) || 1;
                 if (currentValue > 1) {
                     input.value = currentValue - 1;
@@ -5583,9 +5599,8 @@ function initAddonPurchaseModal() {
         button.addEventListener('click', function() {
             const featureType = this.getAttribute('data-feature');
             const input = document.querySelector(`.addon-quantity-input[data-feature="${featureType}"]`);
-            const priceElement = this.closest('.card-body').querySelector('.addon-price');
             
-            if (input && priceElement) {
+            if (input) {
                 const currentValue = parseInt(input.value) || 1;
                 const maxValue = parseInt(input.getAttribute('max')) || 10;
                 if (currentValue < maxValue) {
@@ -5612,22 +5627,15 @@ function initAddonPurchaseModal() {
         });
     });
     
-    // Purchase buttons
+    // Purchase buttons inside the modal
     document.querySelectorAll('.addon-purchase-btn').forEach(button => {
         button.addEventListener('click', function() {
             const featureType = this.getAttribute('data-feature');
             const quantityInput = document.querySelector(`.addon-quantity-input[data-feature="${featureType}"]`);
             const quantity = parseInt(quantityInput?.value) || 1;
             
+            console.log(`Purchase add-on clicked: ${featureType}, quantity: ${quantity}`);
             purchaseAddonItem(featureType, quantity);
-        });
-    });
-    
-    // "Buy" buttons on user profile
-    document.querySelectorAll('.buy-addon-btn').forEach(button => {
-        button.addEventListener('click', function() {
-            const featureType = this.getAttribute('data-feature');
-            showAddonPurchaseModal(featureType);
         });
     });
 }
@@ -5647,13 +5655,6 @@ function updateAddonPrice(featureType, quantity) {
 function purchaseAddonItem(featureType, quantity) {
     if (!firebase.auth().currentUser) {
         showMessage('Please sign in to purchase add-ons', 'warning');
-        safelyCloseModal('addonPurchaseModal');
-        return;
-    }
-    
-    // Check if irisAuth is available
-    if (!window.irisAuth) {
-        showMessage('Authentication system is not available. Please refresh the page and try again.', 'danger');
         safelyCloseModal('addonPurchaseModal');
         return;
     }
@@ -5777,7 +5778,7 @@ function purchaseAddonItem(featureType, quantity) {
             },
             handler: function(response) {
                 // This function runs after successful payment
-                progressBar.style.width = '90%';
+                if (progressBar) progressBar.style.width = '90%';
                 
                 // Verify payment with backend
                 verifyAddonPayment(response, orderResponse.razorpay_order_id, featureType, quantity, effectiveQuantity);
@@ -5814,7 +5815,6 @@ function purchaseAddonItem(featureType, quantity) {
     });
 }
 
-// Function to verify addon payment
 function verifyAddonPayment(paymentResponse, orderId, featureType, quantity, effectiveQuantity) {
     const verificationData = {
         razorpay_order_id: orderId,
@@ -6592,21 +6592,8 @@ function verifyPayment(paymentResponse, orderId, planName) {
         
         console.log("Payment verification successful:", data);
         
-        // Close all existing modals first
-        try {
-            document.querySelectorAll('.modal.show').forEach(modalEl => {
-                const modalInstance = bootstrap.Modal.getInstance(modalEl);
-                if (modalInstance) modalInstance.hide();
-            });
-            
-            // Extra cleanup
-            document.querySelectorAll('.modal-backdrop').forEach(el => el.remove());
-            document.body.classList.remove('modal-open');
-            document.body.style.removeProperty('padding-right');
-            document.body.style.removeProperty('overflow');
-        } catch (closeError) {
-            console.warn("Modal cleanup warning:", closeError);
-        }
+        // Close processing modal BEFORE showing success modal
+        safelyCloseModal('paymentProcessingModal');
         
         // Give a short delay to ensure DOM is ready
         setTimeout(() => {
@@ -6651,11 +6638,7 @@ function verifyPayment(paymentResponse, orderId, planName) {
         console.error("Payment verification error:", error);
         
         // Safely close any processing modals
-        try {
-            safelyCloseModal('paymentProcessingModal');
-        } catch (e) {
-            console.warn("Error closing processing modal:", e);
-        }
+        safelyCloseModal('paymentProcessingModal');
         
         // Show error message
         showMessage(`Error verifying payment: ${error.message}`, "danger");
