@@ -41,32 +41,35 @@ const DOMElements = {
 };
 
 document.addEventListener('DOMContentLoaded', function() {
-    // Check if Firebase auth is initialized
-    if (typeof irisAuth !== 'undefined') {
-        console.log('Firebase Auth module detected');
-    } else {
-        console.warn('Firebase Auth module not found, some features may be limited');
-    }
+    // Wait a moment for Firebase Auth to initialize
+    setTimeout(function() {
+        // Check if Firebase auth is initialized
+        if (typeof irisAuth !== 'undefined') {
+            console.log('Firebase Auth module detected');
+        } else {
+            console.warn('Firebase Auth module not found, some features may be limited');
+        }
 
-    // Initialize UI interactions
-    initNavigation();
-    initButtons();
-    initForms();
-    initProfilePage();
-    initAddonPurchaseModal();
-    enhanceModalCloseHandlers();
-    
-    // Add this line to initialize the modal fixes
-    initModalFixes();
+        // Initialize UI interactions
+        initNavigation();
+        initButtons();
+        initForms();
+        initProfilePage();
+        initAddonPurchaseModal();
+        enhanceModalCloseHandlers();
+        
+        // Add this line to initialize the modal fixes
+        initModalFixes();
 
-    // Load available browser voices (for fallback TTS)
-    loadVoices();
-    if (speechSynthesis.onvoiceschanged !== undefined) {
-        speechSynthesis.onvoiceschanged = loadVoices;
-    }
+        // Load available browser voices (for fallback TTS)
+        loadVoices();
+        if (speechSynthesis.onvoiceschanged !== undefined) {
+            speechSynthesis.onvoiceschanged = loadVoices;
+        }
 
-    // Check browser support
-    checkBrowserSupport();
+        // Check browser support
+        checkBrowserSupport();
+    }, 300); // Wait 300ms for Firebase Auth to initialize
 });
 
 // --- Authentication-related Functions ---
@@ -3633,6 +3636,13 @@ function getFeatureDisplayName(featureType) {
 
 // --- New function to update usage display ---
 function updateUsageDisplay() {
+
+    // Check if irisAuth is defined
+    if (typeof irisAuth === 'undefined') {
+        console.warn('irisAuth not available, cannot update usage display');
+        return;
+    }
+
     const userProfile = irisAuth?.getUserProfile();
     if (!userProfile || !userProfile.usage) return;
 

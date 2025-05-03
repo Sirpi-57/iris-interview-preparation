@@ -1310,6 +1310,25 @@ function startVerificationPolling(user, modalInstance) {
   return checkInterval;
 }
 
+// Add this function before the window.irisAuth export
+function sendEmailVerification(user) {
+  if (!user) {
+    console.warn('Cannot send verification email: No user provided');
+    return Promise.resolve(false);
+  }
+  
+  return user.sendEmailVerification()
+    .then(() => {
+      console.log('Verification email sent successfully');
+      return true;
+    })
+    .catch(error => {
+      console.error('Error sending verification email:', error);
+      showErrorMessage(`Failed to send verification email: ${error.message}`);
+      return false;
+    });
+}
+
 // Export functions for global use
 // Update your irisAuth exported object to include the new functions
 window.irisAuth = {
