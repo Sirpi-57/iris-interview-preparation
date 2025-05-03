@@ -6145,7 +6145,10 @@ function enhanceModalCloseHandlers() {
 }
 
 // Helper function to set limit values in success modal
-function setSuccessModalLimits(featureType, newLimit) {
+function setSuccessModalLimits(planName) {
+    // If we're setting a plan name, we should reset all counters
+    const isFullPlanUpgrade = !!planName;
+    
     const limitElements = {
         'resumeAnalyses': document.getElementById('newResumeLimit'),
         'mockInterviews': document.getElementById('newInterviewLimit'),
@@ -6153,16 +6156,42 @@ function setSuccessModalLimits(featureType, newLimit) {
         'aiEnhance': document.getElementById('newAiLimit')
     };
     
-    // Set the value for the updated feature
-    if (limitElements[featureType]) {
-        limitElements[featureType].textContent = newLimit;
-    }
-    
-    // Set current values for other features
-    for (const [key, element] of Object.entries(limitElements)) {
-        if (key !== featureType && element) {
-            const currentLimit = authState?.userProfile?.usage?.[key]?.limit || 0;
-            element.textContent = currentLimit;
+    // For plan upgrades, set all usage displays to their new limits
+    if (isFullPlanUpgrade) {
+        for (const [key, element] of Object.entries(limitElements)) {
+            if (element) {
+                const newLimit = getPackageLimit(key, planName);
+                element.textContent = newLimit;
+            }
+        }
+        
+        // Update the displayed usage counters to 0 as well, if these elements exist
+        const usedElements = {
+            'resumeAnalyses': document.getElementById('resumeAnalysesCount'),
+            'mockInterviews': document.getElementById('mockInterviewsCount'),
+            'pdfDownloads': document.getElementById('pdfDownloadsCount'),
+            'aiEnhance': document.getElementById('aiEnhanceCount')
+        };
+        
+        for (const [key, element] of Object.entries(usedElements)) {
+            if (element) {
+                const newLimit = getPackageLimit(key, planName);
+                element.textContent = `0/${newLimit}`;
+            }
+        }
+    } 
+    // For individual feature updates (add-ons), just update that specific feature
+    else {
+        if (limitElements[featureType]) {
+            limitElements[featureType].textContent = newLimit;
+        }
+        
+        // Set current values for other features
+        for (const [key, element] of Object.entries(limitElements)) {
+            if (key !== featureType && element) {
+                const currentLimit = authState?.userProfile?.usage?.[key]?.limit || 0;
+                element.textContent = currentLimit;
+            }
         }
     }
 }
@@ -6654,27 +6683,27 @@ function updateLocalPlanLimits(planName) {
     const pdfLimit = getPackageLimit(planName, 'pdfDownloads');
     const aiLimit = getPackageLimit(planName, 'aiEnhance');
     
-    // Keep current usage, update limits
+    // Reset usage counters to 0 and update limits
     if (authState.userProfile.usage.resumeAnalyses) {
-        authState.userProfile.usage.resumeAnalyses.limit = resumeLimit;
+        authState.userProfile.usage.resumeAnalyses = { used: 0, limit: resumeLimit };
     } else {
         authState.userProfile.usage.resumeAnalyses = { used: 0, limit: resumeLimit };
     }
     
     if (authState.userProfile.usage.mockInterviews) {
-        authState.userProfile.usage.mockInterviews.limit = interviewLimit;
+        authState.userProfile.usage.mockInterviews = { used: 0, limit: interviewLimit };
     } else {
         authState.userProfile.usage.mockInterviews = { used: 0, limit: interviewLimit };
     }
     
     if (authState.userProfile.usage.pdfDownloads) {
-        authState.userProfile.usage.pdfDownloads.limit = pdfLimit;
+        authState.userProfile.usage.pdfDownloads = { used: 0, limit: pdfLimit };
     } else {
         authState.userProfile.usage.pdfDownloads = { used: 0, limit: pdfLimit };
     }
     
     if (authState.userProfile.usage.aiEnhance) {
-        authState.userProfile.usage.aiEnhance.limit = aiLimit;
+        authState.userProfile.usage.aiEnhance = { used: 0, limit: aiLimit };
     } else {
         authState.userProfile.usage.aiEnhance = { used: 0, limit: aiLimit };
     }

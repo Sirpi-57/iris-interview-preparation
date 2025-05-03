@@ -68,28 +68,35 @@ function handleAuthStateChanged(user) {
       const pendingPlan = localStorage.getItem('pendingPlanSelection');
       const pendingAddonStr = localStorage.getItem('pendingAddonPurchase');
       
-      // Check email verification first before loading profile
-      checkEmailVerification(user)
-        .then(isVerified => {
-          // Show warning if email is not verified
-          if (!isVerified) {
-            console.log("Email not verified for user:", user.email);
-            showMessage('Please verify your email address to access all features', 'warning');
-            
-            // Optionally show verification modal if this is a fresh login
-            if (user.metadata && 
-                user.metadata.creationTime && 
-                (new Date().getTime() - new Date(user.metadata.creationTime).getTime() < 300000)) {
-              // If account was created less than 5 minutes ago, show the verification modal
-              showEmailVerificationModal(user.email);
-            }
-          }
-          
-          // Continue with profile loading regardless of verification status
-          return loadUserProfile(user);
+      return loadUserProfile(user)
+        .then(() => {
+          // Check email verification after profile is loaded (non-blocking)
+          return checkEmailVerification(user)
+            .then(isVerified => {
+              // Show warning if email is not verified, but don't block any features
+              if (!isVerified) {
+                console.log("Email not verified for user:", user.email);
+                // Only show verification message if they're not in the middle of payment flow
+                const pendingPlan = localStorage.getItem('pendingPlanSelection');
+                const pendingAddonStr = localStorage.getItem('pendingAddonPurchase');
+                
+                if (!pendingPlan && !pendingAddonStr) {
+                  showMessage('Please verify your email address to ensure account security', 'info');
+                  
+                  // Only show verification modal for new accounts not in payment flow
+                  if (user.metadata && 
+                      user.metadata.creationTime && 
+                      (new Date().getTime() - new Date(user.metadata.creationTime).getTime() < 300000)) {
+                    // If account was created less than 5 minutes ago, show the verification modal
+                    showEmailVerificationModal(user.email);
+                  }
+                }
+              }
+              return isVerified; // Return verification status
+            });
         })
         .finally(() => {
-          // This block runs *after* loadUserProfile finishes or fails
+          // This block runs *after* loadUserProfile and email verification check
           console.log("Profile load attempt finished. Current profile state:", authState.userProfile);
           showAppView(); // Show the app view
           updateUserProfileUI(user); // Update UI with basic auth info
@@ -99,6 +106,9 @@ function handleAuthStateChanged(user) {
               initializeIRISApp(); // Now safe to check authState.userProfile
               
               // After initialization is complete, check for pending actions
+              const pendingPlan = localStorage.getItem('pendingPlanSelection');
+              const pendingAddonStr = localStorage.getItem('pendingAddonPurchase');
+              
               if (pendingPlan) {
                   // Clear the pending plan to prevent loops
                   localStorage.removeItem('pendingPlanSelection');

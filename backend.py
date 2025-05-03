@@ -2478,7 +2478,7 @@ def update_user_plan():
         if plan_name not in valid_plans:
             return jsonify({'error': f'Invalid plan name: {plan_name}. Valid plans: {", ".join(valid_plans)}'}), 400
             
-        # Get user profile to keep current usage 
+        # Get user profile to verify existence
         user_data = get_user_usage(user_id)
         if not user_data:
             return jsonify({'error': f'User {user_id} not found'}), 404
@@ -2486,34 +2486,40 @@ def update_user_plan():
         # Calculate new limits based on plan
         resume_limit = get_package_limit(plan_name, 'resumeAnalyses')
         interview_limit = get_package_limit(plan_name, 'mockInterviews')
+        pdf_limit = get_package_limit(plan_name, 'pdfDownloads')
+        ai_limit = get_package_limit(plan_name, 'aiEnhance')
         
-        # Keep track of current usage (or default to 0)
-        current_resume_used = user_data.get('usage', {}).get('resumeAnalyses', {}).get('used', 0)
-        current_interview_used = user_data.get('usage', {}).get('mockInterviews', {}).get('used', 0)
-        
-        # Update user profile
+        # Update user profile with new plan and RESET usage counters to 0
         user_ref = db.collection('users').document(user_id)
         update_data = {
             'plan': plan_name,
             'planPurchasedAt': datetime.now().isoformat(),
             'planExpiresAt': None,  # No expiration for now
             'usage.resumeAnalyses.limit': resume_limit,
-            'usage.resumeAnalyses.used': current_resume_used,
+            'usage.resumeAnalyses.used': 0,  # Reset to 0
             'usage.mockInterviews.limit': interview_limit,
-            'usage.mockInterviews.used': current_interview_used,
+            'usage.mockInterviews.used': 0,  # Reset to 0
+            'usage.pdfDownloads.limit': pdf_limit,
+            'usage.pdfDownloads.used': 0,  # Reset to 0
+            'usage.aiEnhance.limit': ai_limit,
+            'usage.aiEnhance.used': 0,  # Reset to 0
             'last_updated': firestore.SERVER_TIMESTAMP
         }
         
         user_ref.update(update_data)
-        print(f"Updated user {user_id} to plan: {plan_name}")
+        print(f"Updated user {user_id} to plan: {plan_name} with reset usage counters")
         
         return jsonify({
             'success': True,
             'plan': plan_name,
             'resumeLimit': resume_limit,
             'interviewLimit': interview_limit,
-            'resumeUsed': current_resume_used,
-            'interviewUsed': current_interview_used
+            'pdfLimit': pdf_limit,
+            'aiLimit': ai_limit,
+            'resumeUsed': 0,
+            'interviewUsed': 0,
+            'pdfUsed': 0,
+            'aiUsed': 0
         })
         
     except Exception as e:
@@ -3050,32 +3056,33 @@ def verify_razorpay_payment():
             
             print(f"Calculated new limits: resume={resume_limit}, interview={interview_limit}, pdf={pdf_limit}, ai={ai_limit}")
             
-            # Get current usage to preserve
+            # Get user data to validate user exists
             user_data = get_user_usage(user_id)
             if not user_data:
                 print(f"ERROR: User profile {user_id} not found")
                 return jsonify({'success': False, 'error': 'User profile not found'}), 404
                 
+            # Log previous usage for reference only (not using in update)
             current_resume_used = user_data.get('usage', {}).get('resumeAnalyses', {}).get('used', 0)
             current_interview_used = user_data.get('usage', {}).get('mockInterviews', {}).get('used', 0)
             current_pdf_used = user_data.get('usage', {}).get('pdfDownloads', {}).get('used', 0)
             current_ai_used = user_data.get('usage', {}).get('aiEnhance', {}).get('used', 0)
-            
-            print(f"Current usage: resume={current_resume_used}, interview={current_interview_used}, pdf={current_pdf_used}, ai={current_ai_used}")
-            
-            # Update user profile with new plan
+
+            print(f"Previous usage (will be reset): resume={current_resume_used}, interview={current_interview_used}, pdf={current_pdf_used}, ai={current_ai_used}")
+
+            # Update user profile with new plan and RESET usage counters to 0
             update_data = {
                 'plan': plan_name,
                 'planPurchasedAt': datetime.now().isoformat(),
                 'planExpiresAt': None,  # No expiration for now
                 'usage.resumeAnalyses.limit': resume_limit,
-                'usage.resumeAnalyses.used': current_resume_used,
+                'usage.resumeAnalyses.used': 0,  # Reset to 0
                 'usage.mockInterviews.limit': interview_limit,
-                'usage.mockInterviews.used': current_interview_used,
+                'usage.mockInterviews.used': 0,  # Reset to 0
                 'usage.pdfDownloads.limit': pdf_limit,
-                'usage.pdfDownloads.used': current_pdf_used,
+                'usage.pdfDownloads.used': 0,  # Reset to 0
                 'usage.aiEnhance.limit': ai_limit,
-                'usage.aiEnhance.used': current_ai_used,
+                'usage.aiEnhance.used': 0,  # Reset to 0
                 'last_updated': firestore.SERVER_TIMESTAMP
             }
             
