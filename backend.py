@@ -1611,6 +1611,178 @@ def cache_suggested_answers(interview_id, suggestions, ttl=86400):  # Cache for 
     cache_key = f"suggested_answers:{interview_id}"
     redis_client.setex(cache_key, ttl, json.dumps(suggestions))
 
+def process_captured_payment(order_data, payment_id):
+    """Processes a captured payment based on order type."""
+    try:
+        user_id = order_data.get('userId')
+        order_type = order_data.get('order_type')
+        
+        if not user_id or not order_type:
+            print(f"ERROR: Missing user_id or order_type in order data")
+            return False
+            
+        user_ref = db.collection('users').document(user_id)
+        user_doc = user_ref.get()
+        
+        if not user_doc.exists:
+            print(f"ERROR: User {user_id} not found")
+            return False
+            
+        # Handle plan upgrade
+        if order_type == 'plan':
+            plan_name = order_data.get('plan_name')
+            if not plan_name:
+                print(f"ERROR: Plan name not found for order")
+                return False
+                
+            # Calculate new limits based on the plan
+            resume_limit = get_package_limit(plan_name, 'resumeAnalyses')
+            interview_limit = get_package_limit(plan_name, 'mockInterviews')
+            pdf_limit = get_package_limit(plan_name, 'pdfDownloads')
+            ai_limit = get_package_limit(plan_name, 'aiEnhance')
+            
+            # Update user profile with new plan and RESET usage counters to 0
+            update_data = {
+                'plan': plan_name,
+                'planPurchasedAt': datetime.now().isoformat(),
+                'planExpiresAt': None,  # No expiration for now
+                'usage.resumeAnalyses.limit': resume_limit,
+                'usage.resumeAnalyses.used': 0,  # Reset to 0
+                'usage.mockInterviews.limit': interview_limit,
+                'usage.mockInterviews.used': 0,  # Reset to 0
+                'usage.pdfDownloads.limit': pdf_limit,
+                'usage.pdfDownloads.used': 0,  # Reset to 0
+                'usage.aiEnhance.limit': ai_limit,
+                'usage.aiEnhance.used': 0,  # Reset to 0
+                'last_updated': firestore.SERVER_TIMESTAMP
+            }
+            
+            # Record the payment in payments collection
+            payment_data = {
+                'userId': user_id,
+                'orderId': order_data.get('orderId'),
+                'paymentId': payment_id,
+                'amount': order_data.get('amount', 0) / 100,  # Convert from paise to rupees
+                'currency': order_data.get('currency', 'INR'),
+                'type': 'plan_upgrade',
+                'planName': plan_name,
+                'status': 'completed',
+                'webhook_processed': True,
+                'timestamp': datetime.now().isoformat()
+            }
+            
+            # Create a transaction to update multiple documents atomically
+            transaction = db.transaction()
+            
+            @firestore.transactional
+            def update_in_transaction(transaction, user_ref, payment_data):
+                # Update user plan
+                transaction.update(user_ref, update_data)
+                
+                # Add payment record
+                payment_ref = db.collection('payments').document()
+                transaction.set(payment_ref, payment_data)
+                
+                return payment_ref.id
+                
+            payment_id = update_in_transaction(transaction, user_ref, payment_data)
+            print(f"Plan upgrade completed via webhook for user {user_id}, payment record: {payment_id}")
+            return True
+            
+        # Handle addon purchase
+        elif order_type == 'addon':
+            feature_type = order_data.get('feature_type')
+            quantity = int(order_data.get('quantity', 1))
+            effective_quantity = int(order_data.get('effective_quantity', quantity))
+            
+            if not feature_type:
+                print(f"ERROR: Feature type not found for addon purchase")
+                return False
+                
+            # Get current usage
+            user_data = get_user_usage(user_id)
+            if not user_data:
+                print(f"ERROR: Failed to get user data for {user_id}")
+                return False
+                
+            # Get current limit and used values
+            usage = user_data.get('usage', {}).get(feature_type, {})
+            current_limit = usage.get('limit', 0)
+            current_used = usage.get('used', 0)
+            
+            # Calculate new limit
+            new_limit = current_limit + effective_quantity
+            
+            # Update user's limit
+            update_data = {
+                f'usage.{feature_type}.limit': new_limit,
+                'last_updated': firestore.SERVER_TIMESTAMP
+            }
+            
+            # Record addon purchase
+            addon_purchase = {
+                'userId': user_id,
+                'orderId': order_data.get('orderId'),
+                'paymentId': payment_id,
+                'feature': feature_type,
+                'quantity': quantity,
+                'effectiveQuantity': effective_quantity,
+                'unitPrice': order_data.get('amount', 0) / quantity / 100,  # Convert from paise to rupees
+                'totalPrice': order_data.get('amount', 0) / 100,  # Convert from paise to rupees
+                'currency': order_data.get('currency', 'INR'),
+                'purchaseDate': datetime.now().isoformat(),
+                'previousLimit': current_limit,
+                'newLimit': new_limit,
+                'usedAtPurchase': current_used,
+                'webhook_processed': True
+            }
+            
+            # Create a transaction
+            transaction = db.transaction()
+            
+            @firestore.transactional
+            def update_addon_in_transaction(transaction, user_ref, addon_purchase):
+                # Update user limits
+                transaction.update(user_ref, update_data)
+                
+                # Add purchase record
+                purchase_ref = db.collection('addonPurchases').document()
+                transaction.set(purchase_ref, addon_purchase)
+                
+                # Add payment record
+                payment_data = {
+                    'userId': user_id,
+                    'orderId': order_data.get('orderId'),
+                    'paymentId': payment_id,
+                    'amount': addon_purchase['totalPrice'],
+                    'currency': addon_purchase['currency'],
+                    'type': 'addon_purchase',
+                    'featureType': feature_type,
+                    'quantity': quantity,
+                    'effectiveQuantity': effective_quantity,
+                    'status': 'completed',
+                    'webhook_processed': True,
+                    'timestamp': datetime.now().isoformat()
+                }
+                
+                payment_ref = db.collection('payments').document()
+                transaction.set(payment_ref, payment_data)
+                
+                return purchase_ref.id
+            
+            purchase_id = update_addon_in_transaction(transaction, user_ref, addon_purchase)
+            print(f"Addon purchase completed via webhook for user {user_id}, purchase record: {purchase_id}")
+            return True
+            
+        else:
+            print(f"ERROR: Unknown order type: {order_type}")
+            return False
+            
+    except Exception as e:
+        print(f"Error processing captured payment: {e}")
+        traceback.print_exc()
+        return False
+
 
 # === Flask Routes ===
 
@@ -3300,6 +3472,246 @@ def record_payment_failure():
         
     except Exception as e:
         print(f"Error recording payment failure: {e}")
+        return jsonify({'error': f'Server error: {str(e)}'}), 500
+
+@app.route('/payment-webhooks', methods=['POST'])
+def payment_webhooks():
+    """Handles Razorpay webhook events for payments and refunds."""
+    print("=== START: payment-webhooks ===")
+    try:
+        # Get the raw request data and Razorpay signature
+        webhook_data = request.data
+        webhook_signature = request.headers.get('X-Razorpay-Signature')
+        
+        if not webhook_signature:
+            print("ERROR: Missing X-Razorpay-Signature header in webhook request")
+            return jsonify({'error': 'Invalid webhook signature'}), 400
+            
+        # Verify webhook signature
+        try:
+            # The webhook secret should be stored in environment variables
+            webhook_secret = os.environ.get("RAZORPAY_WEBHOOK_SECRET")
+            if not webhook_secret:
+                print("ERROR: RAZORPAY_WEBHOOK_SECRET not configured")
+                return jsonify({'error': 'Webhook secret not configured'}), 500
+                
+            # Verify webhook signature using the hmac library
+            expected_signature = hmac.new(
+                webhook_secret.encode(),
+                webhook_data,
+                hashlib.sha256
+            ).hexdigest()
+            
+            # Use constant time comparison to prevent timing attacks
+            if not compare_digest(webhook_signature, expected_signature):
+                print("ERROR: Invalid webhook signature")
+                return jsonify({'error': 'Invalid webhook signature'}), 401
+                
+        except Exception as sig_error:
+            print(f"ERROR: Webhook signature verification failed: {sig_error}")
+            return jsonify({'error': 'Webhook signature verification failed'}), 401
+            
+        # Parse the JSON payload
+        event_data = json.loads(webhook_data)
+        event_type = event_data.get('event')
+        
+        if not event_type:
+            print("ERROR: Missing event type in webhook data")
+            return jsonify({'error': 'Missing event type'}), 400
+            
+        print(f"Processing Razorpay webhook event: {event_type}")
+        
+        # Extract common fields for logging
+        payment_id = event_data.get('payload', {}).get('payment', {}).get('entity', {}).get('id')
+        order_id = event_data.get('payload', {}).get('payment', {}).get('entity', {}).get('order_id')
+        
+        # Create webhook record for all events
+        if db:
+            webhook_record = {
+                'event_type': event_type,
+                'payment_id': payment_id,
+                'order_id': order_id,
+                'received_at': datetime.now().isoformat(),
+                'raw_data': json.dumps(event_data)[:10000]  # Limit size for storage
+            }
+            db.collection('webhook_events').add(webhook_record)
+            print(f"Webhook event recorded: {event_type}")
+        
+        # Process based on event type
+        if event_type == 'payment.authorized':
+            # Payment was authorized but not yet captured
+            print(f"Payment authorized: payment_id={payment_id}, order_id={order_id}")
+            
+            if db and order_id:
+                order_ref = db.collection('payment_orders').document(order_id)
+                order_doc = order_ref.get()
+                
+                if order_doc.exists:
+                    order_ref.update({
+                        'payment_id': payment_id,
+                        'payment_status': 'authorized',
+                        'authorized_at': datetime.now().isoformat(),
+                        'webhook_events': firestore.ArrayUnion([event_type])
+                    })
+                    print(f"Order {order_id} updated with authorized status")
+            
+        elif event_type == 'payment.captured':
+            # Payment was successfully captured (final success state)
+            print(f"Payment captured: payment_id={payment_id}, order_id={order_id}")
+            
+            if not db:
+                print("ERROR: Database unavailable")
+                return jsonify({'error': 'Database unavailable'}), 503
+                
+            if order_id:
+                order_ref = db.collection('payment_orders').document(order_id)
+                order_doc = order_ref.get()
+                
+                if order_doc.exists:
+                    order_data = order_doc.to_dict()
+                    
+                    # Check if payment was already processed
+                    if order_data.get('payment_status') == 'completed':
+                        print(f"Payment for order {order_id} was already processed")
+                        return jsonify({'status': 'success', 'message': 'Payment already processed'}), 200
+                    
+                    # Update order status
+                    order_ref.update({
+                        'payment_id': payment_id,
+                        'payment_status': 'completed',
+                        'webhook_processed': True,
+                        'completed_at': datetime.now().isoformat(),
+                        'webhook_events': firestore.ArrayUnion([event_type])
+                    })
+                    
+                    # Process the payment based on order type
+                    # This should be similar to your verify-razorpay-payment logic
+                    # For plan purchases, update user plan
+                    # For addon purchases, update user limits
+                    process_captured_payment(order_data, payment_id)
+                    
+                    print(f"Webhook processed successfully for captured payment {payment_id}")
+                else:
+                    print(f"Order {order_id} not found for captured payment {payment_id}")
+            
+        elif event_type == 'payment.failed':
+            # Payment failed
+            print(f"Payment failed: payment_id={payment_id}, order_id={order_id}")
+            
+            if db and order_id:
+                order_ref = db.collection('payment_orders').document(order_id)
+                order_doc = order_ref.get()
+                
+                if order_doc.exists:
+                    # Get failure details
+                    failure_reason = event_data.get('payload', {}).get('payment', {}).get('entity', {}).get('error_code')
+                    failure_description = event_data.get('payload', {}).get('payment', {}).get('entity', {}).get('error_description')
+                    
+                    order_ref.update({
+                        'payment_id': payment_id,
+                        'payment_status': 'failed',
+                        'failure_reason': failure_reason,
+                        'failure_description': failure_description,
+                        'webhook_processed': True,
+                        'failed_at': datetime.now().isoformat(),
+                        'webhook_events': firestore.ArrayUnion([event_type])
+                    })
+                    print(f"Order {order_id} updated with failed status: {failure_reason}")
+            
+        elif event_type == 'refund.created':
+            # Refund was created but not yet processed
+            refund_id = event_data.get('payload', {}).get('refund', {}).get('entity', {}).get('id')
+            refund_amount = event_data.get('payload', {}).get('refund', {}).get('entity', {}).get('amount')
+            
+            print(f"Refund created: refund_id={refund_id}, payment_id={payment_id}, amount={refund_amount}")
+            
+            if db and payment_id:
+                # Create refund record
+                refund_record = {
+                    'refund_id': refund_id,
+                    'payment_id': payment_id,
+                    'order_id': order_id,
+                    'amount': refund_amount,
+                    'status': 'created',
+                    'created_at': datetime.now().isoformat(),
+                    'webhook_events': [event_type]
+                }
+                db.collection('refunds').document(refund_id).set(refund_record)
+                print(f"Refund record created for refund {refund_id}")
+            
+        elif event_type == 'refund.processed':
+            # Refund was successfully processed
+            refund_id = event_data.get('payload', {}).get('refund', {}).get('entity', {}).get('id')
+            refund_amount = event_data.get('payload', {}).get('refund', {}).get('entity', {}).get('amount')
+            
+            print(f"Refund processed: refund_id={refund_id}, payment_id={payment_id}, amount={refund_amount}")
+            
+            if db and refund_id:
+                # Update refund record
+                refund_ref = db.collection('refunds').document(refund_id)
+                refund_ref.update({
+                    'status': 'processed',
+                    'processed_at': datetime.now().isoformat(),
+                    'webhook_events': firestore.ArrayUnion([event_type])
+                })
+                
+                # Also update related order if possible
+                if order_id:
+                    order_ref = db.collection('payment_orders').document(order_id)
+                    order_ref.update({
+                        'refund_status': 'processed',
+                        'refund_amount': refund_amount,
+                        'refund_id': refund_id,
+                        'refunded_at': datetime.now().isoformat(),
+                        'webhook_events': firestore.ArrayUnion([event_type])
+                    })
+                    print(f"Order {order_id} updated with refund status")
+            
+        elif event_type == 'refund.failed':
+            # Refund failed
+            refund_id = event_data.get('payload', {}).get('refund', {}).get('entity', {}).get('id')
+            failure_reason = event_data.get('payload', {}).get('refund', {}).get('entity', {}).get('error_code')
+            failure_description = event_data.get('payload', {}).get('refund', {}).get('entity', {}).get('error_description')
+            
+            print(f"Refund failed: refund_id={refund_id}, payment_id={payment_id}, reason={failure_reason}")
+            
+            if db and refund_id:
+                # Update refund record
+                refund_ref = db.collection('refunds').document(refund_id)
+                refund_ref.update({
+                    'status': 'failed',
+                    'failure_reason': failure_reason,
+                    'failure_description': failure_description,
+                    'failed_at': datetime.now().isoformat(),
+                    'webhook_events': firestore.ArrayUnion([event_type])
+                })
+                
+                # Also update related order if possible
+                if order_id:
+                    order_ref = db.collection('payment_orders').document(order_id)
+                    order_ref.update({
+                        'refund_status': 'failed',
+                        'refund_failure_reason': failure_reason,
+                        'webhook_events': firestore.ArrayUnion([event_type])
+                    })
+                    print(f"Order {order_id} updated with failed refund status")
+                    
+        else:
+            # Other event types - just log them
+            print(f"Received unhandled webhook event type: {event_type}")
+            
+        # Always return 200 OK for webhook - even for unhandled events
+        # This prevents Razorpay from retrying the webhook
+        print("=== END: payment-webhooks ===")
+        return jsonify({'status': 'success'}), 200
+        
+    except json.JSONDecodeError as e:
+        print(f"ERROR: Invalid JSON in webhook payload: {e}")
+        return jsonify({'error': 'Invalid JSON payload'}), 400
+    except Exception as e:
+        print(f"Unhandled error processing webhook: {e}")
+        traceback.print_exc()
+        print("=== END WITH ERROR: payment-webhooks ===")
         return jsonify({'error': f'Server error: {str(e)}'}), 500
 
 
