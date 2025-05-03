@@ -2395,6 +2395,20 @@
         </div>
     </div>
 
+    <div class="modal fade" id="pdfModal" tabindex="-1" aria-labelledby="pdfModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+          <div class="modal-content">
+            <div class="modal-header">
+              <h5 class="modal-title" id="pdfModalLabel">Document</h5>
+              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+              <iframe id="pdfFrame" style="width: 100%; height: 500px;" frameborder="0"></iframe>
+            </div>
+          </div>
+        </div>
+      </div>
+
     <!-- Public Job Details Modal -->
     <!-- <div class="modal fade" id="public-job-details-modal" tabindex="-1" aria-labelledby="publicJobDetailsModalLabel" aria-hidden="true">
         <div class="modal-dialog modal-lg">
@@ -2457,6 +2471,43 @@
             });
           });
         });
+
+        document.addEventListener('DOMContentLoaded', function() {
+            // Get the links
+            const termsLink = document.querySelector('#signup-form .form-check-label a:nth-child(1)');
+            const privacyLink = document.querySelector('#signup-form .form-check-label a:nth-child(2)');
+            
+            // PDF file paths - update these to your actual PDF locations
+            const termsOfServicePDF = "terms-of-service.pdf";
+            const privacyPolicyPDF = "privacy-policy.pdf";
+            
+            // Add event listeners to the links
+            if(termsLink) {
+                termsLink.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    openPDFInModal(termsOfServicePDF, "Terms of Service");
+                });
+            }
+            
+            if(privacyLink) {
+                privacyLink.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    openPDFInModal(privacyPolicyPDF, "Privacy Policy");
+                });
+            }
+        });
+
+        function openPDFInModal(pdfPath, title) {
+            // Set the PDF source
+            document.getElementById('pdfFrame').src = pdfPath;
+            
+            // Set the modal title
+            document.getElementById('pdfModalLabel').textContent = title;
+            
+            // Open the modal
+            const pdfModal = new bootstrap.Modal(document.getElementById('pdfModal'));
+            pdfModal.show();
+        }
     </script>
     <!-- <script src="job-listings.js"></script> -->
 </body>

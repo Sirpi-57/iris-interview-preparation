@@ -21,6 +21,7 @@ import traceback
 import razorpay
 from hmac import compare_digest
 import hashlib
+from fastapi import FastAPI, Request, Header, HTTPException
 
 # --- Add Firebase Imports ---
 import firebase_admin
@@ -48,6 +49,7 @@ MISTRAL_API_URL = "https://api.mistral.ai/v1/chat/completions" # Added based on 
 AWS_DEFAULT_REGION = os.environ.get("AWS_DEFAULT_REGION")
 RAZORPAY_KEY_ID = os.environ.get("RAZORPAY_KEY_ID")
 RAZORPAY_KEY_SECRET = os.environ.get("RAZORPAY_KEY_SECRET")
+RAZORPAY_WEBHOOK_SECRET = os.environ.get("RAZORPAY_WEBHOOK_SECRET")
 # AWS Keys might be needed if IAM role on Render doesn't work for Polly
 # AWS_ACCESS_KEY_ID = os.environ.get("AWS_ACCESS_KEY_ID")
 # AWS_SECRET_ACCESS_KEY = os.environ.get("AWS_SECRET_ACCESS_KEY")
