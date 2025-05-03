@@ -759,7 +759,7 @@ function checkEmailVerification(user) {
     });
 }
 
-// Show email verification modal
+// Updated showEmailVerificationModal function
 function showEmailVerificationModal(email) {
   // Create the modal element if it doesn't exist
   let modalDiv = document.getElementById('email-verification-modal');
@@ -791,6 +791,7 @@ function showEmailVerificationModal(email) {
           </div>
           <div class="modal-footer">
             <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            <button type="button" class="btn btn-info" id="check-verification-btn">Check Verification Status</button>
             <button type="button" class="btn btn-primary" id="resend-verification-btn">Resend Verification</button>
           </div>
         </div>
@@ -812,37 +813,120 @@ function showEmailVerificationModal(email) {
                            new bootstrap.Modal(modalDiv);
   verificationModal.show();
   
+  // Start polling for verification status
+  const user = firebase.auth().currentUser;
+  let pollingInterval = null;
+  
+  if (user) {
+    pollingInterval = startVerificationPolling(user, verificationModal);
+  }
+  
   // Add event listener for resend button
-  document.getElementById('resend-verification-btn')?.addEventListener('click', function() {
-    const user = firebase.auth().currentUser;
-    if (user) {
-      // Show loading state
-      const btn = this;
-      const originalText = btn.innerHTML;
-      btn.disabled = true;
-      btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Sending...';
-      
-      sendEmailVerification(user)
-        .then(success => {
-          if (success) {
-            showMessage('Verification email resent successfully!', 'success');
-          }
-        })
-        .finally(() => {
-          // Reset button state
-          btn.disabled = false;
-          btn.innerHTML = originalText;
-        });
-    } else {
-      showMessage('You must be logged in to resend verification email', 'warning');
+  const resendBtn = document.getElementById('resend-verification-btn');
+  if (resendBtn) {
+    // Remove existing listeners by cloning
+    const newResendBtn = resendBtn.cloneNode(true);
+    if (resendBtn.parentNode) {
+      resendBtn.parentNode.replaceChild(newResendBtn, resendBtn);
     }
-  });
+    
+    newResendBtn.addEventListener('click', function() {
+      const user = firebase.auth().currentUser;
+      if (user) {
+        // Show loading state
+        const btn = this;
+        const originalText = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Sending...';
+        
+        sendEmailVerification(user)
+          .then(success => {
+            if (success) {
+              showMessage('Verification email resent successfully!', 'success');
+            }
+          })
+          .finally(() => {
+            // Reset button state
+            btn.disabled = false;
+            btn.innerHTML = originalText;
+          });
+      } else {
+        showMessage('You must be logged in to resend verification email', 'warning');
+      }
+    });
+  }
+  
+  // Add event listener for check verification button
+  const checkBtn = document.getElementById('check-verification-btn');
+  if (checkBtn) {
+    // Remove existing listeners by cloning
+    const newCheckBtn = checkBtn.cloneNode(true);
+    if (checkBtn.parentNode) {
+      checkBtn.parentNode.replaceChild(newCheckBtn, checkBtn);
+    }
+    
+    newCheckBtn.addEventListener('click', function() {
+      const user = firebase.auth().currentUser;
+      if (user) {
+        // Show loading state
+        const btn = this;
+        const originalText = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Checking...';
+        
+        // Force token refresh to get latest verification status
+        user.reload()
+          .then(() => {
+            if (user.emailVerified) {
+              // Update Firestore user record if needed
+              if (firebase.firestore) {
+                firebase.firestore().collection('users').doc(user.uid).update({
+                  emailVerified: true
+                }).catch(err => console.error('Error updating verification status:', err));
+              }
+              
+              // Update local state
+              if (authState.userProfile) {
+                authState.userProfile.emailVerified = true;
+              }
+              
+              // Hide verification modal
+              const modalInstance = bootstrap.Modal.getInstance(modalDiv);
+              if (modalInstance) modalInstance.hide();
+              
+              // Show success message
+              showMessage('Email verification successful! Your account is now fully activated.', 'success');
+            } else {
+              // Still not verified
+              showMessage('Your email is not verified yet. Please check your inbox and click the verification link.', 'warning');
+            }
+          })
+          .catch(error => {
+            console.error('Error checking verification status:', error);
+            showMessage(`Error checking verification status: ${error.message}`, 'danger');
+          })
+          .finally(() => {
+            // Reset button state
+            btn.disabled = false;
+            btn.innerHTML = originalText;
+          });
+      }
+    });
+  }
   
   // Clean up when modal is hidden
   modalDiv.addEventListener('hidden.bs.modal', function() {
+    // Clear polling interval if it exists
+    if (pollingInterval) {
+      clearInterval(pollingInterval);
+    }
+    
     // Remove any event listeners to prevent memory leaks
     document.getElementById('resend-verification-btn')?.replaceWith(
       document.getElementById('resend-verification-btn').cloneNode(true)
+    );
+    document.getElementById('check-verification-btn')?.replaceWith(
+      document.getElementById('check-verification-btn').cloneNode(true)
     );
   });
 }
@@ -1059,7 +1143,6 @@ function purchaseAddon(featureType, quantity = 1) {
   });
 }
 
-// Event listeners
 function attachAuthEventListeners() {
   // Sign in form submission
   document.getElementById('signin-form')?.addEventListener('submit', function(e) {
@@ -1090,6 +1173,26 @@ function attachAuthEventListeners() {
     });
   });
   
+  // NEW: Forgot password link
+  document.getElementById('forgot-password-link')?.addEventListener('click', function(e) {
+    e.preventDefault();
+    // Hide the sign-in modal
+    hideAuthModal();
+    // Show the password reset modal
+    const resetModal = document.getElementById('reset-password-modal');
+    if (resetModal) {
+      const modalInstance = new bootstrap.Modal(resetModal);
+      modalInstance.show();
+    }
+  });
+  
+  // NEW: Password reset form submission
+  document.getElementById('reset-password-form')?.addEventListener('submit', function(e) {
+    e.preventDefault();
+    const email = document.getElementById('reset-email').value;
+    sendPasswordResetEmail(email);
+  });
+  
   // Modal trigger buttons
   document.querySelectorAll('[data-auth="signin"]').forEach(button => {
     button.addEventListener('click', function() {
@@ -1111,19 +1214,100 @@ function attachAuthEventListeners() {
   });
 }
 
-// Send verification email to newly registered users
-function sendEmailVerification(user) {
-  return user.sendEmailVerification()
+// Function to send password reset email
+function sendPasswordResetEmail(email) {
+  if (!firebase.auth) {
+    showErrorMessage('Authentication service not available');
+    return Promise.reject(new Error('Authentication service not available'));
+  }
+  
+  // Show loading state on the button
+  const resetBtn = document.querySelector('#reset-password-form button[type="submit"]');
+  const originalBtnText = resetBtn ? resetBtn.innerHTML : '';
+  if (resetBtn) {
+    resetBtn.disabled = true;
+    resetBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Sending...';
+  }
+  
+  return firebase.auth().sendPasswordResetEmail(email)
     .then(() => {
-      console.log('Verification email sent successfully');
-      showMessage('A verification email has been sent to your email address. Please check your inbox and verify your account.', 'info');
+      console.log('Password reset email sent successfully');
+      
+      // Hide the reset modal
+      const resetModal = document.getElementById('reset-password-modal');
+      if (resetModal) {
+        const modalInstance = bootstrap.Modal.getInstance(resetModal);
+        if (modalInstance) modalInstance.hide();
+      }
+      
+      // Show success message
+      showMessage('Password reset email sent! Check your inbox for instructions.', 'success');
       return true;
     })
     .catch(error => {
-      console.error('Error sending verification email:', error);
-      showMessage(`Failed to send verification email: ${error.message}`, 'danger');
+      console.error('Error sending password reset email:', error);
+      showErrorMessage(`Failed to send password reset email: ${error.message}`);
       return false;
+    })
+    .finally(() => {
+      // Reset button state
+      if (resetBtn) {
+        resetBtn.disabled = false;
+        resetBtn.innerHTML = originalBtnText;
+      }
     });
+}
+
+// Function to poll for email verification completion
+function startVerificationPolling(user, modalInstance) {
+  if (!user) return null;
+  
+  console.log('Starting email verification polling for user:', user.email);
+  
+  // Start a polling interval to check verification status
+  const checkInterval = setInterval(() => {
+    // Reload the user to get fresh token with updated email verification status
+    console.log('Checking verification status...');
+    user.reload()
+      .then(() => {
+        // Check if email is verified
+        if (user.emailVerified) {
+          console.log('Email verified successfully!');
+          
+          // Clear the interval
+          clearInterval(checkInterval);
+          
+          // Update Firestore user record if needed
+          if (firebase.firestore) {
+            firebase.firestore().collection('users').doc(user.uid).update({
+              emailVerified: true
+            }).catch(err => console.error('Error updating verification status:', err));
+          }
+          
+          // Update local state
+          if (authState.userProfile) {
+            authState.userProfile.emailVerified = true;
+          }
+          
+          // Hide verification modal
+          if (modalInstance) {
+            modalInstance.hide();
+          }
+          
+          // Show success message
+          showMessage('Email verification successful! Your account is now fully activated.', 'success');
+        } else {
+          console.log('Email not yet verified, continuing to poll...');
+        }
+      })
+      .catch(error => {
+        console.error('Error checking email verification status:', error);
+        clearInterval(checkInterval); // Stop on error
+      });
+  }, 5000); // Check every 5 seconds
+  
+  // Store the interval ID so we can clear it if needed
+  return checkInterval;
 }
 
 // Export functions for global use
@@ -1150,5 +1334,6 @@ window.irisAuth = {
   // Add new functions
   sendEmailVerification,
   checkEmailVerification,
-  showEmailVerificationModal
+  showEmailVerificationModal,
+  sendPasswordResetEmail,
 };
