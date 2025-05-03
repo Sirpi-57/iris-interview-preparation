@@ -241,7 +241,7 @@ function loadUserProfile(user) {
 function getPackageLimit(feature, packageName) {
   const limits = {
       'free': {
-          'resumeAnalyses': 2,
+          'resumeAnalyses': 1,
           'mockInterviews': 0,
           'pdfDownloads': 5,
           'aiEnhance': 5
