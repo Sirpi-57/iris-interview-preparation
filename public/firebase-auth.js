@@ -64,31 +64,78 @@ function handleAuthStateChanged(user) {
   if (user) {
       // User is signed in
       
-      // Check if there was a pending plan selection or addon purchase
+      // Hold these variables but don't process them yet
       const pendingPlan = localStorage.getItem('pendingPlanSelection');
       const pendingAddonStr = localStorage.getItem('pendingAddonPurchase');
       
       return loadUserProfile(user)
         .then(() => {
-          // Check email verification after profile is loaded (non-blocking)
+          // Check email verification FIRST and block payment if not verified
           return checkEmailVerification(user)
             .then(isVerified => {
-              // Show warning if email is not verified, but don't block any features
+              // Store verification state globally for reference
+              authState.isEmailVerified = isVerified;
+              
+              // Show warning if email is not verified
               if (!isVerified) {
                 console.log("Email not verified for user:", user.email);
-                // Only show verification message if they're not in the middle of payment flow
-                const pendingPlan = localStorage.getItem('pendingPlanSelection');
-                const pendingAddonStr = localStorage.getItem('pendingAddonPurchase');
                 
-                if (!pendingPlan && !pendingAddonStr) {
-                  showMessage('Please verify your email address to ensure account security', 'info');
+                // Only show verification message if they're not in the middle of payment flow
+                showMessage('Please verify your email address before proceeding', 'info');
+                
+                // Show verification modal for all unverified accounts
+                showEmailVerificationModal(user.email);
+                
+                // Store pending payment data for use after verification
+                if (pendingPlan) {
+                  localStorage.setItem('postVerificationPlan', pendingPlan);
+                  localStorage.removeItem('pendingPlanSelection');
+                  showMessage('You need to verify your email before upgrading your plan', 'warning');
+                }
+                
+                if (pendingAddonStr) {
+                  localStorage.setItem('postVerificationAddon', pendingAddonStr);
+                  localStorage.removeItem('pendingAddonPurchase');
+                  showMessage('You need to verify your email before purchasing add-ons', 'warning');
+                }
+              } else {
+                console.log("Email verified for user:", user.email);
+                // Now that email is verified, check for post-verification payments
+                const postVerificationPlan = localStorage.getItem('postVerificationPlan');
+                const postVerificationAddon = localStorage.getItem('postVerificationAddon');
+                
+                if (postVerificationPlan) {
+                  localStorage.removeItem('postVerificationPlan');
                   
-                  // Only show verification modal for new accounts not in payment flow
-                  if (user.metadata && 
-                      user.metadata.creationTime && 
-                      (new Date().getTime() - new Date(user.metadata.creationTime).getTime() < 300000)) {
-                    // If account was created less than 5 minutes ago, show the verification modal
-                    showEmailVerificationModal(user.email);
+                  // Give a moment for everything to fully initialize
+                  setTimeout(() => {
+                      console.log(`Processing post-verification plan selection: ${postVerificationPlan}`);
+                      // Trigger plan selection with payment
+                      if (typeof selectPlanFixed === 'function') {
+                          selectPlanFixed(postVerificationPlan);
+                      } else {
+                          console.warn("selectPlanFixed function not found. Cannot process pending plan.");
+                          showMessage("Unable to continue with plan selection. Please try again from your profile.", "warning");
+                      }
+                  }, 1500);
+                } else if (postVerificationAddon) {
+                  // Process addon purchase if there's no pending plan
+                  try {
+                      const pendingAddon = JSON.parse(postVerificationAddon);
+                      localStorage.removeItem('postVerificationAddon');
+                      
+                      setTimeout(() => {
+                          console.log(`Processing post-verification addon purchase:`, pendingAddon);
+                          if (typeof purchaseAddonItem === 'function') {
+                              purchaseAddonItem(pendingAddon.featureType, pendingAddon.quantity);
+                          } else {
+                              console.warn("purchaseAddonItem function not found. Cannot process pending addon.");
+                              showMessage("Unable to continue with add-on purchase. Please try again from your profile.", "warning");
+                          }
+                      }, 1500);
+                  } catch (e) {
+                      console.error("Error parsing pending addon data:", e);
+                      localStorage.removeItem('postVerificationAddon');
                   }
                 }
               }
@@ -104,51 +151,12 @@ function handleAuthStateChanged(user) {
           // Initialize app logic *after* profile attempt and showing view
           if (typeof initializeIRISApp === 'function') {
               initializeIRISApp(); // Now safe to check authState.userProfile
-              
-              // After initialization is complete, check for pending actions
-              const pendingPlan = localStorage.getItem('pendingPlanSelection');
-              const pendingAddonStr = localStorage.getItem('pendingAddonPurchase');
-              
-              if (pendingPlan) {
-                  // Clear the pending plan to prevent loops
-                  localStorage.removeItem('pendingPlanSelection');
-                  
-                  // Give a moment for everything to fully initialize
-                  setTimeout(() => {
-                      console.log(`Continuing with pending plan selection: ${pendingPlan}`);
-                      // Trigger plan selection with payment
-                      if (typeof selectPlanFixed === 'function') {
-                          selectPlanFixed(pendingPlan);
-                      } else {
-                          console.warn("selectPlanFixed function not found. Cannot process pending plan.");
-                          showMessage("Unable to continue with plan selection. Please try again from your profile.", "warning");
-                      }
-                  }, 1500);
-              } else if (pendingAddonStr) {
-                  // Process addon purchase if there's no pending plan
-                  try {
-                      const pendingAddon = JSON.parse(pendingAddonStr);
-                      localStorage.removeItem('pendingAddonPurchase');
-                      
-                      setTimeout(() => {
-                          console.log(`Continuing with pending addon purchase:`, pendingAddon);
-                          if (typeof purchaseAddonItem === 'function') {
-                              purchaseAddonItem(pendingAddon.featureType, pendingAddon.quantity);
-                          } else {
-                              console.warn("purchaseAddonItem function not found. Cannot process pending addon.");
-                              showMessage("Unable to continue with add-on purchase. Please try again from your profile.", "warning");
-                          }
-                      }, 1500);
-                  } catch (e) {
-                      console.error("Error parsing pending addon data:", e);
-                      localStorage.removeItem('pendingAddonPurchase');
-                  }
-              }
           }
         });
   } else {
-      // User is signed out
+      // User is signed out logic (no changes needed)
       authState.userProfile = null;
+      authState.isEmailVerified = false;
       // Reset form fields
       const resumeInput = document.getElementById('resumeFile');
       const jobDescriptionInput = document.getElementById('jobDescription');
@@ -162,6 +170,8 @@ function handleAuthStateChanged(user) {
       // Clear any pending purchase actions if user signs out
       localStorage.removeItem('pendingPlanSelection');
       localStorage.removeItem('pendingAddonPurchase');
+      localStorage.removeItem('postVerificationPlan');
+      localStorage.removeItem('postVerificationAddon');
       
       showPublicView();
       clearUserProfileUI();
@@ -1258,7 +1268,6 @@ function sendPasswordResetEmail(email) {
     });
 }
 
-// Function to poll for email verification completion
 function startVerificationPolling(user, modalInstance) {
   if (!user) return null;
   
@@ -1288,6 +1297,7 @@ function startVerificationPolling(user, modalInstance) {
           if (authState.userProfile) {
             authState.userProfile.emailVerified = true;
           }
+          authState.isEmailVerified = true;
           
           // Hide verification modal
           if (modalInstance) {
@@ -1296,6 +1306,45 @@ function startVerificationPolling(user, modalInstance) {
           
           // Show success message
           showMessage('Email verification successful! Your account is now fully activated.', 'success');
+          
+          // Process any pending payments that were waiting for verification
+          const postVerificationPlan = localStorage.getItem('postVerificationPlan');
+          const postVerificationAddon = localStorage.getItem('postVerificationAddon');
+          
+          if (postVerificationPlan) {
+            localStorage.removeItem('postVerificationPlan');
+            
+            // Give a moment for everything to fully initialize
+            setTimeout(() => {
+                console.log(`Processing post-verification plan selection: ${postVerificationPlan}`);
+                // Trigger plan selection with payment
+                if (typeof selectPlanFixed === 'function') {
+                    selectPlanFixed(postVerificationPlan);
+                } else {
+                    console.warn("selectPlanFixed function not found. Cannot process pending plan.");
+                    showMessage("Unable to continue with plan selection. Please try again from your profile.", "warning");
+                }
+            }, 1500);
+          } else if (postVerificationAddon) {
+            // Process addon purchase if there's no pending plan
+            try {
+                const pendingAddon = JSON.parse(postVerificationAddon);
+                localStorage.removeItem('postVerificationAddon');
+                
+                setTimeout(() => {
+                    console.log(`Processing post-verification addon purchase:`, pendingAddon);
+                    if (typeof purchaseAddonItem === 'function') {
+                        purchaseAddonItem(pendingAddon.featureType, pendingAddon.quantity);
+                    } else {
+                        console.warn("purchaseAddonItem function not found. Cannot process pending addon.");
+                        showMessage("Unable to continue with add-on purchase. Please try again from your profile.", "warning");
+                    }
+                }, 1500);
+            } catch (e) {
+                console.error("Error parsing pending addon data:", e);
+                localStorage.removeItem('postVerificationAddon');
+            }
+          }
         } else {
           console.log('Email not yet verified, continuing to poll...');
         }
@@ -1349,6 +1398,8 @@ window.irisAuth = {
   },
   getPackageLimit,
   purchaseAddon,
+  // Add email verification state getter
+  isEmailVerified: () => authState.isEmailVerified || false,
   
   // Add new functions
   sendEmailVerification,

@@ -662,8 +662,16 @@ function initButtons() {
             
             // Check if user is logged in
             if (firebase.auth().currentUser) {
-                // User is logged in, proceed to payment
-                selectPlanFixed(planName);
+                // User is logged in, check if email is verified
+                if (authState.isEmailVerified) {
+                    // Email is verified, proceed to payment
+                    selectPlanFixed(planName);
+                } else {
+                    // Email is not verified, store selection and show verification modal
+                    localStorage.setItem('postVerificationPlan', planName);
+                    showMessage('Please verify your email before upgrading your plan', 'warning');
+                    showEmailVerificationModal(firebase.auth().currentUser.email);
+                }
             } else {
                 // User is not logged in, show auth modal first
                 // Store selected plan in localStorage to retrieve after login
@@ -676,6 +684,7 @@ function initButtons() {
             }
         });
     });
+    
     
     // --- Handlers for plan buttons inside the upgrade modal ---
     document.querySelectorAll('.plan-select-btn').forEach(button => {
@@ -711,8 +720,19 @@ function initButtons() {
             
             // Check if user is logged in
             if (firebase.auth().currentUser) {
-                // User is logged in, proceed to payment
-                purchaseAddonItem(featureType, quantity);
+                // User is logged in, check if email is verified
+                if (authState.isEmailVerified) {
+                    // Email is verified, proceed to payment
+                    purchaseAddonItem(featureType, quantity);
+                } else {
+                    // Email is not verified, store selection and show verification modal
+                    localStorage.setItem('postVerificationAddon', JSON.stringify({
+                        featureType: featureType,
+                        quantity: quantity
+                    }));
+                    showMessage('Please verify your email before purchasing add-ons', 'warning');
+                    showEmailVerificationModal(firebase.auth().currentUser.email);
+                }
             } else {
                 // User is not logged in, show auth modal first
                 localStorage.setItem('pendingAddonPurchase', JSON.stringify({
@@ -5662,10 +5682,26 @@ function updateAddonPrice(featureType, quantity) {
     }
 }
 
+// Modify purchaseAddonItem function 
 function purchaseAddonItem(featureType, quantity) {
+    // First, check if user is logged in and verified
     if (!firebase.auth().currentUser) {
         showMessage('Please sign in to purchase add-ons', 'warning');
-        safelyCloseModal('addonPurchaseModal');
+        if (typeof irisAuth !== 'undefined' && typeof irisAuth.showSignInModal === 'function') {
+            irisAuth.showSignInModal();
+        }
+        return;
+    }
+    
+    // Check if email is verified
+    if (!authState.isEmailVerified) {
+        // Store for later and prompt verification
+        localStorage.setItem('postVerificationAddon', JSON.stringify({
+            featureType: featureType,
+            quantity: quantity
+        }));
+        showMessage('You need to verify your email before purchasing add-ons', 'warning');
+        showEmailVerificationModal(firebase.auth().currentUser.email);
         return;
     }
     
