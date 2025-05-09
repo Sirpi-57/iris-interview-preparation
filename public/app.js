@@ -70,17 +70,11 @@ document.addEventListener('DOMContentLoaded', function() {
         // Check browser support
         checkBrowserSupport();
 
-        // Add event listener to job listings tab button
-        const jobListingsTabBtn = document.querySelector('.tab-button[data-tab="job-listings-tab"]');
-        if (jobListingsTabBtn) {
-            jobListingsTabBtn.addEventListener('click', function() {
-                // Only initialize once when the user clicks on the job listings tab
-                if (!window.publicJobListingsInitialized) {
-                    initPublicJobListings();
-                    window.publicJobListingsInitialized = true;
-                }
-            });
-        }
+        // REMOVED: Old job listings tab button event listener
+        // We'll use the improved tab buttons instead
+        
+        // NEW: Initialize improved tab buttons for smoother tab switching
+        initImprovedTabButtons();
         
         // Add these new lines to check for pending mock interviews
         // This is important to handle cases where users come from job listings,
@@ -816,6 +810,13 @@ function initForms() {
 // --- UI Navigation & State ---
 
 function navigateTo(sectionId) {
+    if (!sectionId) {
+        console.warn("navigateTo called with null or undefined sectionId");
+        return;
+    }
+    
+    console.log(`Navigating to section: ${sectionId}`);
+    
     document.querySelectorAll('.nav-item').forEach(item => {
         item.classList.remove('active');
         if (item.getAttribute('data-target') === sectionId) {
@@ -826,22 +827,24 @@ function navigateTo(sectionId) {
     document.querySelectorAll('.content-section').forEach(section => {
         section.classList.remove('active');
     });
+    
     const targetElement = document.getElementById(sectionId);
     if (targetElement) {
         targetElement.classList.add('active');
+        
         // Special actions after navigation
         if (sectionId === 'history') {
             loadProgressHistory(); // Load history data when navigating to history tab
         }
-        if (sectionId === 'performance' && state.sessionId) {
+        else if (sectionId === 'performance' && state.sessionId) {
             // If we're navigating to performance, make sure we've loaded the most recent interview
             checkAndUnlockHistorySections(state.sessionId);
         }
-        if (sectionId === 'mock-interview' && !state.videoStream) {
+        else if (sectionId === 'mock-interview' && !state.videoStream) {
             // No change needed here - keep as is
         }
     } else {
-        console.error(`Navigation target not found: ${sectionId}`);
+        console.error(`Navigation target element #${sectionId} not found.`);
     }
 }
 
@@ -6194,7 +6197,9 @@ function enhanceModalCloseHandlers() {
         'addonPurchaseModal',
         'paymentProcessingModal',
         'paymentSuccessModal',
-        'limitReachedModal'
+        'limitReachedModal',
+        'jobDetailsModal', // Add job details modal to the list
+        'auth-modal' // Add auth modal to the list
     ];
     
     modals.forEach(modalId => {
@@ -6203,15 +6208,23 @@ function enhanceModalCloseHandlers() {
         
         // Add hidden.bs.modal event listener
         modalElement.addEventListener('hidden.bs.modal', function(event) {
-            // Handle any necessary cleanup specific to this modal
             console.log(`Modal ${modalId} closed properly`);
             
-            // Extra safety - remove any lingering backdrops after a short delay
-            setTimeout(() => {
-                if (document.querySelectorAll('.modal-backdrop').length > 0) {
-                    safelyCloseModal(modalId);
-                }
-            }, 300);
+            // Extra aggressive cleanup - remove any lingering backdrops immediately
+            document.querySelectorAll('.modal-backdrop').forEach(backdrop => {
+                backdrop.remove();
+            });
+            
+            // Reset body classes and styles
+            document.body.classList.remove('modal-open');
+            document.body.style.removeProperty('padding-right');
+            document.body.style.removeProperty('overflow');
+            
+            // Remove the emergency button if it's visible
+            const emergencyButton = document.getElementById('emergency-modal-cleanup');
+            if (emergencyButton && emergencyButton.style.display === 'block') {
+                emergencyButton.style.display = 'none';
+            }
         });
         
         // Make sure close buttons work properly
@@ -6225,20 +6238,40 @@ function enhanceModalCloseHandlers() {
             
             // Add enhanced close handler
             newButton.addEventListener('click', function(event) {
-                safelyCloseModal(modalId);
+                // Close modal properly
+                const modalInstance = bootstrap.Modal.getInstance(modalElement);
+                if (modalInstance) {
+                    modalInstance.hide();
+                }
+                
+                // Force cleanup
+                setTimeout(() => {
+                    document.querySelectorAll('.modal-backdrop').forEach(backdrop => {
+                        backdrop.remove();
+                    });
+                    document.body.classList.remove('modal-open');
+                    document.body.style.removeProperty('padding-right');
+                    document.body.style.overflow = '';
+                }, 300);
             });
         });
     });
     
-    // Also handle ESC key globally
+    // Also handle ESC key globally for better modal cleanup
     document.addEventListener('keydown', function(event) {
         if (event.key === 'Escape') {
             // Check if any modal is visible
             const visibleModals = document.querySelectorAll('.modal.show');
             if (visibleModals.length > 0) {
-                visibleModals.forEach(modal => {
-                    safelyCloseModal(modal.id);
-                });
+                // Force cleanup after a short delay
+                setTimeout(() => {
+                    document.querySelectorAll('.modal-backdrop').forEach(backdrop => {
+                        backdrop.remove();
+                    });
+                    document.body.classList.remove('modal-open');
+                    document.body.style.removeProperty('padding-right');
+                    document.body.style.overflow = '';
+                }, 300);
             }
         }
     });
@@ -6301,15 +6334,21 @@ function setupGlobalModalCleanup() {
     const emergencyButton = document.createElement('button');
     emergencyButton.id = 'emergency-modal-cleanup';
     emergencyButton.className = 'btn btn-danger btn-sm';
-    emergencyButton.style.cssText = 'position: fixed; bottom: 10px; right: 10px; z-index: 10000; opacity: 0.8; display: none;';
+    emergencyButton.style.cssText = 'position: fixed; bottom: 10px; right: 10px; z-index: 10000; opacity: 0.6; display: none;';
     emergencyButton.innerHTML = '<i class="fas fa-times-circle"></i> Unstick UI';
     emergencyButton.onclick = function() {
         console.log("Emergency cleanup triggered by user");
         
         // Close all known modals
         ['upgradeModal', 'paymentProcessingModal', 'paymentSuccessModal', 
-         'limitReachedModal', 'addonPurchaseModal', 'auth-modal'].forEach(modalId => {
-            safelyCloseModal(modalId);
+         'limitReachedModal', 'addonPurchaseModal', 'auth-modal', 'jobDetailsModal'].forEach(modalId => {
+            const modalEl = document.getElementById(modalId);
+            if (modalEl) {
+                const modalInstance = bootstrap.Modal.getInstance(modalEl);
+                if (modalInstance) {
+                    modalInstance.hide();
+                }
+            }
         });
         
         // Force remove any modal backdrops
@@ -6325,7 +6364,10 @@ function setupGlobalModalCleanup() {
     };
     document.body.appendChild(emergencyButton);
     
-    // Check periodically if the user might be stuck
+    // Check less frequently to reduce the chance of showing the button unnecessarily
+    // Only show after a longer delay of potential stuck state
+    let potentiallyStuckCounter = 0;
+    
     setInterval(function() {
         const hasModalClass = document.body.classList.contains('modal-open');
         const hasVisibleModals = document.querySelectorAll('.modal.show').length > 0;
@@ -6335,26 +6377,17 @@ function setupGlobalModalCleanup() {
         const isPossiblyStuck = (hasModalClass && !hasVisibleModals) || 
                               (hasBackdrops && !hasVisibleModals);
         
-        document.getElementById('emergency-modal-cleanup').style.display = 
-            isPossiblyStuck ? 'block' : 'none';
-    }, 2000); // Check every 2 seconds
-    
-    // Add ESC key handler to fix stuck modals
-    document.addEventListener('keydown', function(event) {
-        if (event.key === 'Escape') {
-            // Check if any modal backdrop exists without visible modal
-            const hasBackdrops = document.querySelectorAll('.modal-backdrop').length > 0;
-            const hasVisibleModals = document.querySelectorAll('.modal.show').length > 0;
-            
-            if (hasBackdrops && !hasVisibleModals) {
-                console.log("ESC pressed with backdrop but no visible modal - cleaning up");
-                document.querySelectorAll('.modal-backdrop').forEach(el => el.remove());
-                document.body.classList.remove('modal-open');
-                document.body.style.removeProperty('padding-right');
-                document.body.style.removeProperty('overflow');
+        if (isPossiblyStuck) {
+            potentiallyStuckCounter++;
+            // Only show the button if stuck for more than 3 checks (6 seconds)
+            if (potentiallyStuckCounter >= 3) {
+                document.getElementById('emergency-modal-cleanup').style.display = 'block';
             }
+        } else {
+            potentiallyStuckCounter = 0;
+            document.getElementById('emergency-modal-cleanup').style.display = 'none';
         }
-    });
+    }, 2000); // Check every 2 seconds
 }
 
 // Add this function to modify the showExistingUpgradeModal function to ensure proper cleanup
@@ -7065,34 +7098,258 @@ function initModalFixes() {
 function initPublicJobListings() {
     console.log("Initializing public job listings");
     
+    // Add a visible loading indicator for the entire tab
+    const jobListingsTab = document.getElementById('job-listings-tab');
+    if (jobListingsTab) {
+        // Only add loading indicator if not already present
+        if (!jobListingsTab.querySelector('.full-page-loader')) {
+            const loadingIndicator = document.createElement('div');
+            loadingIndicator.className = 'full-page-loader';
+            loadingIndicator.innerHTML = `
+                <div class="d-flex justify-content-center align-items-center" style="min-height: 300px;">
+                    <div class="text-center">
+                        <div class="spinner-border text-primary" role="status" style="width: 3rem; height: 3rem;">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                        <p class="mt-3">Loading job listings...</p>
+                    </div>
+                </div>
+            `;
+            jobListingsTab.appendChild(loadingIndicator);
+        }
+    }
+    
     // Elements 
     const jobListingsGrid = document.getElementById('publicJobListingsGrid');
     const featuredJobsCarousel = document.getElementById('featuredJobsCarousel');
-    const carouselInner = featuredJobsCarousel?.querySelector('.carousel-inner');
     const searchInput = document.getElementById('publicJobSearchInput');
     const categoryFilter = document.getElementById('publicJobCategoryFilter');
     const techFilter = document.getElementById('publicJobTechFilter');
     const resetFiltersBtn = document.getElementById('publicResetJobFilters');
     
-    // Initialize - load the job listings
-    loadPublicJobListings();
-    
-    // Add event listeners for filtering
+    // Add event listeners for filtering before loading data
     if (searchInput) {
-        searchInput.addEventListener('input', filterPublicJobListings);
+        // Remove existing listeners first to prevent duplicates
+        const newSearchInput = searchInput.cloneNode(true);
+        if (searchInput.parentNode) {
+            searchInput.parentNode.replaceChild(newSearchInput, searchInput);
+        }
+        newSearchInput.addEventListener('input', function() {
+            if (typeof filterPublicJobListings === 'function') {
+                filterPublicJobListings();
+            } else if (typeof filterJobListings === 'function') {
+                filterJobListings();
+            }
+        });
     }
     
     if (categoryFilter) {
-        categoryFilter.addEventListener('change', filterPublicJobListings);
+        const newCategoryFilter = categoryFilter.cloneNode(true);
+        if (categoryFilter.parentNode) {
+            categoryFilter.parentNode.replaceChild(newCategoryFilter, categoryFilter);
+        }
+        newCategoryFilter.addEventListener('change', function() {
+            if (typeof filterPublicJobListings === 'function') {
+                filterPublicJobListings();
+            } else if (typeof filterJobListings === 'function') {
+                filterJobListings();
+            }
+        });
     }
     
     if (techFilter) {
-        techFilter.addEventListener('change', filterPublicJobListings);
+        const newTechFilter = techFilter.cloneNode(true);
+        if (techFilter.parentNode) {
+            techFilter.parentNode.replaceChild(newTechFilter, techFilter);
+        }
+        newTechFilter.addEventListener('change', function() {
+            if (typeof filterPublicJobListings === 'function') {
+                filterPublicJobListings();
+            } else if (typeof filterJobListings === 'function') {
+                filterJobListings();
+            }
+        });
     }
     
     if (resetFiltersBtn) {
-        resetFiltersBtn.addEventListener('click', resetPublicFilters);
+        const newResetBtn = resetFiltersBtn.cloneNode(true);
+        if (resetFiltersBtn.parentNode) {
+            resetFiltersBtn.parentNode.replaceChild(newResetBtn, resetFiltersBtn);
+        }
+        newResetBtn.addEventListener('click', function() {
+            if (typeof resetPublicFilters === 'function') {
+                resetPublicFilters();
+            } else if (typeof resetFilters === 'function') {
+                resetFilters();
+            }
+        });
     }
+    
+    // Initialize - load the job listings
+    // Use a small delay to ensure the UI is ready
+    setTimeout(() => {
+        loadPublicJobListingsOptimized();
+    }, 100);
+}
+
+function loadPublicJobListingsOptimized() {
+    console.log("Loading public job listings (optimized - without featured carousel)");
+    
+    if (!firebase.firestore) {
+        console.error("Firestore not available");
+        showErrorInPublicJobSection("Unable to load job listings at this time.");
+        return;
+    }
+    
+    // First, check if we're on the job listings page by looking for required elements
+    const jobListingsGrid = document.getElementById('publicJobListingsGrid');
+    if (!jobListingsGrid) {
+        console.warn("Job listings grid not found, cannot load job listings");
+        return;
+    }
+    
+    // Remove references to the carousel
+    const featuredJobsCarousel = null; // Don't use the carousel anymore
+    
+    // Show loading state for grid
+    jobListingsGrid.innerHTML = `
+        <div class="col-12 text-center py-5">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading jobs...</span>
+            </div>
+            <p class="mt-2">Loading job listings...</p>
+        </div>
+    `;
+    
+    // Get job listings collection with optimized query
+    firebase.firestore().collection('jobPostings')
+        .where('status', '==', 'active')
+        .orderBy('postedDate', 'desc')
+        .limit(50)
+        .get()
+        .then(snapshot => {
+            console.log(`Received ${snapshot.size} job listings from Firestore`);
+            
+            // Remove the full page loading indicator if it exists
+            const jobListingsTab = document.getElementById('job-listings-tab');
+            const fullPageLoader = jobListingsTab?.querySelector('.full-page-loader');
+            if (fullPageLoader) {
+                fullPageLoader.remove();
+            }
+            
+            if (snapshot.empty) {
+                jobListingsGrid.innerHTML = `
+                    <div class="col-12 text-center py-5">
+                        <p class="text-muted">No job listings found.</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            // Store jobs globally for filtering
+            window.allJobs = [];
+            
+            // Process jobs with more efficient method
+            const processStartTime = performance.now();
+            const jobsData = snapshot.docs.map(doc => {
+                const job = doc.data();
+                job.id = doc.id; // Add document ID to job object
+                return job;
+            });
+            
+            // Assign to window.allJobs for filter functions to use
+            window.allJobs = jobsData;
+            
+            console.log(`Processed ${jobsData.length} jobs in ${(performance.now() - processStartTime).toFixed(2)}ms`);
+            
+            try {
+                // Populate filters
+                const filtersStartTime = performance.now();
+                if (typeof populateFilters === 'function') {
+                    populateFilters(jobsData);
+                } else if (typeof populateFilterOptions === 'function') {
+                    populateFilterOptions();
+                }
+                console.log(`Populated filters in ${(performance.now() - filtersStartTime).toFixed(2)}ms`);
+                
+                // Display jobs with more efficient rendering
+                const displayStartTime = performance.now();
+                displayJobListingsEfficient(jobsData);
+                console.log(`Displayed jobs in ${(performance.now() - displayStartTime).toFixed(2)}ms`);
+                
+                // We no longer initialize the carousel
+            } catch (displayError) {
+                console.error("Error displaying job listings:", displayError);
+                jobListingsGrid.innerHTML = `
+                    <div class="alert alert-danger">
+                        <i class="fas fa-exclamation-circle me-2"></i>Error displaying job listings: ${displayError.message}
+                    </div>
+                `;
+            }
+            
+            console.log(`Loaded ${jobsData.length} job listings successfully`);
+            
+            // Add this new code: Attach event listeners for Take Mock buttons
+            const listenersStartTime = performance.now();
+            if (typeof attachJobListingEventListeners === 'function') {
+                attachJobListingEventListeners();
+                console.log(`Attached event listeners in ${(performance.now() - listenersStartTime).toFixed(2)}ms`);
+            }
+        })
+        .catch(error => {
+            console.error("Error loading job listings:", error);
+            
+            // Remove the full page loading indicator if it exists
+            const jobListingsTab = document.getElementById('job-listings-tab');
+            const fullPageLoader = jobListingsTab?.querySelector('.full-page-loader');
+            if (fullPageLoader) {
+                fullPageLoader.remove();
+            }
+            
+            jobListingsGrid.innerHTML = `
+                <div class="col-12">
+                    <div class="alert alert-danger">
+                        <i class="fas fa-exclamation-circle me-2"></i>Error loading job listings: ${error.message}
+                    </div>
+                </div>
+            `;
+        });
+}
+
+// More efficient display function that uses document fragments for better performance
+function displayJobListingsEfficient(jobs) {
+    const jobListingsGrid = document.getElementById('publicJobListingsGrid');
+    
+    if (!jobListingsGrid) {
+        console.error("Job listings grid not found");
+        return;
+    }
+    
+    // Clear the grid
+    jobListingsGrid.innerHTML = '';
+    
+    if (!jobs || jobs.length === 0) {
+        jobListingsGrid.innerHTML = `
+            <div class="col-12 text-center py-5">
+                <p class="text-muted">No job listings found matching your filters.</p>
+            </div>
+        `;
+        return;
+    }
+    
+    // Use document fragment for better performance
+    const gridFragment = document.createDocumentFragment();
+    
+    // Create grid items
+    jobs.forEach(job => {
+        const gridCol = document.createElement('div');
+        gridCol.className = 'col';
+        gridCol.innerHTML = createJobCardHTML(job, false);
+        gridFragment.appendChild(gridCol);
+    });
+    
+    // Append all grid items at once
+    jobListingsGrid.appendChild(gridFragment);
 }
 
 // Load job listings in the public view
@@ -7368,9 +7625,14 @@ function displayJobListings(jobs) {
 
 // Create HTML for a job card
 function createJobCardHTML(job, isCarousel) {
+    if (!job || !job.id) {
+        console.warn("Job data missing ID:", job);
+    }
+    
+    const jobId = job.id || 'unknown';
     const cardClass = isCarousel ? 'carousel-job-card' : '';
     const logoUrl = job.companyLogoUrl || 'images/default-company-logo.png'; // Fallback logo
-    const postedDate = job.postedDate?.toDate ? job.postedDate.toDate().toLocaleDateString() : 'N/A';
+    const postedDate = formatDate(job.postedDate);
     
     // Limit tech stacks to 3 for display
     const techStacksHtml = job.techStacks && job.techStacks.length > 0
@@ -7385,7 +7647,7 @@ function createJobCardHTML(job, isCarousel) {
     return `
         <div class="card job-card ${cardClass}">
             <span class="job-status-badge badge bg-success">Active</span>
-            <img src="${logoUrl}" class="card-img-top" alt="${job.companyName || 'Company'} logo">
+            <img src="${logoUrl}" class="card-img-top" alt="${job.companyName || 'Company'} logo" onerror="this.src='images/default-company-logo.png';this.onerror='';">
             <div class="card-body d-flex flex-column">
                 <h5 class="card-title">${job.title || 'Job Title'}</h5>
                 <h6 class="card-subtitle mb-2 text-muted">${job.companyName || 'Company'}</h6>
@@ -7398,10 +7660,10 @@ function createJobCardHTML(job, isCarousel) {
                     ${moreStacksHtml}
                 </div>
                 <div class="mt-auto d-flex">
-                    <button class="btn btn-outline-primary me-2 view-job-details-btn" data-job-id="${job.id}">
+                    <button class="btn btn-outline-primary me-2 view-job-details-btn" data-job-id="${jobId}" onclick="showJobDetails('${jobId}')">
                         <i class="fas fa-info-circle me-1"></i> Know More
                     </button>
-                    <button class="btn btn-primary take-mock-interview-btn" data-job-id="${job.id}">
+                    <button class="btn btn-primary take-mock-interview-btn" data-job-id="${jobId}" onclick="takeMockInterview('${jobId}')">
                         <i class="fas fa-microphone-alt me-1"></i> Take Mock
                     </button>
                 </div>
@@ -7412,10 +7674,23 @@ function createJobCardHTML(job, isCarousel) {
 
 // Show job details in modal
 function showJobDetails(jobId) {
-    const modal = new bootstrap.Modal(document.getElementById('jobDetailsModal'));
+    if (!jobId) {
+        console.error("showJobDetails called with no jobId");
+        return;
+    }
+    console.log(`Showing details for job ID: ${jobId}`);
+    
+    // Get the modal elements
+    const modal = document.getElementById('jobDetailsModal');
     const contentDiv = document.getElementById('jobDetailsContent');
     const modalTitle = document.getElementById('jobDetailsModalLabel');
     const takeMockBtn = document.getElementById('takeMockInterviewBtn');
+    
+    if (!modal || !contentDiv) {
+        console.error("Job details modal elements not found");
+        alert("Cannot display job details. Please try again later.");
+        return;
+    }
     
     // Show loading state
     contentDiv.innerHTML = `
@@ -7427,11 +7702,29 @@ function showJobDetails(jobId) {
         </div>
     `;
     
-    // Set job ID on the Take Mock button
-    takeMockBtn.setAttribute('data-job-id', jobId);
+    // Set job ID on the Take Mock button if it exists
+    if (takeMockBtn) {
+        takeMockBtn.setAttribute('data-job-id', jobId);
+    }
     
-    // Show modal while loading
-    modal.show();
+    // Initialize Bootstrap modal and show it
+    try {
+        const modalInstance = new bootstrap.Modal(modal);
+        modalInstance.show();
+    } catch (error) {
+        console.error("Error showing modal:", error);
+        // Try an alternative approach if the first fails
+        if (typeof bootstrap !== 'undefined') {
+            try {
+                bootstrap.Modal.getInstance(modal)?.show();
+            } catch (err) {
+                console.error("Both modal show methods failed:", err);
+                // Last resort: vanilla JS
+                modal.style.display = 'block';
+                modal.classList.add('show');
+            }
+        }
+    }
     
     // Fetch job details
     firebase.firestore().collection('jobPostings').doc(jobId).get()
@@ -7445,11 +7738,13 @@ function showJobDetails(jobId) {
             job.id = doc.id;
             
             // Format date
-            const postedDate = job.postedDate?.toDate ? job.postedDate.toDate().toLocaleDateString() : 'N/A';
-            const expiryDate = job.expiryDate?.toDate ? job.expiryDate.toDate().toLocaleDateString() : 'N/A';
+            const postedDate = formatDate(job.postedDate);
+            const expiryDate = formatDate(job.expiryDate);
             
             // Update modal title
-            modalTitle.textContent = job.title || 'Job Details';
+            if (modalTitle) {
+                modalTitle.textContent = job.title || 'Job Details';
+            }
             
             // Generate tech stacks HTML
             const techStacksHtml = job.techStacks && job.techStacks.length > 0
@@ -7500,7 +7795,7 @@ function showJobDetails(jobId) {
             // Generate full job details HTML
             contentDiv.innerHTML = `
                 <div class="company-header">
-                    <img src="${job.companyLogoUrl || 'images/default-company-logo.png'}" class="company-logo" alt="${job.companyName || 'Company'} logo">
+                    <img src="${job.companyLogoUrl || 'images/default-company-logo.png'}" class="company-logo" alt="${job.companyName || 'Company'} logo" onerror="this.src='images/default-company-logo.png';this.onerror='';">
                     <div>
                         <h4>${job.companyName || 'Company'}</h4>
                         <p class="text-muted mb-0">${job.location || 'Location'}</p>
@@ -7556,6 +7851,41 @@ function showJobDetails(jobId) {
         });
 }
 
+// Helper function to format date from Firestore timestamp
+function formatDate(timestampOrDate) {
+    if (!timestampOrDate) return 'N/A';
+    
+    try {
+        let date;
+        if (typeof timestampOrDate.toDate === 'function') {
+            // It's a Firestore timestamp
+            date = timestampOrDate.toDate();
+        } else if (timestampOrDate instanceof Date) {
+            // It's already a Date object
+            date = timestampOrDate;
+        } else if (typeof timestampOrDate === 'string') {
+            // It's a date string
+            date = new Date(timestampOrDate);
+        } else if (typeof timestampOrDate === 'number') {
+            // It's a timestamp in milliseconds
+            date = new Date(timestampOrDate);
+        } else {
+            // Unknown format
+            return 'N/A';
+        }
+        
+        // Format the date
+        return date.toLocaleDateString(undefined, {
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric'
+        });
+    } catch (error) {
+        console.warn("Error formatting date:", error);
+        return 'N/A';
+    }
+}
+
 // Take Mock Interview function
 function takeMockInterview(jobId) {
     if (!jobId) {
@@ -7571,16 +7901,29 @@ function takeMockInterview(jobId) {
     if (!user) {
         console.log("User not logged in, storing job ID and showing sign up modal");
         
-        // Close job details modal if open
+        // Close job details modal if open (with improved error handling)
         try {
             const jobModal = document.getElementById('jobDetailsModal');
             if (jobModal) {
                 const modalInstance = bootstrap.Modal.getInstance(jobModal);
-                if (modalInstance) modalInstance.hide();
+                if (modalInstance) {
+                    modalInstance.hide();
+                    // Remove modal backdrop forcefully
+                    setTimeout(() => {
+                        document.querySelectorAll('.modal-backdrop').forEach(el => el.remove());
+                        document.body.classList.remove('modal-open');
+                        document.body.style.removeProperty('padding-right');
+                        document.body.style.overflow = '';
+                    }, 300);
+                }
             }
         } catch (modalError) {
             console.warn("Error closing job details modal:", modalError);
-            // Continue anyway - this isn't critical
+            // Force cleanup of modals
+            document.querySelectorAll('.modal-backdrop').forEach(el => el.remove());
+            document.body.classList.remove('modal-open');
+            document.body.style.removeProperty('padding-right');
+            document.body.style.overflow = '';
         }
         
         // Store job ID in localStorage for retrieval after login
@@ -7611,16 +7954,29 @@ function takeMockInterview(jobId) {
         return;
     }
     
-    // Close job details modal if open
+    // Close job details modal if open (with improved error handling)
     try {
         const jobModal = document.getElementById('jobDetailsModal');
         if (jobModal) {
             const modalInstance = bootstrap.Modal.getInstance(jobModal);
-            if (modalInstance) modalInstance.hide();
+            if (modalInstance) {
+                modalInstance.hide();
+                // Remove modal backdrop forcefully
+                setTimeout(() => {
+                    document.querySelectorAll('.modal-backdrop').forEach(el => el.remove());
+                    document.body.classList.remove('modal-open');
+                    document.body.style.removeProperty('padding-right');
+                    document.body.style.overflow = '';
+                }, 300);
+            }
         }
     } catch (modalError) {
         console.warn("Error closing job details modal:", modalError);
-        // Continue anyway - this isn't critical
+        // Force cleanup of modals
+        document.querySelectorAll('.modal-backdrop').forEach(el => el.remove());
+        document.body.classList.remove('modal-open');
+        document.body.style.removeProperty('padding-right');
+        document.body.style.overflow = '';
     }
     
     // Show loading message
@@ -7829,9 +8185,16 @@ function checkPendingMockInterview() {
     
     // Check if user is now logged in
     if (firebase.auth().currentUser) {
+        console.log("User is logged in, proceeding with mock interview for job:", pendingJobId);
+        
+        // Force clean up any UI/modal issues
+        document.querySelectorAll('.modal-backdrop').forEach(el => el.remove());
+        document.body.classList.remove('modal-open');
+        document.body.style.removeProperty('padding-right');
+        document.body.style.overflow = '';
+        
         // Small delay to ensure everything is loaded
         setTimeout(() => {
-            console.log("User is logged in, proceeding with mock interview for job:", pendingJobId);
             takeMockInterview(pendingJobId);
         }, 1000);
     }
@@ -7873,7 +8236,14 @@ function filterPublicJobListings() {
     });
     
     // Display filtered jobs
-    displayJobListings(filteredJobs);
+    displayJobListingsEfficient(filteredJobs);
+    
+    // Reattach event listeners to the newly created job cards
+    setTimeout(() => {
+        if (typeof attachJobListingEventListeners === 'function') {
+            attachJobListingEventListeners();
+        }
+    }, 100);
 }
 
 function resetPublicFilters() {
@@ -7887,10 +8257,17 @@ function resetPublicFilters() {
     
     // Display all jobs
     if (window.allJobs && Array.isArray(window.allJobs)) {
-        displayJobListings(window.allJobs);
+        displayJobListingsEfficient(window.allJobs);
+        
+        // Reattach event listeners
+        setTimeout(() => {
+            if (typeof attachJobListingEventListeners === 'function') {
+                attachJobListingEventListeners();
+            }
+        }, 100);
     } else {
         // If allJobs is not available, reload from Firebase
-        loadPublicJobListings();
+        loadPublicJobListingsOptimized();
     }
 }                                                   
 
@@ -7996,46 +8373,61 @@ function fixJobListingDisplay() {
 
 // Helper function to create job card HTML
 function createJobCardHTML(job, isCarousel) {
-  const cardClass = isCarousel ? 'carousel-job-card' : '';
-  const logoUrl = job.companyLogoUrl || 'images/default-company-logo.png'; // Fallback logo
-  const postedDate = job.postedDate?.toDate ? job.postedDate.toDate().toLocaleDateString() : 'N/A';
-  
-  // Limit tech stacks to 3 for display
-  const techStacksHtml = job.techStacks && job.techStacks.length > 0
-    ? job.techStacks.slice(0, 3).map(tech => `<span class="tech-badge">${tech}</span>`).join('')
-    : '';
-  
-  // Show +X more if there are more tech stacks
-  const moreStacksHtml = job.techStacks && job.techStacks.length > 3
-    ? `<span class="tech-badge">+${job.techStacks.length - 3} more</span>`
-    : '';
-  
-  return `
-    <div class="card job-card ${cardClass}">
-      <span class="job-status-badge badge bg-success">Active</span>
-      <img src="${logoUrl}" class="card-img-top" alt="${job.companyName || 'Company'} logo">
-      <div class="card-body d-flex flex-column">
-        <h5 class="card-title">${job.title || 'Job Title'}</h5>
-        <h6 class="card-subtitle mb-2 text-muted">${job.companyName || 'Company'}</h6>
-        <p class="card-text">
-          <i class="fas fa-map-marker-alt me-2"></i>${job.location || 'Location'}<br>
-          <span class="posted-date"><i class="far fa-calendar-alt me-1"></i>Posted: ${postedDate}</span>
-        </p>
-        <div class="tech-stack mb-3">
-          ${techStacksHtml}
-          ${moreStacksHtml}
+    const cardClass = isCarousel ? 'carousel-job-card' : '';
+    const logoUrl = job.companyLogoUrl || 'images/default-company-logo.png'; // Fallback logo
+    
+    // Format posted date
+    let postedDate = 'N/A';
+    if (job.postedDate) {
+        try {
+            if (typeof job.postedDate.toDate === 'function') {
+                postedDate = job.postedDate.toDate().toLocaleDateString();
+            } else if (job.postedDate instanceof Date) {
+                postedDate = job.postedDate.toLocaleDateString();
+            } else if (typeof job.postedDate === 'string') {
+                postedDate = new Date(job.postedDate).toLocaleDateString();
+            }
+        } catch (e) {
+            console.warn("Error formatting date:", e);
+        }
+    }
+    
+    // Limit tech stacks to 3 for display
+    const techStacksHtml = job.techStacks && job.techStacks.length > 0
+        ? job.techStacks.slice(0, 3).map(tech => `<span class="tech-badge">${tech}</span>`).join('')
+        : '';
+    
+    // Show +X more if there are more tech stacks
+    const moreStacksHtml = job.techStacks && job.techStacks.length > 3
+        ? `<span class="tech-badge">+${job.techStacks.length - 3} more</span>`
+        : '';
+    
+    return `
+        <div class="card job-card ${cardClass}">
+            <span class="job-status-badge badge bg-success">Active</span>
+            <img src="${logoUrl}" class="card-img-top" alt="${job.companyName || 'Company'} logo" onerror="this.src='images/default-company-logo.png';this.onerror='';">
+            <div class="card-body d-flex flex-column">
+                <h5 class="card-title">${job.title || 'Job Title'}</h5>
+                <h6 class="card-subtitle mb-2 text-muted">${job.companyName || 'Company'}</h6>
+                <p class="card-text">
+                    <i class="fas fa-map-marker-alt me-2"></i>${job.location || 'Location'}<br>
+                    <span class="posted-date"><i class="far fa-calendar-alt me-1"></i>Posted: ${postedDate}</span>
+                </p>
+                <div class="tech-stack mb-3">
+                    ${techStacksHtml}
+                    ${moreStacksHtml}
+                </div>
+                <div class="mt-auto d-flex">
+                    <button class="btn btn-outline-primary me-2 view-job-details-btn" data-job-id="${job.id}">
+                        <i class="fas fa-info-circle me-1"></i> Know More
+                    </button>
+                    <button class="btn btn-primary take-mock-interview-btn" data-job-id="${job.id}">
+                        <i class="fas fa-microphone-alt me-1"></i> Take Mock
+                    </button>
+                </div>
+            </div>
         </div>
-        <div class="mt-auto d-flex">
-          <button class="btn btn-outline-primary me-2 view-job-details-btn" data-job-id="${job.id}">
-            <i class="fas fa-info-circle me-1"></i> Know More
-          </button>
-          <button class="btn btn-primary take-mock-interview-btn" data-job-id="${job.id}">
-            <i class="fas fa-microphone-alt me-1"></i> Take Mock
-          </button>
-        </div>
-      </div>
-    </div>
-  `;
+    `;
 }
 
 // Update the featured carousel
@@ -8195,6 +8587,37 @@ function populateFilterOptions() {
 function attachJobListingEventListeners() {
     console.log("Attaching job listing event listeners");
     
+    // For debugging: print all buttons before attaching
+    console.log("Debug - All buttons in DOM:");
+    console.log("- Take Mock buttons:", document.querySelectorAll('.take-mock-interview-btn').length);
+    console.log("- Know More buttons:", document.querySelectorAll('.view-job-details-btn').length);
+    
+    // Add event listeners to "Know More" buttons in job cards
+    const detailButtons = document.querySelectorAll('.view-job-details-btn');
+    console.log(`Found ${detailButtons.length} 'Know More' buttons to attach listeners to`);
+    
+    detailButtons.forEach((button, index) => {
+        // First remove any existing listeners by cloning and replacing the button
+        const newButton = button.cloneNode(true);
+        if (button.parentNode) {
+            button.parentNode.replaceChild(newButton, button);
+        }
+        
+        // Add fresh event listener with console logs
+        newButton.addEventListener('click', function(e) {
+            e.preventDefault(); // Prevent default if it's an anchor
+            console.log(`Know More button clicked (button ${index + 1})`);
+            
+            const jobId = this.getAttribute('data-job-id');
+            if (jobId) {
+                console.log(`Know More clicked for job ID: ${jobId} (button ${index + 1})`);
+                showJobDetails(jobId); // Call our fixed function
+            } else {
+                console.error(`No job ID found on Know More button ${index + 1}`);
+            }
+        });
+    });
+    
     // Add event listeners to "Take Mock" buttons in job cards
     const mockButtons = document.querySelectorAll('.take-mock-interview-btn');
     console.log(`Found ${mockButtons.length} 'Take Mock' buttons to attach listeners to`);
@@ -8209,10 +8632,17 @@ function attachJobListingEventListeners() {
         // Add fresh event listener
         newButton.addEventListener('click', function(e) {
             e.preventDefault(); // Prevent default if it's an anchor
+            console.log(`Take Mock button clicked (button ${index + 1})`);
+            
             const jobId = this.getAttribute('data-job-id');
             if (jobId) {
                 console.log(`Take Mock Interview clicked for job ID: ${jobId} (button ${index + 1})`);
-                takeMockInterview(jobId);
+                if (typeof takeMockInterview === 'function') {
+                    takeMockInterview(jobId);
+                } else {
+                    console.error("takeMockInterview function not defined");
+                    alert("This feature is currently unavailable. Please try again later.");
+                }
             } else {
                 console.error(`No job ID found on Take Mock button ${index + 1}`);
             }
@@ -8233,7 +8663,12 @@ function attachJobListingEventListeners() {
             const jobId = this.getAttribute('data-job-id');
             if (jobId) {
                 console.log("Take Mock Interview clicked from modal for job ID:", jobId);
-                takeMockInterview(jobId);
+                if (typeof takeMockInterview === 'function') {
+                    takeMockInterview(jobId);
+                } else {
+                    console.error("takeMockInterview function not defined");
+                    alert("This feature is currently unavailable. Please try again later.");
+                }
             } else {
                 console.error("No job ID found on modal Take Mock button");
             }
@@ -8291,6 +8726,47 @@ function enhanceDisplayJobListings() {
             attachJobListingEventListeners();
         }, 100);
     };
+}
+
+// Add event listener for tab buttons with improved handling
+function initImprovedTabButtons() {
+    document.querySelectorAll('.tab-button').forEach(button => {
+        // First remove any existing listeners by cloning and replacing
+        const newButton = button.cloneNode(true);
+        if (button.parentNode) {
+            button.parentNode.replaceChild(newButton, button);
+        }
+        
+        // Add fresh event listener with proper handling
+        newButton.addEventListener('click', function(e) {
+            e.preventDefault(); // Prevent default link behavior
+            const tabId = this.getAttribute('data-tab');
+            if (tabId) {
+                switchPublicTab(tabId);
+                
+                // Special handling for job listings tab to ensure it loads
+                if (tabId === 'job-listings-tab') {
+                    console.log("Tab button clicked for job listings");
+                    
+                    // Initialize if not done already
+                    if (!window.publicJobListingsInitialized) {
+                        console.log("Job listings not initialized yet, initializing now");
+                        initPublicJobListings();
+                        window.publicJobListingsInitialized = true;
+                    } 
+                    // If already initialized but we might need to reload
+                    else if (!window.allJobs || window.allJobs.length === 0) {
+                        console.log("Job listings initialized but no jobs loaded, reloading");
+                        loadPublicJobListingsOptimized();
+                    }
+                }
+            } else {
+                console.warn("Tab button clicked but no data-tab attribute found");
+            }
+        });
+    });
+    
+    console.log("Improved tab button handlers initialized");
 }
 
 // Also try to enhance displayJobListings
