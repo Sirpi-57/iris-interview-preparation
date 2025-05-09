@@ -4001,6 +4001,242 @@ def get_job_details(job_id):
         traceback.print_exc()
         return jsonify({'error': f'Server error: {str(e)}'}), 500
 
+@app.route('/analyze-resume-for-job', methods=['POST'])
+def analyze_resume_for_job():
+    """
+    Analyzes resume against a specific job posting from Firestore,
+    enforces usage limits, increments usage counter, creates session,
+    and returns sessionId for further processing.
+    """
+    session_id = None
+    temp_session_dir = None
+    temp_resume_path = None
+    user_id = None
+
+    try:
+        start_time = time.time()
+
+        # --- Validate Request ---
+        if 'resumeFile' not in request.files:
+            return jsonify({'error': 'No resume file'}), 400
+
+        resume_file = request.files['resumeFile']
+        job_id = request.form.get('jobId')
+        user_id = request.form.get('userId')
+
+        if not job_id:
+            return jsonify({'error': 'Job ID required'}), 400
+
+        if not resume_file or not resume_file.filename:
+            return jsonify({'error': 'Invalid resume file'}), 400
+
+        if not user_id:
+            return jsonify({'error': 'User ID required for session tracking'}), 400
+
+        resume_filename = secure_filename(resume_file.filename)
+        if not (resume_file.content_type == 'application/pdf' or resume_filename.lower().endswith('.pdf')):
+            return jsonify({'error': 'Only PDF resumes supported'}), 400
+
+        if not db:
+            return jsonify({'error': 'Database unavailable'}), 503
+        # --- End Validation ---
+
+        # --- Get Job Posting from Firestore ---
+        job_doc = db.collection('jobPostings').document(job_id).get()
+        if not job_doc.exists:
+            return jsonify({'error': 'Job posting not found'}), 404
+            
+        job_data = job_doc.to_dict()
+        job_description = job_data.get('description', '')
+        if not job_description:
+            return jsonify({'error': 'Job description not available'}), 400
+            
+        # Include job requirements if available
+        job_requirements = job_data.get('requirements', '')
+        job_combined = job_description
+        if job_requirements:
+            job_combined = f"{job_description}\n\nREQUIREMENTS:\n{job_requirements}"
+        # --- End Job Data Retrieval ---
+
+        # --- Check usage limits ---
+        access_check = check_feature_access(user_id, 'resumeAnalyses')
+        if not access_check.get('allowed', False):
+            # Return specific error indicating limit reached
+            return jsonify({
+                'error': access_check.get('error', 'Usage limit reached'),
+                'limitReached': True, # Flag for frontend
+                'used': access_check.get('used', 0),
+                'limit': access_check.get('limit', 0),
+                'plan': access_check.get('plan', 'free')
+            }), 403  # Forbidden due to limits
+        # --- End usage limit check ---
+
+        session_id = str(uuid.uuid4())
+        print(f"[{session_id}] Received /analyze-resume-for-job request for file: {resume_filename}, job: {job_id}, user: {user_id}")
+
+        # === Temporary Local File Handling ===
+        try:
+            temp_session_dir = os.path.join(BASE_TEMP_DIR, session_id)
+            os.makedirs(temp_session_dir, exist_ok=True)
+            temp_resume_path = os.path.join(temp_session_dir, resume_filename)
+            resume_file.save(temp_resume_path)
+            print(f"[{session_id}] Resume temporarily saved locally to: {temp_resume_path}")
+        except Exception as file_err:
+            print(f"[{session_id}] ERROR: Failed to save temporary resume file: {file_err}")
+            traceback.print_exc()
+            return jsonify({'error': f'Server file system error: {str(file_err)}'}), 500
+        # === End File Handling ===
+
+        # --- Increment Usage Counter ---
+        increment_result = increment_usage_counter(user_id, 'resumeAnalyses')
+        if not increment_result.get('success', False):
+            error_msg = increment_result.get('error', 'Failed to update usage counter')
+            print(f"[{session_id}] ERROR: {error_msg}")
+            # Clean up temp file if usage increment fails
+            if temp_session_dir and os.path.exists(temp_session_dir):
+                try:
+                    shutil.rmtree(temp_session_dir)
+                except Exception as cleanup_err:
+                    print(f"[{session_id}] Error during cleanup after usage error: {cleanup_err}")
+            return jsonify({'error': error_msg}), 500
+        # --- End Usage Increment ---
+
+        # --- Initialize session doc in Firestore ---
+        session_ref = db.collection('sessions').document(session_id)
+        initial_session_data = {
+            'status': 'processing',
+            'progress': 5,
+            'userId': user_id,
+            'resume_filename_temp': resume_filename,
+            'job_description': job_combined,  # Use the combined job description
+            'jobId': job_id,  # Store the job ID for reference
+            'start_time': datetime.now().isoformat(),
+            'results': {},
+            'errors': [],
+            'last_updated': firestore.SERVER_TIMESTAMP,
+            # Add usage tracking to session for reference
+            'usage_info': {
+                'feature': 'resumeAnalyses',
+                'used': increment_result.get('used', 0),
+                'limit': increment_result.get('limit', 0)
+            },
+            'job_specific': True  # Flag to identify job-specific sessions
+        }
+        session_ref.set(initial_session_data)
+        print(f"[{session_id}] Initial job-specific session created in Firestore for user {user_id}, job {job_id}.")
+        # --- End Firestore Init ---
+
+        # --- Update User Profile with lastActiveSessionId ---
+        try:
+            user_ref = db.collection('users').document(user_id)
+            user_ref.update({
+                'lastActiveSessionId': session_id,
+                'lastSessionUpdate': firestore.SERVER_TIMESTAMP
+            })
+            print(f"[{session_id}] Updated user {user_id} profile with lastActiveSessionId.")
+        except Exception as profile_update_err:
+            print(f"[{session_id}] WARNING: Failed to update user {user_id} profile with last session ID: {profile_update_err}")
+        # --- End User Profile Update ---
+
+        # --- Define background task ---
+        def process_resume_background(current_session_id, resume_local_path, jd, associated_user_id, associated_job_id):
+            session_status = 'failed'; error_list = []
+            try:
+                # (Existing background processing logic...)
+                print(f"[{current_session_id}] Background task started for local file: {resume_local_path}, User: {associated_user_id}, Job: {associated_job_id}")
+                update_session_data(current_session_id, {'progress': 10, 'status_detail': 'Extracting text'})
+                resume_text = extract_text_from_pdf(resume_local_path)
+                if not resume_text: raise ValueError("Failed to extract text from PDF.")
+                update_session_data(current_session_id, {'progress': 30, 'status_detail': 'Parsing resume'})
+                parsed_resume = parse_resume_with_claude(resume_text)
+                if not parsed_resume or not parsed_resume.get("name"): raise ValueError("Failed to parse resume.")
+                update_session_data(current_session_id, {'progress': 50, 'status_detail': 'Matching resume/JD'})
+                
+                # Using OpenAI for matching
+                match_results = match_resume_jd_with_openai(parsed_resume, jd)
+                if match_results.get("error"): raise ValueError(f"JD matching failed: {match_results['error']}")
+                match_results['parsedResume'] = parsed_resume # Add parsed data here for context
+                
+                update_session_data(current_session_id, {'progress': 80, 'status_detail': 'Generating prep plan'})
+                prep_plan = generate_interview_prep_plan(match_results)
+                if not prep_plan: raise ValueError("Failed to generate prep plan.")
+                
+                # Store job info in results for easy reference
+                final_results = { 
+                    'parsed_resume': parsed_resume, 
+                    'match_results': match_results, 
+                    'prep_plan': prep_plan,
+                    'job_id': associated_job_id  # Store job ID in results
+                }
+                
+                update_session_data(current_session_id, { 
+                    'results': final_results, 
+                    'status': 'completed', 
+                    'progress': 100, 
+                    'status_detail': 'Analysis complete',
+                    'end_time': datetime.now().isoformat()
+                })
+                
+                session_status = 'completed'
+            except Exception as e:
+                # (Existing error handling...)
+                error_msg = f"Error in background task for {current_session_id}: {e}"
+                print(error_msg)
+                traceback.print_exc()
+                error_list.append(str(e))
+                update_session_data(current_session_id, { 
+                    'status': 'failed', 
+                    'errors': firestore.ArrayUnion([str(e)]), 
+                    'status_detail': f'Error: {str(e)[:100]}...', 
+                    'end_time': datetime.now().isoformat() 
+                })
+            finally:
+                # (Existing cleanup logic...)
+                dir_to_remove = os.path.dirname(resume_local_path)
+                try:
+                    if os.path.exists(dir_to_remove): 
+                        print(f"[{current_session_id}] Cleaning up temp dir: {dir_to_remove}")
+                        shutil.rmtree(dir_to_remove)
+                except Exception as cleanup_error: 
+                    print(f"[{current_session_id}] WARNING: Failed to cleanup temp dir {dir_to_remove}: {cleanup_error}")
+                print(f"[{current_session_id}] Background processing finished with status: {session_status}")
+        # --- End background task definition ---
+
+        # Start background thread
+        processing_thread = threading.Thread(
+            target=process_resume_background, 
+            args=(session_id, temp_resume_path, job_combined, user_id, job_id)
+        )
+        processing_thread.daemon = True
+        processing_thread.start()
+
+        print(f"[{session_id}] /analyze-resume-for-job request completed in {time.time() - start_time:.2f}s (background running).")
+
+        # Return the latest usage info obtained from increment_result
+        return jsonify({
+            'sessionId': session_id,
+            'jobId': job_id,
+            'status': 'processing',
+            'message': 'Resume analysis started for job-specific interview',
+            'usageInfo': { # Include updated usage info
+                'feature': 'resumeAnalyses',
+                'used': increment_result.get('used', 0),
+                'limit': increment_result.get('limit', 0),
+                'remaining': increment_result.get('remaining', 0)
+            }
+        }), 202 # Accepted
+
+    except Exception as e:
+        print(f"Error in /analyze-resume-for-job route: {e}")
+        traceback.print_exc()
+        if session_id and db:
+            update_session_data(session_id, {'status': 'failed', 'errors': firestore.ArrayUnion([f'Route level error: {str(e)}'])})
+        if temp_resume_path and os.path.exists(os.path.dirname(temp_resume_path)):
+            try:
+                shutil.rmtree(os.path.dirname(temp_resume_path))
+            except Exception as cleanup_err:
+                print(f"Error cleaning up temp dir during route exception: {cleanup_err}")
+        return jsonify({'error': f'Server error: {str(e)}'}), 500
 
 
 # --- Cleanup Function (Needs Review/Replacement with TTL) ---

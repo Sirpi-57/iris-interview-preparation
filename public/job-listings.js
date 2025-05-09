@@ -523,26 +523,77 @@ function takeMockInterview(jobId) {
     // First check if user is logged in
     const currentUser = firebase.auth().currentUser;
     if (!currentUser) {
+        // Store the job ID for later use after authentication
+        // Use the function exposed by irisAuth
+        if (window.irisAuth && typeof window.irisAuth.setPendingJobInterview === 'function') {
+            window.irisAuth.setPendingJobInterview(jobId);
+        } else {
+            console.warn("irisAuth.setPendingJobInterview not available, falling back to global variable");
+            pendingJobInterviewAfterAuth = jobId;
+        }
+        
         // Show login modal
         if (typeof showAuthModal === 'function') {
             showAuthModal('signin');
+        } else if (window.irisAuth && typeof window.irisAuth.showSignInModal === 'function') {
+            window.irisAuth.showSignInModal();
         } else {
             alert('Please sign in to take a mock interview.');
         }
         return;
     }
     
-    // Find job in the array
-    const job = allJobs.find(j => j.id === jobId);
-    
-    if (!job) {
-        console.error("Job not found for mock interview:", jobId);
-        alert('Error loading job details. Please try again.');
-        return;
+    // Check if email needs verification
+    if (window.irisAuth && typeof window.irisAuth.isEmailVerified === 'function') {
+        const isVerified = window.irisAuth.isEmailVerified();
+        if (!isVerified) {
+            // Show email verification modal
+            if (typeof window.irisAuth.showEmailVerificationModal === 'function') {
+                window.irisAuth.showEmailVerificationModal(currentUser.email);
+            }
+            showMessage('Please verify your email before proceeding with the mock interview', 'info');
+            return;
+        }
     }
     
-    // Start mock interview process - this is the entry point
-    startResumeUpload(job);
+    // Check if user can use mock interviews feature
+    if (window.irisAuth && typeof window.irisAuth.canUseFeature === 'function') {
+        if (!window.irisAuth.canUseFeature('mockInterviews')) {
+            showLimitReachedModal('mockInterviews', {
+                used: window.irisAuth.getUserProfile()?.usage?.mockInterviews?.used || 0,
+                limit: window.irisAuth.getUserProfile()?.usage?.mockInterviews?.limit || 0,
+                plan: window.irisAuth.getUserProfile()?.plan || 'free'
+            });
+            return;
+        }
+    }
+    
+    // User is already logged in with verified email and has available interviews
+    startJobSpecificResumeUpload(jobId);
+}
+
+// Function to show a message (similar to your existing showErrorMessage function)
+function showMessage(message, type = 'info', duration = 5000) {
+    // Create toast or use existing error container
+    const errorContainer = document.getElementById('error-messages');
+    if (errorContainer) {
+        const alertDiv = document.createElement('div');
+        alertDiv.className = `alert alert-${type} alert-dismissible fade show`;
+        alertDiv.innerHTML = `
+            ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        `;
+        errorContainer.appendChild(alertDiv);
+        
+        // Auto-dismiss after duration
+        setTimeout(() => {
+            alertDiv.classList.remove('show');
+            setTimeout(() => alertDiv.remove(), 500);
+        }, duration);
+    } else {
+        // Fallback to console
+        console.log(message);
+    }
 }
 
 /**
@@ -993,4 +1044,519 @@ function formatFirestoreDate(timestamp) {
         console.error("Error formatting date:", error);
         return 'Invalid date';
     }
+}
+
+// Global variable to store the selected job for use after authentication
+let selectedJobForMockInterview = null;
+
+function takeMockInterview(jobId) {
+    // First check if user is logged in
+    const currentUser = firebase.auth().currentUser;
+    if (!currentUser) {
+        // Store the job ID for later use after authentication
+        selectedJobForMockInterview = jobId;
+        
+        // Show login modal
+        if (typeof showAuthModal === 'function') {
+            // Add event listener for auth state changes
+            firebase.auth().onAuthStateChanged(function(user) {
+                if (user && selectedJobForMockInterview) {
+                    // User is now signed in, continue with the job-specific flow
+                    startJobSpecificResumeUpload(selectedJobForMockInterview);
+                    // Reset the selected job to prevent duplicate handling
+                    selectedJobForMockInterview = null;
+                }
+            });
+            
+            showAuthModal('signin');
+        } else {
+            alert('Please sign in to take a mock interview.');
+        }
+        return;
+    }
+    
+    // User is already logged in, proceed directly
+    startJobSpecificResumeUpload(jobId);
+}
+
+function startJobSpecificResumeUpload(jobId) {
+    // Find job in the array
+    const job = allJobs.find(j => j.id === jobId);
+    
+    if (!job) {
+        console.error("Job not found for mock interview:", jobId);
+        alert('Error loading job details. Please try again.');
+        return;
+    }
+    
+    // Create a modal for resume upload if it doesn't exist
+    if (!document.getElementById('job-resume-upload-modal')) {
+        const modalHTML = `
+            <div class="modal fade" id="job-resume-upload-modal" tabindex="-1" aria-labelledby="jobResumeUploadModalLabel" aria-hidden="true">
+                <div class="modal-dialog">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title" id="jobResumeUploadModalLabel">Upload Your Resume</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <div class="modal-body">
+                            <p class="mb-3">Upload your resume to tailor the mock interview for <strong id="job-title-display"></strong> at <strong id="company-name-display"></strong>.</p>
+                            
+                            <form id="job-resume-upload-form">
+                                <div class="mb-3">
+                                    <label for="job-resume-file" class="form-label">Resume (PDF format)</label>
+                                    <input type="file" class="form-control" id="job-resume-file" accept=".pdf" required>
+                                </div>
+                                <div class="d-grid">
+                                    <button type="submit" class="btn btn-primary" id="submit-resume-btn">
+                                        <i class="fas fa-upload me-1"></i> Upload & Continue
+                                    </button>
+                                </div>
+                            </form>
+                            
+                            <div id="job-resume-upload-progress" class="mt-3" style="display: none;">
+                                <div class="progress mb-2">
+                                    <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 0%"></div>
+                                </div>
+                                <p class="text-center" id="job-resume-upload-status">Preparing...</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        document.body.insertAdjacentHTML('beforeend', modalHTML);
+        
+        // Add event listener for form submission
+        document.getElementById('job-resume-upload-form').addEventListener('submit', function(e) {
+            e.preventDefault();
+            processJobSpecificResumeUpload();
+        });
+    }
+    
+    // Update modal title and job info
+    document.getElementById('jobResumeUploadModalLabel').textContent = `Upload Resume for ${job.title} Interview`;
+    document.getElementById('job-title-display').textContent = job.title || 'the position';
+    document.getElementById('company-name-display').textContent = job.companyName || 'the company';
+    
+    // Store the current job ID as a data attribute on the form for reference
+    document.getElementById('job-resume-upload-form').setAttribute('data-job-id', jobId);
+    
+    // Show the modal
+    const resumeUploadModal = new bootstrap.Modal(document.getElementById('job-resume-upload-modal'));
+    resumeUploadModal.show();
+}
+
+function processJobSpecificResumeUpload() {
+    const resumeFile = document.getElementById('job-resume-file').files[0];
+    if (!resumeFile) {
+        alert('Please select a resume file.');
+        return;
+    }
+    
+    const jobId = document.getElementById('job-resume-upload-form').getAttribute('data-job-id');
+    if (!jobId) {
+        alert('Job information is missing. Please try again.');
+        return;
+    }
+    
+    // Show progress UI
+    const progressContainer = document.getElementById('job-resume-upload-progress');
+    const progressBar = progressContainer.querySelector('.progress-bar');
+    const statusText = document.getElementById('job-resume-upload-status');
+    const submitButton = document.getElementById('submit-resume-btn');
+    
+    progressContainer.style.display = 'block';
+    submitButton.disabled = true;
+    progressBar.style.width = '10%';
+    statusText.textContent = 'Uploading resume...';
+    
+    // Check if user can use resumeAnalyses feature
+    if (window.irisAuth && typeof window.irisAuth.canUseFeature === 'function') {
+        if (!window.irisAuth.canUseFeature('resumeAnalyses')) {
+            // Update status message
+            progressBar.style.width = '0%';
+            progressBar.classList.add('bg-danger');
+            statusText.textContent = 'Resume analysis limit reached. Please upgrade your plan.';
+            
+            // Show limit reached modal
+            setTimeout(() => {
+                // Hide the upload modal
+                const resumeUploadModal = bootstrap.Modal.getInstance(document.getElementById('job-resume-upload-modal'));
+                if (resumeUploadModal) {
+                    resumeUploadModal.hide();
+                }
+                
+                showLimitReachedModal('resumeAnalyses', {
+                    used: window.irisAuth.getUserProfile()?.usage?.resumeAnalyses?.used || 0,
+                    limit: window.irisAuth.getUserProfile()?.usage?.resumeAnalyses?.limit || 0,
+                    plan: window.irisAuth.getUserProfile()?.plan || 'free'
+                });
+                
+                // Re-enable submit button
+                submitButton.disabled = false;
+            }, 1000);
+            
+            return;
+        }
+    }
+    
+    // Get the current user ID
+    const currentUser = firebase.auth().currentUser;
+    if (!currentUser) {
+        statusText.textContent = 'Error: You must be logged in to continue.';
+        progressBar.classList.add('bg-danger');
+        return;
+    }
+    
+    // Increment usage counter for resumeAnalyses
+    if (window.irisAuth && typeof window.irisAuth.incrementUsageCounter === 'function') {
+        window.irisAuth.incrementUsageCounter('resumeAnalyses')
+            .then(incrementResult => {
+                console.log("Resume analysis usage incremented:", incrementResult);
+                
+                // Continue with uploading
+                continueWithUpload();
+            })
+            .catch(error => {
+                console.error("Error incrementing usage:", error);
+                statusText.textContent = `Error: ${error.message}`;
+                progressBar.classList.add('bg-danger');
+                submitButton.disabled = false;
+            });
+    } else {
+        // No usage tracking, continue with upload
+        continueWithUpload();
+    }
+    
+    function continueWithUpload() {
+        // Prepare form data
+        const formData = new FormData();
+        formData.append('resumeFile', resumeFile);
+        formData.append('userId', currentUser.uid);
+        formData.append('jobId', jobId);
+        
+        // Make API call to backend
+        fetch('/analyze-resume-for-job', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => {
+            if (!response.ok) {
+                return response.json().then(data => {
+                    throw new Error(data.error || 'Failed to analyze resume');
+                });
+            }
+            return response.json();
+        })
+        .then(data => {
+            // Update progress
+            progressBar.style.width = '50%';
+            statusText.textContent = 'Analysis complete! Preparing interview...';
+            
+            // Hide the resume upload modal
+            const resumeUploadModal = bootstrap.Modal.getInstance(document.getElementById('job-resume-upload-modal'));
+            if (resumeUploadModal) {
+                resumeUploadModal.hide();
+            }
+            
+            // Continue with job-specific mock interview
+            initiateJobSpecificInterview(data.sessionId, jobId);
+        })
+        .catch(error => {
+            console.error("Error in resume upload process:", error);
+            statusText.textContent = `Error: ${error.message}`;
+            progressBar.classList.remove('progress-bar-animated', 'progress-bar-striped');
+            progressBar.classList.add('bg-danger');
+            
+            // Re-enable submit button after error
+            submitButton.disabled = false;
+        });
+    }
+}
+
+function initiateJobSpecificInterview(sessionId, jobId) {
+    // Show payment confirmation modal
+    if (!document.getElementById('mock-payment-modal')) {
+        createPaymentConfirmationModal();
+    }
+    
+    // Get job details to display in the confirmation modal
+    const job = allJobs.find(j => j.id === jobId);
+    const jobTitle = job ? job.title : 'this position';
+    const companyName = job ? job.companyName : 'the company';
+    
+    document.querySelector('#mock-payment-modal .job-title-placeholder').textContent = `${jobTitle} at ${companyName}`;
+    
+    // Store session ID and job ID in confirm button
+    const confirmBtn = document.getElementById('confirm-mock-payment-btn');
+    confirmBtn.setAttribute('data-session-id', sessionId);
+    confirmBtn.setAttribute('data-job-id', jobId);
+    
+    // Update confirm button click handler for job-specific flow
+    confirmBtn.onclick = function() {
+        const confirmedSessionId = this.getAttribute('data-session-id');
+        const confirmedJobId = this.getAttribute('data-job-id');
+        if (confirmedSessionId && confirmedJobId) {
+            startJobSpecificMockInterview(confirmedSessionId, confirmedJobId);
+        }
+    };
+    
+    // Show the modal
+    const mockPaymentModal = new bootstrap.Modal(document.getElementById('mock-payment-modal'));
+    mockPaymentModal.show();
+}
+
+function createPaymentConfirmationModal() {
+    const modalHTML = `
+        <div class="modal fade" id="mock-payment-modal" tabindex="-1" aria-labelledby="mockPaymentModalLabel" aria-hidden="true">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="mockPaymentModalLabel">Interview Preparation</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="text-center mb-4">
+                            <i class="fas fa-check-circle text-success fa-3x"></i>
+                            <h4 class="mt-3">Resume Analysis Complete!</h4>
+                            <p>Your resume has been successfully analyzed against the job requirements.</p>
+                        </div>
+                        
+                        <div class="alert alert-info">
+                            <i class="fas fa-info-circle me-2"></i>
+                            <strong>Next Step:</strong> Continue to the mock interview for <strong class="job-title-placeholder"></strong>
+                        </div>
+                        
+                        <div id="mock-payment-details">
+                            <p class="text-center">This will use <strong>1 mock interview</strong> credit from your account.</p>
+                            <p class="text-center text-muted small">Your account will be charged based on your current plan.</p>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="button" class="btn btn-primary" id="confirm-mock-payment-btn">
+                            Continue to Interview
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    document.body.insertAdjacentHTML('beforeend', modalHTML);
+}
+
+function startJobSpecificMockInterview(sessionId, jobId) {
+    // Hide the payment modal
+    const mockPaymentModal = bootstrap.Modal.getInstance(document.getElementById('mock-payment-modal'));
+    if (mockPaymentModal) {
+        mockPaymentModal.hide();
+    }
+    
+    // Check if user can use mockInterviews feature again (in case usage changed)
+    if (window.irisAuth && typeof window.irisAuth.canUseFeature === 'function') {
+        if (!window.irisAuth.canUseFeature('mockInterviews')) {
+            showLimitReachedModal('mockInterviews', {
+                used: window.irisAuth.getUserProfile()?.usage?.mockInterviews?.used || 0,
+                limit: window.irisAuth.getUserProfile()?.usage?.mockInterviews?.limit || 0,
+                plan: window.irisAuth.getUserProfile()?.plan || 'free'
+            });
+            return;
+        }
+    }
+    
+    // Show a processing spinner
+    if (!document.getElementById('processing-spinner-modal')) {
+        const spinnerHTML = `
+            <div class="modal fade" id="processing-spinner-modal" data-bs-backdrop="static" tabindex="-1" aria-hidden="true">
+                <div class="modal-dialog modal-dialog-centered">
+                    <div class="modal-content">
+                        <div class="modal-body text-center p-5">
+                            <div class="spinner-border text-primary mb-3" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                            <h5>Starting Interview...</h5>
+                            <p>Please wait while we prepare your mock interview.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+        document.body.insertAdjacentHTML('beforeend', spinnerHTML);
+    }
+    
+    const spinnerModal = new bootstrap.Modal(document.getElementById('processing-spinner-modal'));
+    spinnerModal.show();
+    
+    // Increment usage counter for mockInterviews
+    let incrementPromise = Promise.resolve();
+    if (window.irisAuth && typeof window.irisAuth.incrementUsageCounter === 'function') {
+        incrementPromise = window.irisAuth.incrementUsageCounter('mockInterviews')
+            .then(incrementResult => {
+                console.log("Mock interview usage incremented:", incrementResult);
+                return incrementResult;
+            })
+            .catch(error => {
+                console.error("Error incrementing usage:", error);
+                // Even if increment fails, we try to continue (server will verify limits)
+                return { success: false, error: error.message };
+            });
+    }
+    
+    // After incrementing (or attempting to), make API call
+    incrementPromise.then(() => {
+        // Make API call to start job-specific mock interview
+        return fetch('/job-specific-mock', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                sessionId: sessionId,
+                jobId: jobId,
+                interviewType: 'general' // Default to general type
+            })
+        });
+    })
+    .then(response => {
+        if (!response.ok) {
+            return response.json().then(data => {
+                // Check if it's a limit reached error
+                if (data.limitReached) {
+                    // Show upgrade modal
+                    if (typeof showLimitReachedModal === 'function') {
+                        spinnerModal.hide();
+                        showLimitReachedModal('mockInterviews', data);
+                    } else {
+                        throw new Error(`You've reached your limit for mock interviews. Please upgrade your plan to continue.`);
+                    }
+                } else {
+                    throw new Error(data.error || 'Failed to start mock interview');
+                }
+            });
+        }
+        return response.json();
+    })
+    .then(data => {
+        // Hide spinner
+        spinnerModal.hide();
+        
+        // Get interview ID and navigate to mock interview UI
+        const interviewId = data.interviewId;
+        navigateToMockInterview(interviewId);
+    })
+    .catch(error => {
+        console.error("Error starting job-specific mock interview:", error);
+        
+        // Hide spinner
+        spinnerModal.hide();
+        
+        // Show error
+        showMessage(`Error: ${error.message}`, 'danger');
+    });
+}
+
+// Add support for showing limit reached modal
+function showLimitReachedModal(featureType, usageData) {
+    const featureLabels = {
+        'resumeAnalyses': 'Resume Analyses',
+        'mockInterviews': 'Mock Interviews',
+        'pdfDownloads': 'PDF Downloads',
+        'aiEnhance': 'AI Enhancements'
+    };
+    
+    const featureLabel = featureLabels[featureType] || featureType;
+    
+    // Create modal if it doesn't exist
+    if (!document.getElementById('limitReachedModal')) {
+        const modalHTML = `
+            <div class="modal fade" id="limitReachedModal" tabindex="-1" aria-hidden="true">
+                <div class="modal-dialog">
+                    <div class="modal-content">
+                        <div class="modal-header bg-warning">
+                            <h5 class="modal-title"><i class="fas fa-exclamation-triangle me-2"></i> Limit Reached</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <div class="modal-body">
+                            <p id="limitReachedMessage">You've reached the limit for this feature on your current plan.</p>
+                            <div class="alert alert-info">
+                                <strong>You have two options:</strong>
+                                <ul class="mb-0 mt-2">
+                                    <li>Upgrade your plan for increased limits on all features</li>
+                                    <li>Purchase individual add-ons for just this feature</li>
+                                </ul>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                            <button type="button" class="btn btn-success" id="limitReachedAddonBtn">
+                                <i class="fas fa-plus-circle me-2"></i> Buy Add-ons
+                            </button>
+                            <button type="button" class="btn btn-primary" id="limitReachedUpgradeBtn">Upgrade Plan</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+        document.body.insertAdjacentHTML('beforeend', modalHTML);
+        
+        // Add event listeners
+        document.getElementById('limitReachedAddonBtn').addEventListener('click', function() {
+            // Hide this modal
+            const limitModal = bootstrap.Modal.getInstance(document.getElementById('limitReachedModal'));
+            if (limitModal) limitModal.hide();
+            
+            // Show addon purchase modal if it exists
+            if (typeof showAddonPurchaseModal === 'function') {
+                showAddonPurchaseModal(featureType);
+            } else if (document.getElementById('addonPurchaseModal')) {
+                const addonModal = new bootstrap.Modal(document.getElementById('addonPurchaseModal'));
+                addonModal.show();
+            } else {
+                // Fallback to a simple message
+                alert(`To purchase ${featureLabel} add-ons, please go to your profile page.`);
+            }
+        });
+        
+        document.getElementById('limitReachedUpgradeBtn').addEventListener('click', function() {
+            // Hide this modal
+            const limitModal = bootstrap.Modal.getInstance(document.getElementById('limitReachedModal'));
+            if (limitModal) limitModal.hide();
+            
+            // Redirect to pricing tab
+            document.getElementById('public-view').style.display = 'block';
+            document.getElementById('app-view').style.display = 'none';
+            
+            // Show pricing tab
+            document.querySelectorAll('.public-tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            document.getElementById('pricing-tab').classList.add('active');
+            
+            // Update active state in nav
+            document.querySelectorAll('.nav-link').forEach(link => {
+                link.classList.remove('active');
+            });
+            document.querySelector('.nav-link[data-tab="pricing-tab"]')?.classList.add('active');
+            
+            // Scroll to pricing
+            window.scrollTo(0, 0);
+        });
+    }
+    
+    // Update message with feature-specific info
+    const limitMessage = document.getElementById('limitReachedMessage');
+    if (limitMessage) {
+        const used = usageData?.used || 0;
+        const limit = usageData?.limit || 0;
+        const planName = usageData?.plan ? (usageData.plan.charAt(0).toUpperCase() + usageData.plan.slice(1)) : 'current';
+        
+        limitMessage.innerHTML = `You've reached your limit of <strong>${limit} ${featureLabel}</strong> on your ${planName} plan. You've used ${used} out of ${limit}.`;
+    }
+    
+    // Show the modal
+    const limitReachedModal = new bootstrap.Modal(document.getElementById('limitReachedModal'));
+    limitReachedModal.show();
 }
