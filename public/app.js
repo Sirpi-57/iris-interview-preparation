@@ -7713,3 +7713,315 @@ function resetPublicFilters() {
         loadPublicJobListings();
     }
 }
+
+
+
+
+function debugJobListingDisplay() {
+  console.log("--- Job Listing Debug Information ---");
+  
+  // Check main container
+  const publicJobListingsGrid = document.getElementById('publicJobListingsGrid');
+  console.log("publicJobListingsGrid exists:", !!publicJobListingsGrid);
+  
+  if (publicJobListingsGrid) {
+    console.log("publicJobListingsGrid innerHTML:", publicJobListingsGrid.innerHTML.substring(0, 100) + "...");
+  }
+  
+  // Check if we're actually loading jobs properly
+  console.log("window.allJobs:", window.allJobs ? `Array with ${window.allJobs.length} items` : "undefined");
+  
+  if (window.allJobs && window.allJobs.length > 0) {
+    console.log("First job in allJobs:", {
+      title: window.allJobs[0].title,
+      company: window.allJobs[0].companyName,
+      id: window.allJobs[0].id
+    });
+  }
+  
+  // Check displayJobListings function
+  console.log("displayJobListings function exists:", typeof displayJobListings === "function");
+  
+  // Check other key elements
+  const featuredCarousel = document.getElementById('featuredJobsCarousel');
+  console.log("featuredJobsCarousel exists:", !!featuredCarousel);
+  
+  // Fix the job listing display function if needed
+  fixJobListingDisplay();
+}
+
+// Now let's fix the display function
+function fixJobListingDisplay() {
+  // Make sure allJobs is defined
+  if (!window.allJobs || !Array.isArray(window.allJobs)) {
+    console.warn("No jobs loaded yet to display");
+    return;
+  }
+  
+  // Check both potential element IDs for the job listings grid
+  const publicJobListingsGrid = document.getElementById('publicJobListingsGrid');
+  
+  if (!publicJobListingsGrid) {
+    console.error("Job listings container element not found");
+    return;
+  }
+  
+  // Clear any existing loading indicator
+  publicJobListingsGrid.innerHTML = '';
+  
+  if (window.allJobs.length === 0) {
+    publicJobListingsGrid.innerHTML = `
+      <div class="col-12 text-center py-5">
+        <p class="text-muted">No job listings found matching your filters.</p>
+      </div>
+    `;
+    return;
+  }
+  
+  // Create HTML for each job card
+  window.allJobs.forEach(job => {
+    const jobCard = createJobCardHTML(job, false);
+    const gridCol = document.createElement('div');
+    gridCol.className = 'col';
+    gridCol.innerHTML = jobCard;
+    publicJobListingsGrid.appendChild(gridCol);
+  });
+  
+  // Add event handlers to the newly created cards
+  document.querySelectorAll('.view-job-details-btn').forEach(button => {
+    button.addEventListener('click', function() {
+      const jobId = this.getAttribute('data-job-id');
+      if (typeof showJobDetails === 'function') {
+        showJobDetails(jobId);
+      } else {
+        console.error("showJobDetails function is not defined");
+      }
+    });
+  });
+  
+  document.querySelectorAll('.take-mock-interview-btn').forEach(button => {
+    button.addEventListener('click', function() {
+      const jobId = this.getAttribute('data-job-id');
+      if (typeof takeMockInterview === 'function') {
+        takeMockInterview(jobId);
+      } else {
+        console.error("takeMockInterview function is not defined");
+      }
+    });
+  });
+  
+  // Also update the featured carousel if it exists
+  updateFeaturedCarousel();
+}
+
+// Helper function to create job card HTML
+function createJobCardHTML(job, isCarousel) {
+  const cardClass = isCarousel ? 'carousel-job-card' : '';
+  const logoUrl = job.companyLogoUrl || 'images/default-company-logo.png'; // Fallback logo
+  const postedDate = job.postedDate?.toDate ? job.postedDate.toDate().toLocaleDateString() : 'N/A';
+  
+  // Limit tech stacks to 3 for display
+  const techStacksHtml = job.techStacks && job.techStacks.length > 0
+    ? job.techStacks.slice(0, 3).map(tech => `<span class="tech-badge">${tech}</span>`).join('')
+    : '';
+  
+  // Show +X more if there are more tech stacks
+  const moreStacksHtml = job.techStacks && job.techStacks.length > 3
+    ? `<span class="tech-badge">+${job.techStacks.length - 3} more</span>`
+    : '';
+  
+  return `
+    <div class="card job-card ${cardClass}">
+      <span class="job-status-badge badge bg-success">Active</span>
+      <img src="${logoUrl}" class="card-img-top" alt="${job.companyName || 'Company'} logo">
+      <div class="card-body d-flex flex-column">
+        <h5 class="card-title">${job.title || 'Job Title'}</h5>
+        <h6 class="card-subtitle mb-2 text-muted">${job.companyName || 'Company'}</h6>
+        <p class="card-text">
+          <i class="fas fa-map-marker-alt me-2"></i>${job.location || 'Location'}<br>
+          <span class="posted-date"><i class="far fa-calendar-alt me-1"></i>Posted: ${postedDate}</span>
+        </p>
+        <div class="tech-stack mb-3">
+          ${techStacksHtml}
+          ${moreStacksHtml}
+        </div>
+        <div class="mt-auto d-flex">
+          <button class="btn btn-outline-primary me-2 view-job-details-btn" data-job-id="${job.id}">
+            <i class="fas fa-info-circle me-1"></i> Know More
+          </button>
+          <button class="btn btn-primary take-mock-interview-btn" data-job-id="${job.id}">
+            <i class="fas fa-microphone-alt me-1"></i> Take Mock
+          </button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+// Update the featured carousel
+function updateFeaturedCarousel() {
+  const carouselInner = document.querySelector('#featuredJobsCarousel .carousel-inner');
+  if (!carouselInner || !window.allJobs || !window.allJobs.length) return;
+  
+  carouselInner.innerHTML = '';
+  
+  // Take at most 9 jobs for featured carousel
+  const featuredJobs = window.allJobs.slice(0, 9);
+  
+  // Group into chunks of 3 for carousel slides
+  const groupSize = 3;
+  for (let i = 0; i < featuredJobs.length; i += groupSize) {
+    const jobGroup = featuredJobs.slice(i, i + groupSize);
+    const isActive = i === 0;
+    
+    const carouselItem = document.createElement('div');
+    carouselItem.className = `carousel-item ${isActive ? 'active' : ''}`;
+    
+    const row = document.createElement('div');
+    row.className = 'row mx-0';
+    
+    jobGroup.forEach(job => {
+      const col = document.createElement('div');
+      col.className = 'col-md-4';
+      col.innerHTML = createJobCardHTML(job, true);
+      row.appendChild(col);
+    });
+    
+    carouselItem.appendChild(row);
+    carouselInner.appendChild(carouselItem);
+  }
+  
+  // Initialize the carousel
+  const carousel = document.getElementById('featuredJobsCarousel');
+  if (carousel && typeof bootstrap !== 'undefined') {
+    new bootstrap.Carousel(carousel, {
+      interval: 5000
+    });
+  }
+}
+
+// Fix for the loadPublicJobListings function
+function fixLoadPublicJobListings() {
+  // First check if we're on the public page section
+  const publicJobListingsGrid = document.getElementById('publicJobListingsGrid');
+  const featuredJobsCarousel = document.getElementById('featuredJobsCarousel');
+  
+  if (!publicJobListingsGrid || !featuredJobsCarousel) {
+    console.log("Not on the job listings page, skipping load");
+    return;
+  }
+  
+  // Show loading state
+  publicJobListingsGrid.innerHTML = `
+    <div class="col-12 text-center py-5">
+      <div class="spinner-border text-primary" role="status">
+        <span class="visually-hidden">Loading jobs...</span>
+      </div>
+      <p class="mt-2">Loading job listings...</p>
+    </div>
+  `;
+  
+  featuredJobsCarousel.querySelector('.carousel-inner').innerHTML = `
+    <div class="carousel-item active">
+      <div class="text-center py-5">
+        <div class="spinner-border text-primary" role="status">
+          <span class="visually-hidden">Loading jobs...</span>
+        </div>
+        <p class="mt-2">Loading featured jobs...</p>
+      </div>
+    </div>
+  `;
+  
+  // Load jobs from Firebase
+  if (typeof firebase !== 'undefined' && firebase.firestore) {
+    firebase.firestore().collection('jobPostings')
+      .where('status', '==', 'active')
+      .orderBy('postedDate', 'desc')
+      .limit(50)
+      .get()
+      .then(snapshot => {
+        window.allJobs = [];
+        
+        snapshot.forEach(doc => {
+          const job = doc.data();
+          job.id = doc.id;
+          window.allJobs.push(job);
+        });
+        
+        console.log(`Loaded ${window.allJobs.length} job listings`);
+        
+        // Display the jobs
+        fixJobListingDisplay();
+        
+        // Populate filter options
+        populateFilterOptions();
+      })
+      .catch(error => {
+        console.error("Error loading job listings:", error);
+        publicJobListingsGrid.innerHTML = `
+          <div class="col-12">
+            <div class="alert alert-danger">
+              <i class="fas fa-exclamation-circle me-2"></i>Error loading job listings: ${error.message}
+            </div>
+          </div>
+        `;
+      });
+  } else {
+    console.error("Firebase or Firestore not available");
+    publicJobListingsGrid.innerHTML = `
+      <div class="col-12">
+        <div class="alert alert-danger">
+          <i class="fas fa-exclamation-circle me-2"></i>Database not available
+        </div>
+      </div>
+    `;
+  }
+}
+
+// Populate filter dropdown options
+function populateFilterOptions() {
+  if (!window.allJobs || !window.allJobs.length) return;
+  
+  const categoryFilter = document.getElementById('publicJobCategoryFilter');
+  const techFilter = document.getElementById('publicJobTechFilter');
+  
+  if (!categoryFilter || !techFilter) return;
+  
+  // Extract unique categories and tech stacks
+  const categories = new Set();
+  const techStacks = new Set();
+  
+  window.allJobs.forEach(job => {
+    if (job.category) categories.add(job.category);
+    if (job.techStacks && Array.isArray(job.techStacks)) {
+      job.techStacks.forEach(tech => techStacks.add(tech));
+    }
+  });
+  
+  // Populate category filter
+  categoryFilter.innerHTML = '<option value="">All Categories</option>';
+  Array.from(categories).sort().forEach(category => {
+    categoryFilter.innerHTML += `<option value="${category}">${category}</option>`;
+  });
+  
+  // Populate tech stack filter
+  techFilter.innerHTML = '<option value="">All Tech Stacks</option>';
+  Array.from(techStacks).sort().forEach(tech => {
+    techFilter.innerHTML += `<option value="${tech}">${tech}</option>`;
+  });
+}
+
+// Call these debugging functions once the page has loaded
+// Add this code to your JavaScript to fix the display:
+document.addEventListener('DOMContentLoaded', function() {
+  const tabButton = document.querySelector('.tab-button[data-tab="job-listings-tab"]');
+  if (tabButton) {
+    tabButton.addEventListener('click', function() {
+      console.log("Job listings tab clicked, running debug and fix");
+      setTimeout(function() {
+        debugJobListingDisplay();
+        fixLoadPublicJobListings();
+      }, 200); // Small delay to ensure tab is visible
+    });
+  }
+});
