@@ -2297,3 +2297,97 @@ overflow: hidden; /* Ensures iframe respects rounded corners */
 .team-card .social-icons a:hover {
     color: #a777e3;
 }
+
+/* Job Listings Styling */
+.job-card {
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.job-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
+}
+
+/* Resume Upload Modal Styling */
+#job-resume-upload-modal .modal-title {
+    color: #0d6efd;
+    font-weight: 600;
+}
+
+#job-resume-upload-modal .modal-body {
+    padding: 2rem;
+}
+
+#job-resume-upload-progress {
+    background-color: #f8f9fa;
+    border-radius: 8px;
+    padding: 1rem;
+}
+
+/* Processing Spinner Modal */
+#processing-spinner-modal .modal-content {
+    border: none;
+    border-radius: 12px;
+}
+
+#processing-spinner-modal .spinner-border {
+    width: 3rem;
+    height: 3rem;
+}
+
+/* Payment Modal Styling */
+#mock-payment-modal .modal-body {
+    padding: 2rem;
+}
+
+#mock-payment-modal .alert {
+    border-left: 4px solid #0dcaf0;
+}
+
+#mock-payment-modal .fa-check-circle {
+    color: #198754;
+}
+
+/* Job-Specific Interview UI Enhancements */
+.interview-layout.job-specific {
+    border-top: 4px solid #0d6efd;
+}
+
+.job-specific .video-panel-footer {
+    background-color: #f0f7ff;
+}
+
+.company-badge {
+    position: absolute;
+    top: 15px;
+    right: 15px;
+    background: rgba(255, 255, 255, 0.9);
+    border-radius: 20px;
+    padding: 5px 12px;
+    font-size: 12px;
+    font-weight: 600;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.company-badge img {
+    height: 16px;
+    width: auto;
+}
+
+/* Responsive Adjustments */
+@media (max-width: 768px) {
+    #job-resume-upload-modal .modal-body {
+        padding: 1rem;
+    }
+    
+    .company-badge {
+        top: 10px;
+        right: 10px;
+        padding: 4px 8px;
+        font-size: 11px;
+    }
+}

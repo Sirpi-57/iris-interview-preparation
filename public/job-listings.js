@@ -967,6 +967,8 @@ async function startMockInterview(sessionId) {
  * @param {string} interviewId - Interview ID
  */
 function navigateToMockInterview(interviewId) {
+    console.log(`Navigating to mock interview: ${interviewId}`);
+    
     // Check if we're in the public or app view
     const isPublicView = document.getElementById('public-view').style.display !== 'none';
     
@@ -994,13 +996,54 @@ function navigateToMockInterview(interviewId) {
         document.getElementById('mock-interview')?.classList.add('active');
     }
     
-    // Trigger the interview initialization in the app-specific code
+    // Initialize the interview UI with the interview ID
     if (typeof initializeMockInterview === 'function') {
         initializeMockInterview(interviewId);
     } else {
-        console.warn("initializeMockInterview function not found. Interview might not start properly.");
-        // As a fallback, reload the page with the interview ID in the URL
-        window.location.href = `/index.html?interviewId=${interviewId}#mock-interview`;
+        console.warn("initializeMockInterview function not found. Attempting fallback initialization.");
+        
+        // Basic fallback initialization
+        const conversationContainer = document.getElementById('conversationContainer');
+        if (conversationContainer) {
+            // Clear previous conversations
+            conversationContainer.innerHTML = '';
+            
+            // Fetch the initial conversation state
+            fetch(`/get-interview-data/${interviewId}`)
+                .then(response => {
+                    if (!response.ok) throw new Error('Failed to load interview data');
+                    return response.json();
+                })
+                .then(data => {
+                    if (data.conversation && data.conversation.length > 0) {
+                        // Display the initial greeting
+                        const firstMessage = data.conversation[0];
+                        if (firstMessage.role === 'assistant') {
+                            const messageHTML = `
+                                <div class="message interviewer-message">
+                                    <div class="message-content">
+                                        <p>${firstMessage.content}</p>
+                                    </div>
+                                </div>
+                            `;
+                            conversationContainer.innerHTML = messageHTML;
+                        }
+                    }
+                })
+                .catch(error => {
+                    console.error('Error initializing interview:', error);
+                    conversationContainer.innerHTML = `
+                        <div class="message system-message">
+                            <div class="message-content">
+                                <p>There was an error loading the interview. Please try again.</p>
+                            </div>
+                        </div>
+                    `;
+                });
+            
+            // Store the interview ID for future API calls
+            document.getElementById('mock-interview').setAttribute('data-interview-id', interviewId);
+        }
     }
 }
 

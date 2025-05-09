@@ -69,6 +69,14 @@ document.addEventListener('DOMContentLoaded', function() {
 
         // Check browser support
         checkBrowserSupport();
+
+        // Check if we need to handle a redirect from job listing
+        if (window.location.hash === '#job-specific-interview') {
+            // This could be used if you need a more complex redirect flow
+            console.log("Detected job-specific interview redirect");
+            
+            // The rest of the flow would be handled by the URL param checking above
+        }
     }, 300); // Wait 300ms for Firebase Auth to initialize
 });
 
@@ -7006,3 +7014,166 @@ function initModalFixes() {
     
     console.log("[INIT_DEBUG] IRIS Modal Fixes initialized successfully!");
 }
+
+// Function to initialize a mock interview with a given ID
+function initializeMockInterview(interviewId) {
+    console.log(`Initializing mock interview: ${interviewId}`);
+    
+    // Store the current interview ID
+    currentInterviewId = interviewId;
+    
+    // Clear previous conversation
+    conversationContainer.innerHTML = '';
+    
+    // Reset recording status
+    isRecording = false;
+    if (recordingIndicator) {
+        recordingIndicator.style.display = 'none';
+    }
+    
+    // Reset timer if active
+    if (recordingTimer) {
+        clearInterval(recordingTimer);
+        recordingTimer = null;
+        recordingSeconds = 0;
+        if (recordingTimeDisplay) {
+            recordingTimeDisplay.textContent = '0:00';
+        }
+    }
+    
+    // Reset UI elements
+    userReplyInput.value = '';
+    
+    // Check if camera permissions were previously granted
+    if (localStream) {
+        // Already have camera/mic access, proceed with loading interview
+        loadInterviewConversation(interviewId);
+    } else {
+        // Show permissions modal to request camera/mic
+        const permissionsModal = new bootstrap.Modal(document.getElementById('permissionsModal'));
+        permissionsModal.show();
+        
+        // Set up the grant permissions button
+        document.getElementById('grantPermissionsBtn').onclick = function() {
+            permissionsModal.hide();
+            requestCameraAndMicAccess(function() {
+                // After permissions granted, load the interview
+                loadInterviewConversation(interviewId);
+            });
+        };
+    }
+}
+
+// Function to load the interview conversation
+function loadInterviewConversation(interviewId) {
+    // Show loading state
+    conversationContainer.innerHTML = `
+        <div class="message system-message">
+            <div class="message-content">
+                <p><i class="fas fa-spinner fa-spin me-2"></i> Loading interview...</p>
+            </div>
+        </div>
+    `;
+    
+    // Fetch interview data to get the initial conversation
+    fetch(`/get-interview-data/${interviewId}`)
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Failed to load interview data');
+            }
+            return response.json();
+        })
+        .then(data => {
+            // Store the interview type for reference
+            currentInterviewType = data.interviewType || 'general';
+            
+            // Update interview type selector if it exists
+            if (document.getElementById('interviewTypeSelector')) {
+                const buttons = document.getElementById('interviewTypeSelector').querySelectorAll('button');
+                buttons.forEach(btn => {
+                    btn.classList.toggle('active', btn.getAttribute('data-type') === currentInterviewType);
+                });
+            }
+            
+            // Clear the conversation container
+            conversationContainer.innerHTML = '';
+            
+            // Check if there are any messages to display
+            if (data.conversation && data.conversation.length > 0) {
+                data.conversation.forEach(message => {
+                    const isUser = message.role === 'user';
+                    const messageHTML = `
+                        <div class="message ${isUser ? 'user-message' : 'interviewer-message'}">
+                            <div class="message-content">
+                                <p>${message.content}</p>
+                            </div>
+                        </div>
+                    `;
+                    conversationContainer.innerHTML += messageHTML;
+                });
+                
+                // Scroll to the bottom of the conversation
+                conversationContainer.scrollTop = conversationContainer.scrollHeight;
+            } else {
+                // If no messages (rare case), show a default message
+                conversationContainer.innerHTML = `
+                    <div class="message system-message">
+                        <div class="message-content">
+                            <p>Interview ready to start. Waiting for the interviewer's first question...</p>
+                        </div>
+                    </div>
+                `;
+            }
+            
+            // Enable the UI
+            userReplyInput.disabled = false;
+            sendReplyBtn.disabled = false;
+        })
+        .catch(error => {
+            console.error('Error loading interview data:', error);
+            conversationContainer.innerHTML = `
+                <div class="message system-message">
+                    <div class="message-content">
+                        <p>There was an error loading the interview: ${error.message}</p>
+                        <p>Please try refreshing the page or starting a new interview.</p>
+                    </div>
+                </div>
+            `;
+        });
+}
+
+// Additional initialization for job-specific functionality
+document.addEventListener('DOMContentLoaded', function() {
+    // Check URL params for interviewId
+    const urlParams = new URLSearchParams(window.location.search);
+    const interviewIdFromUrl = urlParams.get('interviewId');
+    
+    if (interviewIdFromUrl) {
+        // If we have an interview ID in the URL, initialize that interview
+        // (useful for resuming after page refresh or sharing interview links)
+        console.log(`Found interview ID in URL: ${interviewIdFromUrl}`);
+        
+        // Need to wait for auth to be ready first
+        firebase.auth().onAuthStateChanged(function(user) {
+            if (user) {
+                // User is signed in, initialize the interview
+                // Switch to mock interview tab
+                document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
+                document.querySelector('.nav-item[data-target="mock-interview"]')?.classList.add('active');
+                
+                document.querySelectorAll('.content-section').forEach(section => section.classList.remove('active'));
+                document.getElementById('mock-interview')?.classList.add('active');
+                
+                // Initialize the interview with the ID from URL
+                initializeMockInterview(interviewIdFromUrl);
+            } else {
+                // User is not signed in, redirect to login page
+                console.log("User not signed in, showing auth modal");
+                showAuthModal('signin', function() {
+                    // This callback runs after successful login
+                    initializeMockInterview(interviewIdFromUrl);
+                });
+            }
+        });
+    }
+});
