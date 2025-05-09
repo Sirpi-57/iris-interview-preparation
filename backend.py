@@ -4017,6 +4017,7 @@ def analyze_resume_for_job():
     try:
         start_time = time.time()
         user_id_from_request = request.form.get('userId') # Get user_id early for logging
+        print(f"[USER:{user_id_from_request}] Received request to /analyze-resume-for-job")
 
         # --- 1. Validate Request and Configuration ---
         if 'resumeFile' not in request.files:
@@ -4042,38 +4043,48 @@ def analyze_resume_for_job():
             return jsonify({'error': 'Our database service is currently unavailable. Please try again later.', 'errorCode': 'DB_UNAVAILABLE'}), 503
 
         # --- 2. Fetch Job Posting ---
-        job_doc = db.collection('jobPostings').document(job_id).get()
-        if not job_doc.exists:
-            return jsonify({'error': f'The specified job posting (ID: {job_id}) could not be found.', 'errorCode': 'JOB_NOT_FOUND'}), 404
-            
-        job_data = job_doc.to_dict()
-        job_description_from_db = job_data.get('description', '') # Renamed to avoid conflict
-        if not job_description_from_db:
-            return jsonify({'error': f'The job description for job ID {job_id} is missing or empty. Analysis cannot proceed.', 'errorCode': 'JOB_DESC_MISSING'}), 400
-          
-        job_requirements_from_db = job_data.get('requirements', '') # Renamed
-        job_combined_for_analysis = job_description_from_db # Renamed
-        if job_requirements_from_db:
-            job_combined_for_analysis = f"{job_description_from_db}\n\nREQUIREMENTS:\n{job_requirements_from_db}"
+        try:
+            job_doc = db.collection('jobPostings').document(job_id).get()
+            if not job_doc.exists:
+                return jsonify({'error': f'The specified job posting (ID: {job_id}) could not be found.', 'errorCode': 'JOB_NOT_FOUND'}), 404
+                
+            job_data = job_doc.to_dict()
+            job_description_from_db = job_data.get('description', '') # Renamed to avoid conflict
+            if not job_description_from_db:
+                return jsonify({'error': f'The job description for job ID {job_id} is missing or empty. Analysis cannot proceed.', 'errorCode': 'JOB_DESC_MISSING'}), 400
+              
+            job_requirements_from_db = job_data.get('requirements', '') # Renamed
+            job_combined_for_analysis = job_description_from_db # Renamed
+            if job_requirements_from_db:
+                job_combined_for_analysis = f"{job_description_from_db}\n\nREQUIREMENTS:\n{job_requirements_from_db}"
+                
+            print(f"[USER:{user_id_from_request}] Successfully fetched job data for job ID: {job_id}")
+        except Exception as job_fetch_err:
+            print(f"Error fetching job data: {job_fetch_err}")
+            return jsonify({'error': f'Failed to retrieve job information: {str(job_fetch_err)}', 'errorCode': 'JOB_FETCH_ERROR'}), 500
 
         # --- 3. Check Usage Limits ---
-        access_check = check_feature_access(user_id_from_request, 'resumeAnalyses')
-        if not access_check.get('allowed', False):
-            error_detail = access_check.get('error', 'Usage limit reached for resume analysis.')
-            print(f"Usage limit reached for user {user_id_from_request} for resumeAnalyses: {error_detail}")
-            return jsonify({
-                'error': error_detail,
-                'limitReached': True, 
-                'used': access_check.get('used', 0),
-                'limit': access_check.get('limit', 0),
-                'plan': access_check.get('plan', 'free'),
-                'feature': 'resumeAnalyses',
-                'errorCode': 'USAGE_LIMIT_REACHED'
-            }), 403
+        try:
+            access_check = check_feature_access(user_id_from_request, 'resumeAnalyses')
+            if not access_check.get('allowed', False):
+                error_detail = access_check.get('error', 'Usage limit reached for resume analysis.')
+                print(f"Usage limit reached for user {user_id_from_request} for resumeAnalyses: {error_detail}")
+                return jsonify({
+                    'error': error_detail,
+                    'limitReached': True, 
+                    'used': access_check.get('used', 0),
+                    'limit': access_check.get('limit', 0),
+                    'plan': access_check.get('plan', 'free'),
+                    'feature': 'resumeAnalyses',
+                    'errorCode': 'USAGE_LIMIT_REACHED'
+                }), 403
+        except Exception as access_check_err:
+            print(f"Error checking feature access: {access_check_err}")
+            return jsonify({'error': f'Failed to verify account limits: {str(access_check_err)}', 'errorCode': 'ACCESS_CHECK_ERROR'}), 500
 
         # --- 4. Prepare Session and Save File ---
         session_id = str(uuid.uuid4()) # Now assign session_id
-        print(f"[{session_id}] Initiating /analyze-resume-for-job: File: {resume_filename}, Job: {job_id}, User: {user_id_from_request}")
+        print(f"[{session_id}] Initiating job-specific analysis for File: {resume_filename}, Job: {job_id}, User: {user_id_from_request}")
 
         try:
             temp_session_dir = os.path.join(BASE_TEMP_DIR, session_id)
@@ -4094,22 +4105,26 @@ def analyze_resume_for_job():
                 # This is a critical failure, as we might have saved the file but can't charge usage.
                 error_msg = increment_result.get('error', 'Failed to update your usage counter for resume analysis.')
                 print(f"[{session_id}] CRITICAL ERROR: {error_msg} for user {user_id_from_request}")
-                # Raising an exception here will be caught by the outer try-except, which will handle cleanup.
+                # Raising an exception here will be caught by the outer try-except and will handle the cleanup
                 raise Exception(f"UsageCounterError: {error_msg}") 
         except Exception as increment_err:
             print(f"[{session_id}] CRITICAL ERROR during usage increment for {user_id_from_request}: {increment_err}")
-            # No specific cleanup for temp_session_dir needed here if it's to be caught by outer finally
+            traceback.print_exc()
             return jsonify({'error': f'Failed to update your usage credits: {str(increment_err)}. Please try again.', 'errorCode': 'USAGE_INCREMENT_FAILED'}), 500
 
         # --- 6. Initialize Session in Firestore (Critical Step) ---
         try:
             session_ref = db.collection('sessions').document(session_id)
             initial_session_data = {
-                'status': 'processing', 'progress': 5, 'userId': user_id_from_request,
+                'status': 'processing', 
+                'progress': 5, 
+                'userId': user_id_from_request,
                 'resume_filename_temp': resume_filename, # For record-keeping, actual path is temp_resume_path
                 'job_description_snapshot': job_combined_for_analysis, # Store the version used for analysis
                 'jobId': job_id, 
-                'start_time': datetime.now().isoformat(), 'results': {}, 'errors': [],
+                'start_time': datetime.now().isoformat(), 
+                'results': {}, 
+                'errors': [],
                 'last_updated': firestore.SERVER_TIMESTAMP,
                 'usage_info': { 
                     'feature': 'resumeAnalyses',
@@ -4122,10 +4137,8 @@ def analyze_resume_for_job():
             print(f"[{session_id}] Initial job-specific session created in Firestore for user {user_id_from_request}, job {job_id}.")
         except Exception as db_init_err:
             print(f"[{session_id}] CRITICAL ERROR: Failed to initialize session in Firestore for user {user_id_from_request}: {db_init_err}")
-            # TODO: Consider a compensating action for usage_increment if this fails.
-            # For now, this error means the user was charged but the session isn't tracked.
-            # Raising an exception here will be caught by the outer try-except.
-            raise Exception(f"DatabaseError: {str(db_init_err)}")
+            traceback.print_exc()
+            return jsonify({'error': f'Failed to create analysis session in our database: {str(db_init_err)}', 'errorCode': 'SESSION_CREATION_ERROR'}), 500
 
         # --- 7. Update User Profile (Less Critical, Log Warning if Fails) ---
         try:
@@ -4140,7 +4153,6 @@ def analyze_resume_for_job():
             # Not returning error to client for this, as main process can continue.
 
         # --- 8. Define and Start Background Task ---
-        # (Ensuring variable names in background task are distinct if needed)
         def process_resume_background_task(current_session_id_bg, resume_local_path_bg, jd_for_analysis_bg, user_id_bg, job_id_bg):
             bg_task_status = 'failed' # Renamed for clarity within the thread
             bg_error_list = []    # Renamed
@@ -4211,12 +4223,15 @@ def analyze_resume_for_job():
         )
         analysis_thread.daemon = True 
         analysis_thread.start()
-        temp_resume_path = None # Thread will handle cleanup
-        temp_session_dir = None # Thread will handle cleanup
-
+        
+        # Thread will handle cleanup, so we nullify these variables to avoid double cleanup in the finally block
+        temp_resume_path = None 
+        temp_session_dir = None 
 
         print(f"[{session_id}] /analyze-resume-for-job request processed in {time.time() - start_time:.2f}s. Background task initiated.")
+        
         # --- 9. Return Success Response (202 Accepted) ---
+        # This is the critical line that must use jsonify() to ensure proper Content-Type header
         return jsonify({
             'sessionId': session_id,
             'jobId': job_id, # Include jobId in the response
@@ -4228,12 +4243,10 @@ def analyze_resume_for_job():
                 'limit': increment_result.get('limit', 0),
                 'remaining': increment_result.get('remaining', 0) # Provide remaining for frontend
             }
-        }), 202
+        }), 202  # Use 202 Accepted since processing continues asynchronously
 
     except Exception as e: 
         # This is the general catch-all for unexpected errors in the main route logic
-        # Errors from critical steps (usage increment, DB init) should ideally be caught specifically above
-        # and raise new exceptions to be caught here if they imply a need for cleanup.
         error_id_general = str(uuid.uuid4())
         error_message_general = f"A critical server error occurred during the resume analysis process. Please try again later. Ref: {error_id_general}"
         print(f"[{error_id_general}] UNHANDLED ERROR in /analyze-resume-for-job (User: {user_id_from_request}, Job: {request.form.get('jobId', 'N/A')}): {e}")
@@ -4249,7 +4262,11 @@ def analyze_resume_for_job():
             except Exception as session_update_err_general:
                 print(f"[{error_id_general}] Additionally, failed to update session with error state: {session_update_err_general}")
 
-        return jsonify({'error': error_message_general, 'errorCode': 'SERVER_PROCESSING_ERROR'}), 500
+        # Important: Always return JSON for errors
+        return jsonify({
+            'error': error_message_general, 
+            'errorCode': 'SERVER_PROCESSING_ERROR'
+        }), 500
     finally:
         # This finally block handles cleanup if an error occurred *before* the thread was started
         # or if the thread itself was never meant to handle the cleanup (e.g., file save error).
