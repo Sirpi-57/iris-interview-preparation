@@ -7654,3 +7654,62 @@ function checkPendingMockInterview() {
         }
     }
 }
+
+// Function to filter job listings based on search and filter inputs
+function filterPublicJobListings() {
+    const searchInput = document.getElementById('publicJobSearchInput');
+    const categoryFilter = document.getElementById('publicJobCategoryFilter');
+    const techFilter = document.getElementById('publicJobTechFilter');
+    
+    if (!window.allJobs || !Array.isArray(window.allJobs)) {
+        console.error("Job listings not loaded yet");
+        return;
+    }
+    
+    // Get filter values
+    const searchTerm = searchInput?.value?.toLowerCase() || '';
+    const categoryValue = categoryFilter?.value || '';
+    const techValue = techFilter?.value || '';
+    
+    // Filter jobs
+    const filteredJobs = window.allJobs.filter(job => {
+        // Search term filter
+        const searchMatch = !searchTerm || 
+            (job.title && job.title.toLowerCase().includes(searchTerm)) ||
+            (job.companyName && job.companyName.toLowerCase().includes(searchTerm)) ||
+            (job.location && job.location.toLowerCase().includes(searchTerm)) ||
+            (job.description && job.description.toLowerCase().includes(searchTerm));
+        
+        // Category filter
+        const categoryMatch = !categoryValue || (job.category === categoryValue);
+        
+        // Tech stack filter
+        const techMatch = !techValue || 
+            (job.techStacks && Array.isArray(job.techStacks) && 
+             job.techStacks.some(tech => tech.toLowerCase() === techValue.toLowerCase()));
+        
+        return searchMatch && categoryMatch && techMatch;
+    });
+    
+    // Display filtered jobs
+    displayJobListings(filteredJobs);
+}
+
+// Also add the resetPublicFilters function which is likely missing too
+function resetPublicFilters() {
+    const searchInput = document.getElementById('publicJobSearchInput');
+    const categoryFilter = document.getElementById('publicJobCategoryFilter');
+    const techFilter = document.getElementById('publicJobTechFilter');
+    
+    if (searchInput) searchInput.value = '';
+    if (categoryFilter) categoryFilter.value = '';
+    if (techFilter) techFilter.value = '';
+    
+    // Display all jobs
+    if (window.allJobs && Array.isArray(window.allJobs)) {
+        displayJobListings(window.allJobs);
+    } else {
+        // If allJobs is not available, reload from Firebase
+        loadPublicJobListings();
+    }
+}
