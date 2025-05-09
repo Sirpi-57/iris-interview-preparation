@@ -19,10 +19,6 @@ const authState = {
   subscription: null, // For payment info later
 };
 
-let pendingJobInterviewAfterAuth = null;
-let pendingRedirectCallback = null;
-let authCallbacksRegistered = false;
-
 // Initialize Firebase
 document.addEventListener('DOMContentLoaded', () => {
   initializeFirebase();
@@ -1050,26 +1046,6 @@ function showAuthModal(mode = 'signin') {
         console.error("Error parsing pending addon data:", e);
       }
     }
-    // Check for pending job interview after auth
-    if (pendingJobInterviewAfterAuth) {
-      // Remove any existing message first
-      const existingMessage = document.getElementById('auth-pending-message');
-      if (existingMessage) {
-        existingMessage.remove();
-      }
-      
-      // Create a new message element
-      const messageEl = document.createElement('div');
-      messageEl.id = 'auth-pending-message';
-      messageEl.className = 'alert alert-info mb-3';
-      messageEl.innerHTML = `<i class="fas fa-info-circle me-2"></i>You'll be redirected back to the job-specific interview process after signing in.`;
-      
-      // Insert at the top of the form
-      const authForm = document.getElementById(type === 'signin' ? 'signin-form' : 'signup-form');
-      if (authForm) {
-        authForm.insertBefore(messageEl, authForm.firstChild);
-      }
-    }
   }
 }
 
@@ -1110,42 +1086,6 @@ function showErrorMessage(message, duration = 5000) {
     console.error(message);
     alert(message);
   }
-}
-
-// Function to handle auth state changes and redirects
-function setupAuthStateChangeHandlers() {
-  firebase.auth().onAuthStateChanged(function(user) {
-    const authModal = bootstrap.Modal.getInstance(document.getElementById('auth-modal'));
-    
-    if (user) {
-      // Close auth modal if open
-      if (authModal) {
-        authModal.hide();
-      }
-      
-      // Handle any pending job interview request
-      if (pendingJobInterviewAfterAuth) {
-        console.log(`Resuming job-specific interview flow for job: ${pendingJobInterviewAfterAuth}`);
-        // Small delay to ensure modal is fully closed
-        setTimeout(() => {
-          startJobSpecificResumeUpload(pendingJobInterviewAfterAuth);
-          pendingJobInterviewAfterAuth = null;
-        }, 500);
-      }
-      
-      // Execute any pending redirect callback
-      if (pendingRedirectCallback && typeof pendingRedirectCallback === 'function') {
-        pendingRedirectCallback();
-        pendingRedirectCallback = null;
-      }
-    }
-  });
-}
-
-// Function to set pending job interview
-function setPendingJobInterview(jobId) {
-  pendingJobInterviewAfterAuth = jobId;
-  console.log(`Set pending job interview: ${jobId}`);
 }
 
 /// --- New function to purchase an addon ---
@@ -1466,9 +1406,4 @@ window.irisAuth = {
   checkEmailVerification,
   showEmailVerificationModal,
   sendPasswordResetEmail,
-
-  // Add new functions for job-specific interview flow
-  setPendingJobInterview: setPendingJobInterview,
-  getPendingJobInterview: () => pendingJobInterviewAfterAuth,
-  clearPendingJobInterview: () => { pendingJobInterviewAfterAuth = null; }
 };
