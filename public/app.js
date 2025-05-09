@@ -81,6 +81,48 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             });
         }
+        
+        // Add these new lines to check for pending mock interviews
+        // This is important to handle cases where users come from job listings,
+        // log in, and need to be redirected to the upload page with the job description
+        if (firebase.auth().currentUser) {
+            // Check if there's a pending mock interview
+            const pendingJobId = localStorage.getItem('pendingMockInterviewJobId');
+            if (pendingJobId) {
+                console.log("Found pending mock interview job ID:", pendingJobId);
+                
+                // Give some time for the app to fully initialize before proceeding
+                setTimeout(() => {
+                    checkPendingMockInterview();
+                }, 1000);
+            }
+        } else {
+            // Set up a listener for when auth state changes to check again
+            const unsubscribe = firebase.auth().onAuthStateChanged(function(user) {
+                if (user) {
+                    // User just logged in, check for pending mock interview
+                    const pendingJobId = localStorage.getItem('pendingMockInterviewJobId');
+                    if (pendingJobId) {
+                        console.log("Auth state changed, found pending mock interview:", pendingJobId);
+                        setTimeout(() => {
+                            checkPendingMockInterview();
+                        }, 1000);
+                    }
+                    // Remove this listener since we only need to check once after login
+                    unsubscribe();
+                }
+            });
+        }
+        
+        // Also enhance the job listing functions to properly attach event listeners
+        if (typeof loadPublicJobListings === 'function') {
+            enhanceLoadPublicJobListings();
+        }
+        
+        if (typeof displayJobListings === 'function') {
+            enhanceDisplayJobListings();
+        }
+        
     }, 300); // Wait 300ms for Firebase Auth to initialize
 });
 
@@ -7026,16 +7068,16 @@ function initPublicJobListings() {
     // Elements 
     const jobListingsGrid = document.getElementById('publicJobListingsGrid');
     const featuredJobsCarousel = document.getElementById('featuredJobsCarousel');
-    const carouselInner = featuredJobsCarousel.querySelector('.carousel-inner');
+    const carouselInner = featuredJobsCarousel?.querySelector('.carousel-inner');
     const searchInput = document.getElementById('publicJobSearchInput');
     const categoryFilter = document.getElementById('publicJobCategoryFilter');
     const techFilter = document.getElementById('publicJobTechFilter');
     const resetFiltersBtn = document.getElementById('publicResetJobFilters');
     
-    // Initialize
+    // Initialize - load the job listings
     loadPublicJobListings();
     
-    // Add event listeners
+    // Add event listeners for filtering
     if (searchInput) {
         searchInput.addEventListener('input', filterPublicJobListings);
     }
@@ -7134,11 +7176,41 @@ function loadPublicJobListings() {
             }
             
             console.log(`Loaded ${window.allJobs.length} job listings`);
+            
+            // Add this new code: Attach event listeners for Take Mock buttons
+            setTimeout(() => {
+                attachJobListingEventListeners();
+            }, 500);
         })
         .catch(error => {
             console.error("Error loading job listings:", error);
             showErrorInJobSection("Failed to load job listings. Please try again later.");
         });
+}
+
+// Helper function for showing errors in the job section
+function showErrorInPublicJobSection(message) {
+    const jobListingsGrid = document.getElementById('publicJobListingsGrid');
+    if (jobListingsGrid) {
+        jobListingsGrid.innerHTML = `
+            <div class="col-12">
+                <div class="alert alert-danger">
+                    <i class="fas fa-exclamation-circle me-2"></i>${message}
+                </div>
+            </div>
+        `;
+    }
+    
+    const carouselInner = document.querySelector('#featuredJobsCarousel .carousel-inner');
+    if (carouselInner) {
+        carouselInner.innerHTML = `
+            <div class="carousel-item active">
+                <div class="alert alert-danger mx-3">
+                    <i class="fas fa-exclamation-circle me-2"></i>${message}
+                </div>
+            </div>
+        `;
+    }
 }
 
 // Populate filter dropdowns
@@ -7487,6 +7559,7 @@ function takeMockInterview(jobId) {
             }
             
             const job = doc.data();
+            console.log("Retrieved job data for interview:", job);
             
             // Navigate to the resume upload section
             navigateTo('upload');
@@ -7506,6 +7579,8 @@ function takeMockInterview(jobId) {
                         showMessage("Job description loaded. Please upload your resume to continue.", "success");
                     }, 300);
                 }
+            } else {
+                console.error("Could not find jobDescription textarea in the upload section");
             }
         })
         .catch(error => {
@@ -7514,7 +7589,8 @@ function takeMockInterview(jobId) {
         });
 }
 
-// Format job object into a comprehensive job description
+
+
 function formatJobToDescription(job) {
     // Create a structured job description from the job fields
     let jobDesc = `${job.title} at ${job.companyName}\n\n`;
@@ -7639,9 +7715,11 @@ function chunkArray(array, chunkSize) {
 }
 
 // Check and process pending mock interview after login
-function checkPendingMockInterview() {
+ffunction checkPendingMockInterview() {
     const pendingJobId = localStorage.getItem('pendingMockInterviewJobId');
     if (pendingJobId) {
+        console.log("Found pending mock interview job ID:", pendingJobId);
+        
         // Clear from storage to prevent repeats
         localStorage.removeItem('pendingMockInterviewJobId');
         
@@ -7649,13 +7727,13 @@ function checkPendingMockInterview() {
         if (firebase.auth().currentUser) {
             // Small delay to ensure everything is loaded
             setTimeout(() => {
+                console.log("User is logged in, proceeding with mock interview for job:", pendingJobId);
                 takeMockInterview(pendingJobId);
             }, 1000);
         }
     }
 }
 
-// Function to filter job listings based on search and filter inputs
 function filterPublicJobListings() {
     const searchInput = document.getElementById('publicJobSearchInput');
     const categoryFilter = document.getElementById('publicJobCategoryFilter');
@@ -7695,7 +7773,6 @@ function filterPublicJobListings() {
     displayJobListings(filteredJobs);
 }
 
-// Also add the resetPublicFilters function which is likely missing too
 function resetPublicFilters() {
     const searchInput = document.getElementById('publicJobSearchInput');
     const categoryFilter = document.getElementById('publicJobCategoryFilter');
@@ -7712,7 +7789,7 @@ function resetPublicFilters() {
         // If allJobs is not available, reload from Firebase
         loadPublicJobListings();
     }
-}
+}                                                   
 
 
 
@@ -8010,6 +8087,119 @@ function populateFilterOptions() {
     techFilter.innerHTML += `<option value="${tech}">${tech}</option>`;
   });
 }
+
+// Ensure this listener gets attached to job listing cards
+function attachJobListingEventListeners() {
+    console.log("Attaching job listing event listeners");
+    
+    // Add event listeners to "Take Mock" buttons in job cards
+    document.querySelectorAll('.take-mock-interview-btn').forEach(button => {
+        // First remove any existing listeners by cloning and replacing the button
+        const newButton = button.cloneNode(true);
+        if (button.parentNode) {
+            button.parentNode.replaceChild(newButton, button);
+        }
+        
+        // Add fresh event listener
+        newButton.addEventListener('click', function(e) {
+            e.preventDefault(); // Prevent default if it's an anchor
+            const jobId = this.getAttribute('data-job-id');
+            if (jobId) {
+                console.log("Take Mock Interview clicked for job ID:", jobId);
+                takeMockInterview(jobId);
+            } else {
+                console.error("No job ID found on Take Mock button");
+            }
+        });
+    });
+    
+    // Also bind the button in the job details modal
+    const modalMockButton = document.getElementById('takeMockInterviewBtn');
+    if (modalMockButton) {
+        // Remove existing listeners
+        const newModalButton = modalMockButton.cloneNode(true);
+        if (modalMockButton.parentNode) {
+            modalMockButton.parentNode.replaceChild(newModalButton, modalMockButton);
+        }
+        
+        // Add fresh event listener
+        newModalButton.addEventListener('click', function() {
+            const jobId = this.getAttribute('data-job-id');
+            if (jobId) {
+                console.log("Take Mock Interview clicked from modal for job ID:", jobId);
+                takeMockInterview(jobId);
+            } else {
+                console.error("No job ID found on modal Take Mock button");
+            }
+        });
+    }
+}
+
+// Call this after jobs are loaded and displayed
+// Add this to your job display function or where you currently 
+// add event listeners to the job cards
+function enhanceLoadPublicJobListings() {
+    const original = loadPublicJobListings;
+    
+    // Replace the original function with our enhanced version
+    window.loadPublicJobListings = function() {
+        // Call the original function
+        original.apply(this, arguments);
+        
+        // Add a small delay to ensure DOM is updated
+        setTimeout(() => {
+            console.log("Attaching job listing event listeners");
+            attachJobListingEventListeners();
+        }, 500);
+    };
+}
+
+// Register our enhancement when the page loads
+document.addEventListener('DOMContentLoaded', function() {
+    if (typeof loadPublicJobListings === 'function') {
+        enhanceLoadPublicJobListings();
+    } else {
+        console.warn("loadPublicJobListings function not found yet, will try again soon");
+        // Try again after a small delay
+        setTimeout(() => {
+            if (typeof loadPublicJobListings === 'function') {
+                enhanceLoadPublicJobListings();
+            } else {
+                console.error("loadPublicJobListings function not found, could not enhance");
+            }
+        }, 2000);
+    }
+});
+
+// Improve the display job listings function to also attach our event listeners
+function enhanceDisplayJobListings() {
+    const original = displayJobListings;
+    
+    // Replace with enhanced version
+    window.displayJobListings = function() {
+        // Call original
+        original.apply(this, arguments);
+        
+        // Add our event listeners
+        setTimeout(() => {
+            attachJobListingEventListeners();
+        }, 100);
+    };
+}
+
+// Also try to enhance displayJobListings
+document.addEventListener('DOMContentLoaded', function() {
+    if (typeof displayJobListings === 'function') {
+        enhanceDisplayJobListings();
+    } else {
+        // Try again after a delay
+        setTimeout(() => {
+            if (typeof displayJobListings === 'function') {
+                enhanceDisplayJobListings();
+            }
+        }, 2000);
+    }
+});
 
 // Call these debugging functions once the page has loaded
 // Add this code to your JavaScript to fix the display:
