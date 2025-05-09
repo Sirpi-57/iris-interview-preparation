@@ -1786,6 +1786,61 @@ def process_captured_payment(order_data, payment_id):
         traceback.print_exc()
         return False
 
+# Add this function to your backend.py file
+
+def create_job_specific_interviewer_prompt(resume_data, job_data, interview_type="general"):
+    """
+    Creates a customized system prompt for job-specific interviews.
+    This integrates with your existing create_mock_interviewer_prompt function.
+    """
+    # Extract key job information
+    job_title = job_data.get("title", "the position")
+    company_name = job_data.get("companyName", "the company")
+    experience_level = job_data.get("experienceLevel", "")
+    job_description = job_data.get("description", "")
+    requirements = job_data.get("requirements", "")
+    tech_stacks = job_data.get("techStacks", [])
+    previous_questions = job_data.get("previousInterviewQuestions", [])
+    
+    # Start with a base prompt using your existing function
+    base_prompt = create_mock_interviewer_prompt(resume_data, job_data, interview_type)
+    
+    # Enhance with job-specific information
+    job_context = f"""
+**Job-Specific Information:**
+You are interviewing {resume_data.get('name', 'the candidate')} for the "{job_title}" position at {company_name}.
+
+Company: {company_name}
+Position: {job_title}
+Required Experience: {experience_level}
+Technical Requirements: {', '.join(tech_stacks) if tech_stacks else 'Not specified'}
+
+Job Description Excerpt:
+{job_description[:300]}{'...' if len(job_description) > 300 else ''}
+
+Key Requirements:
+{requirements[:300]}{'...' if len(requirements) > 300 else ''}
+"""
+
+    # Add previous interview questions if available
+    if previous_questions:
+        job_context += f"\nThe company has previously asked questions like:\n"
+        for i, question in enumerate(previous_questions[:5]):  # Limit to 5 questions
+            job_context += f"- {question}\n"
+        
+        job_context += "\nIncorporate these types of questions into your interview, but don't just repeat them verbatim. Create similar questions in the same style."
+    
+    # Find a good insertion point in the base prompt
+    insertion_point = base_prompt.find("**Critical Directives")
+    if insertion_point != -1:
+        # Insert before the "Critical Directives" section
+        enhanced_prompt = base_prompt[:insertion_point] + job_context + "\n\n" + base_prompt[insertion_point:]
+    else:
+        # Fallback: Insert at the beginning
+        enhanced_prompt = job_context + "\n\n" + base_prompt
+    
+    return enhanced_prompt
+
 
 # === Flask Routes ===
 
@@ -3717,8 +3772,234 @@ def payment_webhooks():
         print("=== END WITH ERROR: payment-webhooks ===")
         return jsonify({'error': f'Server error: {str(e)}'}), 500
 
+@app.route('/job-specific-mock', methods=['POST'])
+def job_specific_mock():
+    """Creates and starts a mock interview tailored to a specific job posting."""
+    try:
+        data = request.get_json()
+        if not data: return jsonify({'error': 'Invalid JSON payload'}), 400
+        
+        session_id = data.get('sessionId')
+        job_id = data.get('jobId')
+        interview_type = data.get('interviewType', 'general')
+        
+        if not session_id: return jsonify({'error': 'Session ID required'}), 400
+        if not job_id: return jsonify({'error': 'Job ID required'}), 400
+        if not db: return jsonify({'error': 'Database unavailable'}), 503
+        
+        # Get session data (contains resume info)
+        session_data = get_session_data(session_id)
+        if session_data is None: return jsonify({'error': 'Session not found or expired'}), 404
+        if session_data.get('status') != 'completed': return jsonify({'error': 'Analysis not completed'}), 400
+        
+        # Get user ID from session
+        user_id = session_data.get('userId')
+        if not user_id: return jsonify({'error': 'User ID not found in session'}), 400
+        
+        # Fetch job data from Firestore
+        job_doc = db.collection('jobPostings').document(job_id).get()
+        if not job_doc.exists: return jsonify({'error': 'Job posting not found'}), 404
+        
+        job_data = job_doc.to_dict()
+        
+        # Check usage limits for mock interviews
+        access_check = check_feature_access(user_id, 'mockInterviews')
+        if not access_check.get('allowed', False):
+            return jsonify({
+                'error': access_check.get('error', 'Usage limit reached for mock interviews'),
+                'limitReached': True,
+                'used': access_check.get('used', 0),
+                'limit': access_check.get('limit', 0),
+                'plan': access_check.get('plan', 'free')
+            }), 403
+        
+        # Increment usage counter
+        increment_result = increment_usage_counter(user_id, 'mockInterviews')
+        if not increment_result.get('success', False):
+            error_msg = increment_result.get('error', 'Failed to update usage counter')
+            print(f"[{session_id}] ERROR: {error_msg}")
+            return jsonify({'error': error_msg}), 500
+        
+        # Get resume data from session
+        resume_data = session_data.get('results', {}).get('parsed_resume', {})
+        
+        # Create interview ID and generate custom system prompt based on job data
+        interview_id = str(uuid.uuid4())
+        
+        # Generate system prompt by integrating job data
+        system_prompt = create_job_specific_interviewer_prompt(resume_data, job_data, interview_type)
+        
+        # Generate initial greeting with job context
+        initial_prompt = f"Start the interview for {job_data.get('title', 'the position')} at {job_data.get('companyName', 'the company')}. Give a brief professional greeting mentioning the company and role, then ask your first question."
+        
+        try:
+            # Get current time for context
+            current_time_str = datetime.now().strftime("%I:%M %p")
+            
+            greeting = call_claude_api(
+                messages=[{"role": "user", "content": initial_prompt}],
+                system_prompt=system_prompt,
+                model=CLAUDE_MODEL,
+                temperature=0.3,
+                current_time_str=current_time_str
+            )
+        except Exception as e:
+            print(f"[{session_id}] Error generating greeting for job-specific interview {interview_id}: {e}")
+            greeting = f"Hello {resume_data.get('name', 'there')}. Welcome to your mock interview for the {job_data.get('title', 'position')} at {job_data.get('companyName', 'company')}. Let's begin. Can you start by telling me a bit about yourself and your background?"
+        
+        # Create interview document in Firestore
+        interview_doc_ref = db.collection('interviews').document(interview_id)
+        interview_data = {
+            'sessionId': session_id,
+            'jobId': job_id,
+            'userId': user_id,
+            'interviewType': interview_type,
+            'system_prompt_summary': system_prompt[:1000] + "...",
+            'conversation': [{'role': 'assistant', 'content': greeting, 'timestamp': datetime.now().isoformat()}],
+            'status': 'active',
+            'start_time': datetime.now().isoformat(),
+            'last_updated': firestore.SERVER_TIMESTAMP,
+            'resume_data_snapshot': resume_data,
+            'job_data_snapshot': job_data,
+            'analysis_status': 'not_started',
+            'analysis': None,
+            'usage_info': {
+                'feature': 'mockInterviews',
+                'used': increment_result.get('used', 0),
+                'limit': increment_result.get('limit', 0)
+            }
+        }
+        interview_doc_ref.set(interview_data)
+        
+        print(f"[{session_id}] Started job-specific interview {interview_id} for job {job_id}, user {user_id}.")
+        
+        return jsonify({
+            'interviewId': interview_id,
+            'sessionId': session_id,
+            'jobId': job_id,
+            'interviewType': interview_type,
+            'greeting': greeting,
+            'usageInfo': {
+                'feature': 'mockInterviews',
+                'used': increment_result.get('used', 0),
+                'limit': increment_result.get('limit', 0),
+                'remaining': increment_result.get('remaining', 0)
+            }
+        })
+        
+    except Exception as e:
+        print(f"Error in /job-specific-mock: {e}")
+        traceback.print_exc()
+        return jsonify({'error': f'Server error starting job-specific interview: {str(e)}'}), 500
+
+@app.route('/get-job-listings', methods=['GET'])
+def get_job_listings():
+    """Retrieves active job listings for display on the website."""
+    try:
+        # Optional category filter
+        category = request.args.get('category')
+        limit = request.args.get('limit', '50')
+        
+        try:
+            limit_num = int(limit)
+            if limit_num <= 0 or limit_num > 100:
+                limit_num = 50
+        except (ValueError, TypeError):
+            limit_num = 50
+        
+        if not db:
+            return jsonify({'error': 'Database unavailable'}), 503
+        
+        # Start with active jobs query
+        query = db.collection('jobPostings').where('status', '==', 'active')
+        
+        # Add category filter if provided
+        if category and category != 'all':
+            query = query.where('category', '==', category)
+        
+        # Order by posted date (most recent first)
+        query = query.order_by('postedDate', 'desc').limit(limit_num)
+        
+        # Execute query
+        snapshot = query.get()
+        
+        job_listings = []
+        for doc in snapshot:
+            job_data = doc.to_dict()
+            job_data['id'] = doc.id
+            
+            # Format dates for easier frontend processing
+            if 'postedDate' in job_data and hasattr(job_data['postedDate'], 'toDate'):
+                job_data['postedDateFormatted'] = job_data['postedDate'].toDate().isoformat()
+            
+            if 'expiryDate' in job_data and hasattr(job_data['expiryDate'], 'toDate'):
+                job_data['expiryDateFormatted'] = job_data['expiryDate'].toDate().isoformat()
+            
+            # Include only necessary fields to reduce payload size
+            job_listings.append({
+                'id': job_data['id'],
+                'title': job_data.get('title'),
+                'companyName': job_data.get('companyName'),
+                'companyLogoUrl': job_data.get('companyLogoUrl'),
+                'location': job_data.get('location'),
+                'category': job_data.get('category'),
+                'subCategory': job_data.get('subCategory'),
+                'experienceLevel': job_data.get('experienceLevel'),
+                'postedDateFormatted': job_data.get('postedDateFormatted'),
+                'expiryDateFormatted': job_data.get('expiryDateFormatted'),
+                'salaryRange': job_data.get('salaryRange'),
+                'relocation': job_data.get('relocation', False),
+                'status': job_data.get('status')
+            })
+        
+        return jsonify({
+            'jobs': job_listings,
+            'count': len(job_listings)
+        })
+        
+    except Exception as e:
+        print(f"Error getting job listings: {e}")
+        traceback.print_exc()
+        return jsonify({'error': f'Server error: {str(e)}'}), 500
 
 
+@app.route('/get-job-details/<job_id>', methods=['GET'])
+def get_job_details(job_id):
+    """Retrieves complete details for a specific job posting."""
+    try:
+        if not db:
+            return jsonify({'error': 'Database unavailable'}), 503
+        
+        job_ref = db.collection('jobPostings').document(job_id)
+        job_doc = job_ref.get()
+        
+        if not job_doc.exists:
+            return jsonify({'error': 'Job not found'}), 404
+        
+        job_data = job_doc.to_dict()
+        job_data['id'] = job_id
+        
+        # Format dates
+        if 'postedDate' in job_data and hasattr(job_data['postedDate'], 'toDate'):
+            job_data['postedDateFormatted'] = job_data['postedDate'].toDate().isoformat()
+        
+        if 'expiryDate' in job_data and hasattr(job_data['expiryDate'], 'toDate'):
+            job_data['expiryDateFormatted'] = job_data['expiryDate'].toDate().isoformat()
+        
+        # Increment view counter if available
+        try:
+            job_ref.update({
+                'viewCount': firestore.Increment(1)
+            })
+        except Exception as view_err:
+            print(f"Warning: Could not update view count for job {job_id}: {view_err}")
+        
+        return jsonify(job_data)
+        
+    except Exception as e:
+        print(f"Error getting job details for {job_id}: {e}")
+        traceback.print_exc()
+        return jsonify({'error': f'Server error: {str(e)}'}), 500
 
 
 

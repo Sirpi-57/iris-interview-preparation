@@ -97,9 +97,9 @@
                         <li class="nav-item">
                             <a class="nav-link tab-button active" data-tab="welcome-tab" href="#">Home</a>
                         </li>
-                        <!-- <li class="nav-item">
-                            <a class="nav-link tab-button" data-tab="job-listings-tab" href="#">Job Practice</a>
-                        </li> -->
+                        <li class="nav-item">
+                            <a class="nav-link tab-button" data-tab="job-listings-tab" href="#">Job Listings</a>
+                        </li>
                         <li class="nav-item">
                             <a class="nav-link tab-button" data-tab="features-tab" href="#">Features</a>
                         </li>
@@ -389,8 +389,7 @@
                 </div>
             </div>
 
-            <!-- Job Listings Tab -->
-            <!-- <div id="job-listings-tab" class="public-tab">
+            <div id="job-listings-tab" class="public-tab">
                 <div class="container py-5">
                     <h1 class="text-center mb-5">Practice Real Job Interviews</h1>
                     <p class="lead text-center mb-4">Prepare for your next interview by practicing with AI-powered mock interviews tailored to actual job openings.</p>
@@ -426,10 +425,10 @@
                                 </div>
                             </div>
                         </div>
-                    </div> -->
+                    </div>
                     
                     <!-- Filter and Search Bar -->
-                    <!-- <div class="card mb-4">
+                    <div class="card mb-4">
                         <div class="card-body">
                             <div class="row g-3">
                                 <div class="col-md-6">
@@ -473,12 +472,12 @@
                                 </div>
                             </div>
                         </div>
-                    </div> -->
+                    </div>
                     
                     <!-- Job Listings Grid -->
-                    <!-- <div class="row g-4" id="public-job-listings-container"> -->
+                    <div class="row g-4" id="public-job-listings-container">
                         <!-- Loading placeholder -->
-                        <!-- <div class="col-12 text-center py-5">
+                        <div class="col-12 text-center py-5">
                             <div class="spinner-border text-primary" role="status">
                                 <span class="visually-hidden">Loading...</span>
                             </div>
@@ -486,7 +485,7 @@
                         </div>
                     </div>
                 </div>
-            </div> -->
+            </div>
 
             <div id="showcase-tab" class="public-tab">
                 <div class="container py-5">
@@ -2418,17 +2417,16 @@
         </div>
       </div>
 
-    <!-- Public Job Details Modal -->
-    <!-- <div class="modal fade" id="public-job-details-modal" tabindex="-1" aria-labelledby="publicJobDetailsModalLabel" aria-hidden="true">
+    <div class="modal fade" id="public-job-details-modal" tabindex="-1" aria-labelledby="publicJobDetailsModalLabel" aria-hidden="true">
         <div class="modal-dialog modal-lg">
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title" id="publicJobDetailsModalLabel">Job Details</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
-                <div class="modal-body" id="public-job-details-content"> -->
+                <div class="modal-body" id="public-job-details-content">
                     <!-- Job details will be loaded here -->
-                    <!-- <div class="text-center py-3">
+                    <div class="text-center py-3">
                         <div class="spinner-border text-primary" role="status">
                             <span class="visually-hidden">Loading...</span>
                         </div>
@@ -2443,7 +2441,7 @@
                 </div>
             </div>
         </div>
-    </div> -->
+    </div>
 
     <!-- Scripts -->
     <!-- Firebase SDK -->
@@ -2464,6 +2462,7 @@
     <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
     <script src="firebase-auth.js"></script>
     <script src="app.js"></script>
+    <script src="job-listings.js"></script>
     <script>
         document.addEventListener('DOMContentLoaded', function() {
           const imgLinks = document.querySelectorAll('.img-link');

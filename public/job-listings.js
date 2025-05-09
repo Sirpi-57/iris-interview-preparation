@@ -1,533 +1,996 @@
-// IRIS - Public Job Listings Module
+// job-listings.js - Handles Job Listings functionality for IRIS public website
 
-// Global state for public job listings
-const publicJobListingsState = {
-    jobs: [],
-    filteredJobs: [],
-    currentCategory: 'all',
-    currentSort: 'deadline',
-    searchTerm: '',
-    currentJobId: null
-};
+// --- DOM Elements ---
+const jobListingsContainer = document.getElementById('public-job-listings-container');
+const categoryFilterDropdown = document.getElementById('public-category-filter-dropdown');
+const sortOptionsDropdown = document.getElementById('public-sort-options-dropdown');
+const jobSearchInput = document.getElementById('public-job-search-input');
+const searchJobsBtn = document.getElementById('public-search-jobs-btn');
+const jobDetailsModal = new bootstrap.Modal(document.getElementById('public-job-details-modal'));
+const jobDetailsContent = document.getElementById('public-job-details-content');
+const startPracticeBtn = document.getElementById('public-start-practice-btn');
 
-// Initialize on page load
-document.addEventListener('DOMContentLoaded', function() {
-    // Add public job listings tab to navbar
-    addJobListingsTab();
+// --- State Variables ---
+let allJobs = [];
+let currentCategory = 'all';
+let currentSortOption = 'deadline';
+let currentSearchQuery = '';
+
+// --- Initialization ---
+document.addEventListener('DOMContentLoaded', () => {
+    loadJobListings();
     
-    // Initialize public job listings when tab is clicked
-    const jobListingsTabButton = document.querySelector('.tab-button[data-tab="job-listings-tab"]');
-    if (jobListingsTabButton) {
-        jobListingsTabButton.addEventListener('click', function() {
-            initPublicJobListings();
+    // Event Listeners
+    if (categoryFilterDropdown) {
+        categoryFilterDropdown.addEventListener('click', handleCategoryFilter);
+    }
+    
+    if (sortOptionsDropdown) {
+        sortOptionsDropdown.addEventListener('click', handleSortOption);
+    }
+    
+    if (searchJobsBtn) {
+        searchJobsBtn.addEventListener('click', handleSearch);
+    }
+    
+    if (jobSearchInput) {
+        jobSearchInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') handleSearch();
         });
     }
     
-    // Check if we're starting on the job listings tab (from direct link)
-    const urlParams = new URLSearchParams(window.location.search);
-    if (urlParams.get('tab') === 'job-listings') {
-        // Select the job listings tab
-        const jobListingsTab = document.querySelector('.tab-button[data-tab="job-listings-tab"]');
-        if (jobListingsTab) {
-            jobListingsTab.click();
-        }
+    if (startPracticeBtn) {
+        startPracticeBtn.addEventListener('click', startPracticeInterview);
     }
 });
 
-// Add job listings tab to navbar if it doesn't exist
-function addJobListingsTab() {
-    const navbarNav = document.getElementById('navbarNav');
-    if (!navbarNav) return;
-    
-    const tabsUl = navbarNav.querySelector('ul.navbar-nav');
-    if (!tabsUl) return;
-    
-    // Check if tab already exists
-    if (tabsUl.querySelector('[data-tab="job-listings-tab"]')) return;
-    
-    // Create and insert tab before the last item (pricing)
-    const jobListingsTab = document.createElement('li');
-    jobListingsTab.className = 'nav-item';
-    jobListingsTab.innerHTML = `
-        <a class="nav-link tab-button" data-tab="job-listings-tab" href="#">Job Practice</a>
-    `;
-    
-    // Find pricing tab and insert before it
-    const pricingTab = tabsUl.querySelector('[data-tab="pricing-tab"]');
-    if (pricingTab && pricingTab.parentNode) {
-        tabsUl.insertBefore(jobListingsTab, pricingTab.parentNode);
-    } else {
-        // If pricing tab not found, just append
-        tabsUl.appendChild(jobListingsTab);
-    }
-}
+// --- Functions ---
 
-// Initialize public job listings
-function initPublicJobListings() {
-    console.log("Initializing public job listings");
+/**
+ * Loads job listings from Firestore
+ */
+async function loadJobListings() {
+    if (!jobListingsContainer) return;
     
-    // Set up search functionality
-    const searchInput = document.getElementById('public-job-search-input');
-    const searchButton = document.getElementById('public-search-jobs-btn');
-    
-    if (searchInput && searchButton) {
-        searchInput.addEventListener('input', function() {
-            publicJobListingsState.searchTerm = this.value.trim().toLowerCase();
-            filterAndSortPublicJobs();
-        });
+    try {
+        setLoadingState(true);
         
-        searchButton.addEventListener('click', function() {
-            filterAndSortPublicJobs();
-        });
+        // Query Firestore for active job listings
+        const snapshot = await firebase.firestore()
+            .collection('jobPostings')
+            .where('status', '==', 'active')
+            .orderBy('postedDate', 'desc')
+            .limit(50)
+            .get();
+            
+        if (snapshot.empty) {
+            showNoJobsMessage();
+            return;
+        }
         
-        // Also trigger search on Enter key
-        searchInput.addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') {
-                filterAndSortPublicJobs();
+        // Process job data
+        allJobs = [];
+        snapshot.forEach(doc => {
+            const job = doc.data();
+            job.id = doc.id;
+            
+            // Format dates for display
+            if (job.postedDate) {
+                job.postedDateFormatted = formatFirestoreDate(job.postedDate);
+                job.postedDateRaw = job.postedDate.toDate();
             }
+            
+            if (job.expiryDate) {
+                job.expiryDateFormatted = formatFirestoreDate(job.expiryDate);
+                job.expiryDateRaw = job.expiryDate.toDate();
+            }
+            
+            allJobs.push(job);
         });
-    }
-    
-    // Set up category filter dropdown
-    const categoryLinks = document.querySelectorAll('#public-category-filter-dropdown .dropdown-item');
-    categoryLinks.forEach(link => {
-        link.addEventListener('click', function(e) {
-            e.preventDefault();
-            
-            // Update active class
-            categoryLinks.forEach(item => item.classList.remove('active'));
-            this.classList.add('active');
-            
-            // Update state and filter
-            publicJobListingsState.currentCategory = this.getAttribute('data-category');
-            filterAndSortPublicJobs();
-        });
-    });
-    
-    // Set up sort options
-    const sortLinks = document.querySelectorAll('#public-sort-options-dropdown .dropdown-item');
-    sortLinks.forEach(link => {
-        link.addEventListener('click', function(e) {
-            e.preventDefault();
-            
-            // Update active class
-            sortLinks.forEach(item => item.classList.remove('active'));
-            this.classList.add('active');
-            
-            // Update state and sort
-            publicJobListingsState.currentSort = this.getAttribute('data-sort');
-            filterAndSortPublicJobs();
-        });
-    });
-    
-    // Set up job details modal events
-    document.getElementById('public-start-practice-btn')?.addEventListener('click', function() {
-        handlePublicInterviewStart(publicJobListingsState.currentJobId);
-    });
-    
-    // Load job listings from Firestore
-    loadPublicJobListings();
-}
-
-// Load job listings from Firestore
-function loadPublicJobListings() {
-    const container = document.getElementById('public-job-listings-container');
-    if (!container) return;
-    
-    // Show loading state
-    container.innerHTML = `
-        <div class="col-12 text-center py-5">
-            <div class="spinner-border text-primary" role="status">
-                <span class="visually-hidden">Loading...</span>
-            </div>
-            <p class="mt-2">Loading job listings...</p>
-        </div>
-    `;
-    
-    // Check if Firebase is available
-    if (!firebase || !firebase.firestore) {
-        container.innerHTML = `
-            <div class="col-12">
+        
+        // Apply initial filtering and sorting
+        filterAndDisplayJobs();
+        
+    } catch (error) {
+        console.error("Error loading job listings:", error);
+        jobListingsContainer.innerHTML = `
+            <div class="col-12 text-center">
                 <div class="alert alert-danger">
                     <i class="fas fa-exclamation-circle me-2"></i>
-                    Firebase is not initialized. Cannot load job listings.
+                    Error loading job listings. Please try again later.
                 </div>
             </div>
         `;
-        return;
+    } finally {
+        setLoadingState(false);
     }
-    
-    // Get current date for filtering expired jobs
-    const currentDate = new Date();
-    
-    // Query Firestore for active job listings (where application deadline hasn't passed)
-    firebase.firestore().collection('jobPostings')
-        .where('applicationDeadline', '>=', currentDate.toISOString().split('T')[0])
-        .orderBy('applicationDeadline', 'asc')
-        .get()
-        .then(snapshot => {
-            publicJobListingsState.jobs = [];
-            snapshot.forEach(doc => {
-                publicJobListingsState.jobs.push({
-                    id: doc.id,
-                    ...doc.data()
-                });
-            });
-            
-            // Apply initial filtering and sorting
-            filterAndSortPublicJobs();
-        })
-        .catch(error => {
-            console.error("Error loading public job listings:", error);
-            container.innerHTML = `
-                <div class="col-12">
-                    <div class="alert alert-danger">
-                        <i class="fas fa-exclamation-circle me-2"></i>
-                        Error loading job listings: ${error.message}
-                    </div>
-                </div>
-            `;
-        });
 }
 
-// Filter and sort jobs based on current state
-function filterAndSortPublicJobs() {
-    // Start with all jobs
-    let filtered = [...publicJobListingsState.jobs];
+/**
+ * Filters and displays jobs based on current filters and sort options
+ */
+function filterAndDisplayJobs() {
+    if (!jobListingsContainer || !allJobs) return;
     
-    // Apply category filter if not 'all'
-    if (publicJobListingsState.currentCategory !== 'all') {
-        filtered = filtered.filter(job => job.category === publicJobListingsState.currentCategory);
+    // Apply category filter
+    let filteredJobs = allJobs;
+    if (currentCategory !== 'all') {
+        filteredJobs = allJobs.filter(job => {
+            return job.category && job.category.toLowerCase() === currentCategory.toLowerCase();
+        });
     }
     
-    // Apply search term filter if any
-    if (publicJobListingsState.searchTerm) {
-        const searchTerm = publicJobListingsState.searchTerm.toLowerCase();
-        filtered = filtered.filter(job => {
+    // Apply search query if exists
+    if (currentSearchQuery) {
+        const query = currentSearchQuery.toLowerCase();
+        filteredJobs = filteredJobs.filter(job => {
             return (
-                (job.jobTitle?.toLowerCase().includes(searchTerm)) ||
-                (job.companyName?.toLowerCase().includes(searchTerm)) ||
-                (job.location?.toLowerCase().includes(searchTerm)) ||
-                (job.category?.toLowerCase().includes(searchTerm))
+                (job.title && job.title.toLowerCase().includes(query)) ||
+                (job.companyName && job.companyName.toLowerCase().includes(query)) ||
+                (job.description && job.description.toLowerCase().includes(query)) ||
+                (job.location && job.location.toLowerCase().includes(query)) ||
+                (job.category && job.category.toLowerCase().includes(query))
             );
         });
     }
     
     // Apply sorting
-    filtered.sort((a, b) => {
-        switch (publicJobListingsState.currentSort) {
-            case 'deadline':
-                return new Date(a.applicationDeadline) - new Date(b.applicationDeadline);
-            case 'date':
-                return new Date(b.createdAt) - new Date(a.createdAt);
-            case 'company':
-                return a.companyName.localeCompare(b.companyName);
-            default:
-                return new Date(a.applicationDeadline) - new Date(b.applicationDeadline);
-        }
-    });
+    if (currentSortOption === 'deadline') {
+        filteredJobs.sort((a, b) => {
+            if (!a.expiryDateRaw) return 1;
+            if (!b.expiryDateRaw) return -1;
+            return a.expiryDateRaw - b.expiryDateRaw;
+        });
+    } else if (currentSortOption === 'date') {
+        filteredJobs.sort((a, b) => {
+            if (!a.postedDateRaw) return 1;
+            if (!b.postedDateRaw) return -1;
+            return b.postedDateRaw - a.postedDateRaw;
+        });
+    } else if (currentSortOption === 'company') {
+        filteredJobs.sort((a, b) => {
+            if (!a.companyName) return 1;
+            if (!b.companyName) return -1;
+            return a.companyName.localeCompare(b.companyName);
+        });
+    }
     
-    // Save filtered and sorted jobs
-    publicJobListingsState.filteredJobs = filtered;
-    
-    // Render the jobs
-    renderPublicJobListings();
+    // Display filtered jobs
+    displayJobs(filteredJobs);
 }
 
-// Render job listings to the container
-function renderPublicJobListings() {
-    const container = document.getElementById('public-job-listings-container');
-    if (!container) return;
+/**
+ * Renders job listings to the DOM
+ * @param {Array} jobs - Array of job objects to display
+ */
+function displayJobs(jobs) {
+    if (!jobListingsContainer) return;
     
-    // If no jobs to show
-    if (publicJobListingsState.filteredJobs.length === 0) {
-        container.innerHTML = `
-            <div class="col-12">
-                <div class="alert alert-info">
-                    <i class="fas fa-info-circle me-2"></i>
-                    No job listings found matching your criteria. Try adjusting your filters.
-                </div>
-            </div>
-        `;
+    if (!jobs.length) {
+        showNoJobsMessage();
         return;
     }
     
-    // Create HTML for job cards
-    const jobCardsHTML = publicJobListingsState.filteredJobs.map(job => {
-        // Calculate days remaining until deadline
-        const deadlineDate = new Date(job.applicationDeadline);
-        const now = new Date();
-        const daysRemaining = Math.ceil((deadlineDate - now) / (1000 * 60 * 60 * 24));
+    let jobsHTML = '';
+    
+    jobs.forEach(job => {
+        const daysAgo = job.postedDateRaw ? Math.floor((new Date() - job.postedDateRaw) / (1000 * 60 * 60 * 24)) : 0;
+        const daysUntilExpiry = job.expiryDateRaw ? Math.floor((job.expiryDateRaw - new Date()) / (1000 * 60 * 60 * 24)) : null;
         
-        // Format dates
-        const deadlineFormatted = formatDate(job.applicationDeadline);
-        const postedFormatted = job.createdAt ? formatDate(job.createdAt.seconds ? new Date(job.createdAt.seconds * 1000) : job.createdAt) : 'N/A';
-        
-        return `
+        jobsHTML += `
             <div class="col-md-6 col-lg-4">
-                <div class="card h-100 job-card">
+                <div class="card h-100 shadow-sm">
                     <div class="card-body">
-                        <div class="d-flex justify-content-between align-items-start mb-2">
-                            <h5 class="card-title mb-0">${job.jobTitle}</h5>
-                            <span class="badge bg-secondary">${job.category || 'Uncategorized'}</span>
-                        </div>
-                        <h6 class="mb-2 text-muted">${job.companyName}</h6>
-                        <p class="card-text mb-1"><i class="fas fa-map-marker-alt me-2"></i>${job.location || 'Location not specified'}</p>
-                        <p class="card-text mb-1"><i class="fas fa-briefcase me-2"></i>${job.jobType || 'Job type not specified'}</p>
-                        <p class="card-text mb-1"><i class="fas fa-graduation-cap me-2"></i>${job.experience || 'Experience not specified'}</p>
-                        
-                        ${job.salaryRange ? `<p class="card-text mb-1"><i class="fas fa-money-bill-wave me-2"></i>${job.salaryRange}</p>` : ''}
-                        
-                        <div class="d-flex justify-content-between align-items-center mt-3 mb-2">
-                            <small class="text-muted">Posted: ${postedFormatted}</small>
-                            <div class="deadline-badge ${daysRemaining <= 3 ? 'text-danger' : ''}">
-                                <i class="fas fa-calendar-day me-1"></i>
-                                <span>Deadline: ${deadlineFormatted}</span>
+                        <div class="d-flex align-items-center mb-3">
+                            ${job.companyLogoUrl ? 
+                                `<img src="${job.companyLogoUrl}" alt="${job.companyName}" class="me-3" style="height: 40px; width: auto; max-width: 100px; object-fit: contain;">` : 
+                                `<div class="bg-light rounded-circle d-flex align-items-center justify-content-center me-3" style="width: 40px; height: 40px;">
+                                    <i class="fas fa-building text-secondary"></i>
+                                </div>`
+                            }
+                            <div>
+                                <h5 class="card-title mb-0">${job.title || 'Untitled Position'}</h5>
+                                <p class="text-muted mb-0">${job.companyName || 'Unknown Company'}</p>
                             </div>
                         </div>
                         
-                        ${daysRemaining <= 3 ? `
-                            <div class="alert alert-warning py-1 px-2 mt-2 mb-0 text-center">
-                                <small><i class="fas fa-exclamation-triangle me-1"></i>Closing in ${daysRemaining} day${daysRemaining === 1 ? '' : 's'}</small>
-                            </div>
-                        ` : ''}
-                    </div>
-                    <div class="card-footer bg-transparent">
-                        <div class="d-grid gap-2">
-                            <button class="btn btn-outline-primary view-public-job-details" data-job-id="${job.id}">
-                                <i class="fas fa-eye me-1"></i>View Details
+                        <div class="mb-3">
+                            <p class="card-text mb-2">
+                                <i class="fas fa-map-marker-alt text-secondary me-2"></i> ${job.location || 'Location not specified'}
+                            </p>
+                            <p class="card-text mb-2">
+                                <i class="fas fa-briefcase text-secondary me-2"></i> ${job.experienceLevel || 'Experience not specified'}
+                            </p>
+                            <p class="card-text mb-0">
+                                <i class="fas fa-tag text-secondary me-2"></i> ${job.category || 'Uncategorized'}
+                                ${job.subCategory ? ` / ${job.subCategory}` : ''}
+                            </p>
+                        </div>
+                        
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span class="badge bg-light text-dark">
+                                <i class="far fa-calendar-alt me-1"></i> Posted ${daysAgo === 0 ? 'today' : daysAgo + ' days ago'}
+                            </span>
+                            ${daysUntilExpiry !== null ? 
+                                `<span class="badge ${daysUntilExpiry < 3 ? 'bg-danger' : daysUntilExpiry < 7 ? 'bg-warning text-dark' : 'bg-success'}">
+                                    ${daysUntilExpiry <= 0 ? 'Closing today' : `${daysUntilExpiry} days left`}
+                                </span>` : 
+                                ''}
+                        </div>
+                        
+                        <div class="mt-3 d-grid gap-2">
+                            <button class="btn btn-outline-primary view-job-details" data-job-id="${job.id}">
+                                <i class="fas fa-info-circle me-1"></i> Know More
                             </button>
-                            <button class="btn btn-primary practice-public-interview" data-job-id="${job.id}">
-                                <i class="fas fa-play-circle me-1"></i>Practice Interview
+                            <button class="btn btn-primary take-mock-btn" data-job-id="${job.id}">
+                                <i class="fas fa-play-circle me-1"></i> Take Mock
                             </button>
                         </div>
                     </div>
                 </div>
             </div>
         `;
-    }).join('');
+    });
     
-    // Update container
-    container.innerHTML = jobCardsHTML;
+    jobListingsContainer.innerHTML = jobsHTML;
     
-    // Add event listeners to buttons
-    container.querySelectorAll('.view-public-job-details').forEach(btn => {
-        btn.addEventListener('click', function() {
-            const jobId = this.getAttribute('data-job-id');
-            showPublicJobDetails(jobId);
+    // Add event listeners to job cards
+    document.querySelectorAll('.view-job-details').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            const jobId = e.currentTarget.getAttribute('data-job-id');
+            showJobDetails(jobId);
         });
     });
     
-    container.querySelectorAll('.practice-public-interview').forEach(btn => {
-        btn.addEventListener('click', function() {
-            const jobId = this.getAttribute('data-job-id');
-            handlePublicInterviewStart(jobId);
+    document.querySelectorAll('.take-mock-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            const jobId = e.currentTarget.getAttribute('data-job-id');
+            takeMockInterview(jobId);
         });
     });
 }
 
-// Show job details in modal
-function showPublicJobDetails(jobId) {
-    // Set current job ID
-    publicJobListingsState.currentJobId = jobId;
+/**
+ * Shows a message when no jobs are found
+ */
+function showNoJobsMessage() {
+    if (!jobListingsContainer) return;
     
-    // Find job in state
-    const job = publicJobListingsState.jobs.find(j => j.id === jobId);
-    if (!job) {
-        showMessage('Job not found', 'danger');
-        return;
-    }
-    
-    // Populate modal
-    const modalTitle = document.getElementById('publicJobDetailsModalLabel');
-    const modalContent = document.getElementById('public-job-details-content');
-    
-    modalTitle.textContent = `${job.jobTitle} - ${job.companyName}`;
-    
-    // Format dates
-    const deadlineFormatted = formatDate(job.applicationDeadline);
-    const postedFormatted = job.createdAt ? formatDate(job.createdAt.seconds ? new Date(job.createdAt.seconds * 1000) : job.createdAt) : 'N/A';
-    
-    // Format skills lists
-    const mustHaveSkillsHtml = job.mustHaveSkills?.length 
-        ? `<ul>${job.mustHaveSkills.map(skill => `<li>${skill}</li>`).join('')}</ul>`
-        : '<em>None specified</em>';
-        
-    const niceToHaveSkillsHtml = job.niceToHaveSkills?.length 
-        ? `<ul>${job.niceToHaveSkills.map(skill => `<li>${skill}</li>`).join('')}</ul>`
-        : '<em>None specified</em>';
-    
-    modalContent.innerHTML = `
-        <div class="job-details">
-            <div class="d-flex justify-content-between align-items-start mb-3">
-                <div>
-                    <span class="badge bg-secondary">${job.category || 'Uncategorized'}</span>
-                    <span class="badge bg-primary">${job.jobType || 'Not specified'}</span>
-                    <span class="badge bg-info text-dark">${job.experience || 'Not specified'}</span>
-                </div>
-            </div>
-            
-            <div class="row mb-4">
-                <div class="col-md-6">
-                    <p><strong><i class="fas fa-map-marker-alt me-2"></i>Location:</strong> ${job.location || 'Not specified'}</p>
-                    ${job.salaryRange ? `<p><strong><i class="fas fa-money-bill-wave me-2"></i>Salary Range:</strong> ${job.salaryRange}</p>` : ''}
-                </div>
-                <div class="col-md-6">
-                    <p><strong><i class="fas fa-calendar-alt me-2"></i>Posted Date:</strong> ${postedFormatted}</p>
-                    <p><strong><i class="fas fa-hourglass-end me-2"></i>Application Deadline:</strong> ${deadlineFormatted}</p>
-                </div>
-            </div>
-            
-            <div class="row mb-3">
-                <div class="col-md-6">
-                    <h5><i class="fas fa-check-circle me-2"></i>Must-Have Skills</h5>
-                    ${mustHaveSkillsHtml}
-                </div>
-                <div class="col-md-6">
-                    <h5><i class="fas fa-plus-circle me-2"></i>Nice-to-Have Skills</h5>
-                    ${niceToHaveSkillsHtml}
-                </div>
-            </div>
-            
-            <div class="mb-4 pb-3 border-bottom">
-                <h5><i class="fas fa-align-left me-2"></i>Job Description</h5>
-                <div>${job.jobDescription.replace(/\n/g, '<br>')}</div>
-            </div>
-            
-            ${job.responsibilities ? `
-                <div class="mb-4 pb-3 border-bottom">
-                    <h5><i class="fas fa-tasks me-2"></i>Key Responsibilities</h5>
-                    <div>${job.responsibilities.replace(/\n/g, '<br>')}</div>
-                </div>
-            ` : ''}
-            
-            ${job.education ? `
-                <div class="mb-4 pb-3 border-bottom">
-                    <h5><i class="fas fa-graduation-cap me-2"></i>Education Requirements</h5>
-                    <p>${job.education}</p>
-                </div>
-            ` : ''}
-            
+    jobListingsContainer.innerHTML = `
+        <div class="col-12 text-center py-4">
             <div class="alert alert-info">
                 <i class="fas fa-info-circle me-2"></i>
-                <strong>Ready to practice?</strong> Click "Practice Interview" to start a tailored mock interview for this position.
+                No job listings found matching your criteria.
             </div>
+            <button class="btn btn-outline-primary mt-3" id="reset-filters-btn">
+                <i class="fas fa-sync me-1"></i> Reset Filters
+            </button>
         </div>
     `;
     
-    // Show modal
-    const modal = new bootstrap.Modal(document.getElementById('public-job-details-modal'));
-    modal.show();
+    document.getElementById('reset-filters-btn')?.addEventListener('click', resetFilters);
 }
 
-// Handle Practice Interview button from public view
-function handlePublicInterviewStart(jobId) {
-    console.log(`Starting interview for job ID: ${jobId}`);
+/**
+ * Resets all filters and search criteria
+ */
+function resetFilters() {
+    currentCategory = 'all';
+    currentSortOption = 'deadline';
+    currentSearchQuery = '';
     
-    // Check if user is authenticated
+    // Reset UI elements
+    if (jobSearchInput) jobSearchInput.value = '';
+    
+    // Update active state in dropdowns
+    if (categoryFilterDropdown) {
+        categoryFilterDropdown.querySelectorAll('.dropdown-item').forEach(item => {
+            item.classList.toggle('active', item.getAttribute('data-category') === 'all');
+        });
+    }
+    
+    if (sortOptionsDropdown) {
+        sortOptionsDropdown.querySelectorAll('.dropdown-item').forEach(item => {
+            item.classList.toggle('active', item.getAttribute('data-sort') === 'deadline');
+        });
+    }
+    
+    // Reapply filters and display
+    filterAndDisplayJobs();
+}
+
+/**
+ * Handles category filter changes
+ * @param {Event} e - Click event
+ */
+function handleCategoryFilter(e) {
+    e.preventDefault();
+    const item = e.target.closest('.dropdown-item');
+    if (!item) return;
+    
+    const category = item.getAttribute('data-category');
+    if (!category || category === currentCategory) return;
+    
+    // Update active state in dropdown
+    categoryFilterDropdown.querySelectorAll('.dropdown-item').forEach(el => {
+        el.classList.toggle('active', el === item);
+    });
+    
+    currentCategory = category;
+    filterAndDisplayJobs();
+}
+
+/**
+ * Handles sort option changes
+ * @param {Event} e - Click event
+ */
+function handleSortOption(e) {
+    e.preventDefault();
+    const item = e.target.closest('.dropdown-item');
+    if (!item) return;
+    
+    const sortOption = item.getAttribute('data-sort');
+    if (!sortOption || sortOption === currentSortOption) return;
+    
+    // Update active state in dropdown
+    sortOptionsDropdown.querySelectorAll('.dropdown-item').forEach(el => {
+        el.classList.toggle('active', el === item);
+    });
+    
+    currentSortOption = sortOption;
+    filterAndDisplayJobs();
+}
+
+/**
+ * Handles search input
+ */
+function handleSearch() {
+    if (!jobSearchInput) return;
+    
+    const query = jobSearchInput.value.trim();
+    if (query === currentSearchQuery) return;
+    
+    currentSearchQuery = query;
+    filterAndDisplayJobs();
+}
+
+/**
+ * Shows job details in a modal
+ * @param {string} jobId - ID of the job to display
+ */
+async function showJobDetails(jobId) {
+    if (!jobDetailsModal || !jobDetailsContent) return;
+    
+    // Show loading state
+    jobDetailsContent.innerHTML = `
+        <div class="text-center py-3">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <p class="mt-2">Loading job details...</p>
+        </div>
+    `;
+    jobDetailsModal.show();
+    
+    try {
+        // Find job in the existing array first
+        let job = allJobs.find(j => j.id === jobId);
+        
+        // If not found, fetch from Firestore
+        if (!job) {
+            const doc = await firebase.firestore().collection('jobPostings').doc(jobId).get();
+            if (!doc.exists) {
+                throw new Error('Job not found');
+            }
+            job = doc.data();
+            job.id = doc.id;
+            
+            // Format dates
+            if (job.postedDate) {
+                job.postedDateFormatted = formatFirestoreDate(job.postedDate);
+            }
+            
+            if (job.expiryDate) {
+                job.expiryDateFormatted = formatFirestoreDate(job.expiryDate);
+            }
+        }
+        
+        // Store current job ID for practice button
+        startPracticeBtn.setAttribute('data-job-id', jobId);
+        
+        // Render job details
+        jobDetailsContent.innerHTML = `
+            <div class="job-details">
+                <div class="d-flex align-items-center mb-4">
+                    ${job.companyLogoUrl ? 
+                        `<img src="${job.companyLogoUrl}" alt="${job.companyName}" class="me-3" style="height: 60px; width: auto; max-width: 150px; object-fit: contain;">` : 
+                        `<div class="bg-light rounded-circle d-flex align-items-center justify-content-center me-3" style="width: 60px; height: 60px;">
+                            <i class="fas fa-building text-secondary fa-2x"></i>
+                        </div>`
+                    }
+                    <div>
+                        <h4 class="mb-1">${job.title || 'Untitled Position'}</h4>
+                        <p class="text-muted mb-0">${job.companyName || 'Unknown Company'}</p>
+                    </div>
+                </div>
+                
+                <div class="row mb-4">
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <h6><i class="fas fa-map-marker-alt text-primary me-2"></i> Location:</h6>
+                            <p>${job.location || 'Not specified'}</p>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <h6><i class="fas fa-briefcase text-primary me-2"></i> Experience:</h6>
+                            <p>${job.experienceLevel || 'Not specified'}</p>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <h6><i class="fas fa-tag text-primary me-2"></i> Category:</h6>
+                            <p>${job.category || 'Not specified'}${job.subCategory ? ` / ${job.subCategory}` : ''}</p>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <h6><i class="fas fa-calendar-alt text-primary me-2"></i> Posted:</h6>
+                            <p>${job.postedDateFormatted || 'Not specified'}</p>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <h6><i class="fas fa-calendar-times text-primary me-2"></i> Deadline:</h6>
+                            <p>${job.expiryDateFormatted || 'Not specified'}</p>
+                        </div>
+                        
+                        ${job.salaryRange ? `
+                        <div class="mb-3">
+                            <h6><i class="fas fa-money-bill-wave text-primary me-2"></i> Salary Range:</h6>
+                            <p>${job.salaryRange}</p>
+                        </div>
+                        ` : ''}
+                        
+                        ${job.relocation ? `
+                        <div class="mb-3">
+                            <h6><i class="fas fa-plane-departure text-primary me-2"></i> Relocation:</h6>
+                            <p>Relocation assistance available</p>
+                        </div>
+                        ` : ''}
+                    </div>
+                </div>
+                
+                <div class="mb-4">
+                    <h5><i class="fas fa-laptop-code text-primary me-2"></i> Tech Stack:</h5>
+                    <div>
+                        ${job.techStacks && job.techStacks.length ? 
+                            job.techStacks.map(tech => `<span class="badge bg-light text-dark border me-2 mb-2 py-2 px-3">${tech}</span>`).join('') : 
+                            '<p>No specific tech stack mentioned</p>'
+                        }
+                    </div>
+                </div>
+                
+                <div class="mb-4">
+                    <h5><i class="fas fa-align-left text-primary me-2"></i> Job Description:</h5>
+                    <div class="job-description">
+                        ${job.description || 'No description available'}
+                    </div>
+                </div>
+                
+                <div class="mb-4">
+                    <h5><i class="fas fa-clipboard-list text-primary me-2"></i> Requirements:</h5>
+                    <div class="job-requirements">
+                        ${job.requirements || 'No specific requirements mentioned'}
+                    </div>
+                </div>
+                
+                ${job.sourceLink ? `
+                <div class="mb-4">
+                    <h5><i class="fas fa-external-link-alt text-primary me-2"></i> Source:</h5>
+                    <a href="${job.sourceLink}" target="_blank" rel="noopener noreferrer">View original job posting</a>
+                </div>
+                ` : ''}
+                
+                ${job.customFields && Object.keys(job.customFields).length > 0 ? `
+                <div class="mb-4">
+                    <h5><i class="fas fa-info-circle text-primary me-2"></i> Additional Information:</h5>
+                    <dl class="row">
+                        ${Object.entries(job.customFields).map(([key, value]) => `
+                            <dt class="col-sm-3">${key}:</dt>
+                            <dd class="col-sm-9">${value}</dd>
+                        `).join('')}
+                    </dl>
+                </div>
+                ` : ''}
+            </div>
+        `;
+        
+    } catch (error) {
+        console.error("Error loading job details:", error);
+        jobDetailsContent.innerHTML = `
+            <div class="alert alert-danger">
+                <i class="fas fa-exclamation-circle me-2"></i>
+                Error loading job details. Please try again later.
+            </div>
+        `;
+    }
+}
+
+/**
+ * Initiates mock interview for a job
+ * @param {string} jobId - ID of the job to practice for
+ */
+function takeMockInterview(jobId) {
+    // First check if user is logged in
     const currentUser = firebase.auth().currentUser;
     if (!currentUser) {
-        console.log("User not logged in, showing sign in modal");
-        
-        // Close the job details modal if open
-        const detailsModal = bootstrap.Modal.getInstance(document.getElementById('public-job-details-modal'));
-        if (detailsModal) {
-            detailsModal.hide();
-        }
-        
-        // Store job ID in localStorage to retrieve after login
-        localStorage.setItem('pendingJobInterviewId', jobId);
-        
-        // Show auth modal
-        if (typeof irisAuth !== 'undefined' && typeof irisAuth.showSignInModal === 'function') {
-            irisAuth.showSignInModal();
+        // Show login modal
+        if (typeof showAuthModal === 'function') {
+            showAuthModal('signin');
         } else {
-            // Fallback to basic modal
-            const authModal = bootstrap.Modal.getInstance(document.getElementById('auth-modal'));
-            if (authModal) {
-                authModal.show();
-            }
+            alert('Please sign in to take a mock interview.');
         }
-        
-        // Add a login success listener that redirects to interview setup
-        window.addEventListener('authSuccess', function handleAuthSuccess() {
-            // This will fire when authentication is successful
-            // Remove the listener to prevent multiple calls
-            window.removeEventListener('authSuccess', handleAuthSuccess);
-            
-            // Get the stored job ID
-            const pendingJobId = localStorage.getItem('pendingJobInterviewId');
-            if (pendingJobId) {
-                localStorage.removeItem('pendingJobInterviewId');
-                
-                // Redirect to main app with job ID
-                initiateJobSpecificFlow(pendingJobId);
-            }
-        }, { once: true });
-        
         return;
     }
     
-    // User is already logged in, proceed to interview setup
-    initiateJobSpecificFlow(jobId);
+    // Find job in the array
+    const job = allJobs.find(j => j.id === jobId);
+    
+    if (!job) {
+        console.error("Job not found for mock interview:", jobId);
+        alert('Error loading job details. Please try again.');
+        return;
+    }
+    
+    // Start mock interview process - this is the entry point
+    startResumeUpload(job);
 }
 
-// Function to initiate job-specific interview flow
-function initiateJobSpecificFlow(jobId) {
-    console.log(`Initiating job-specific flow for job ID: ${jobId}`);
+/**
+ * Handles the start of the mock process from the job details modal
+ */
+function startPracticeInterview() {
+    const jobId = startPracticeBtn.getAttribute('data-job-id');
+    if (!jobId) {
+        console.error("No job ID found for practice button");
+        return;
+    }
     
-    // Store route ID and job ID in localStorage
-    localStorage.setItem('routeId', 'jobSpecific');
-    localStorage.setItem('currentJobId', jobId);
+    // Hide the modal
+    jobDetailsModal.hide();
     
-    // Check if already in main app view
-    const appViewVisible = document.getElementById('app-view').style.display !== 'none';
-    
-    if (appViewVisible) {
-        // Already in app view, just load job-specific interface
-        loadJobSpecificInterface();
-    } else {
-        // Switch to app view first
-        document.getElementById('public-view').style.display = 'none';
-        document.getElementById('app-view').style.display = 'flex';
+    // Start the mock interview process
+    takeMockInterview(jobId);
+}
+
+/**
+ * Prompt user to upload resume for mock interview
+ * @param {Object} job - The job object for the mock interview
+ */
+function startResumeUpload(job) {
+    // Create a modal for resume upload if it doesn't exist
+    if (!document.getElementById('resume-upload-modal')) {
+        const modalHTML = `
+            <div class="modal fade" id="resume-upload-modal" tabindex="-1" aria-labelledby="resumeUploadModalLabel" aria-hidden="true">
+                <div class="modal-dialog">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title" id="resumeUploadModalLabel">Upload Your Resume</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <div class="modal-body">
+                            <p class="mb-3">Upload your resume to tailor the mock interview for <strong>${job.title}</strong> at <strong>${job.companyName}</strong>.</p>
+                            
+                            <form id="job-resume-upload-form">
+                                <div class="mb-3">
+                                    <label for="job-resume-file" class="form-label">Resume (PDF format)</label>
+                                    <input type="file" class="form-control" id="job-resume-file" accept=".pdf" required>
+                                </div>
+                                <div class="d-grid">
+                                    <button type="submit" class="btn btn-primary" id="submit-resume-btn">
+                                        <i class="fas fa-upload me-1"></i> Upload & Continue
+                                    </button>
+                                </div>
+                            </form>
+                            
+                            <div id="job-resume-upload-progress" class="mt-3" style="display: none;">
+                                <div class="progress mb-2">
+                                    <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 0%"></div>
+                                </div>
+                                <p class="text-center" id="job-resume-upload-status">Preparing...</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
         
-        // Load job-specific interface
-        loadJobSpecificInterface();
+        document.body.insertAdjacentHTML('beforeend', modalHTML);
+        
+        // Add event listener for form submission
+        document.getElementById('job-resume-upload-form').addEventListener('submit', (e) => {
+            e.preventDefault();
+            processResumeUpload(job);
+        });
+    }
+    
+    // Update modal title with job info if it already exists
+    const modalTitle = document.getElementById('resumeUploadModalLabel');
+    if (modalTitle) {
+        modalTitle.innerHTML = `Upload Resume for ${job.title} Interview`;
+    }
+    
+    // Show the modal
+    const resumeUploadModal = new bootstrap.Modal(document.getElementById('resume-upload-modal'));
+    resumeUploadModal.show();
+}
+
+/**
+ * Process resume upload and initiates mock interview
+ * @param {Object} job - The job object for the mock interview
+ */
+async function processResumeUpload(job) {
+    const resumeFile = document.getElementById('job-resume-file').files[0];
+    if (!resumeFile) {
+        alert('Please select a resume file.');
+        return;
+    }
+    
+    // Show progress UI
+    const progressContainer = document.getElementById('job-resume-upload-progress');
+    const progressBar = progressContainer.querySelector('.progress-bar');
+    const statusText = document.getElementById('job-resume-upload-status');
+    const submitButton = document.getElementById('submit-resume-btn');
+    
+    progressContainer.style.display = 'block';
+    submitButton.disabled = true;
+    progressBar.style.width = '10%';
+    statusText.textContent = 'Uploading resume...';
+    
+    try {
+        // Prepare form data - need job description from the job object
+        const formData = new FormData();
+        formData.append('resumeFile', resumeFile);
+        formData.append('jobDescription', job.description);
+        
+        // Add job requirements if available
+        if (job.requirements) {
+            formData.append('jobRequirements', job.requirements);
+        }
+        
+        // Add user ID if logged in
+        const currentUser = firebase.auth().currentUser;
+        if (currentUser) {
+            formData.append('userId', currentUser.uid);
+        } else {
+            throw new Error('You must be logged in to take a mock interview.');
+        }
+        
+        // Add job ID for reference
+        formData.append('jobId', job.id);
+        
+        // Update progress
+        progressBar.style.width = '30%';
+        statusText.textContent = 'Analyzing resume against job description...';
+        
+        // Make API call to backend
+        const response = await fetch('/analyze-resume', {
+            method: 'POST',
+            body: formData
+        });
+        
+        if (!response.ok) {
+            // Check if it's a limit reached error
+            const data = await response.json();
+            if (data.limitReached) {
+                // Show upgrade modal
+                if (typeof showLimitReachedModal === 'function') {
+                    showLimitReachedModal('resumeAnalyses', data);
+                } else {
+                    alert(`You've reached your limit for resume analyses. Please upgrade your plan to continue.`);
+                }
+                throw new Error('Usage limit reached');
+            }
+            throw new Error('Server error: ' + (response.statusText || 'Failed to analyze resume'));
+        }
+        
+        // Get session ID from response
+        const data = await response.json();
+        const sessionId = data.sessionId;
+        
+        // Update progress
+        progressBar.style.width = '60%';
+        statusText.textContent = 'Processing resume analysis...';
+        
+        // Wait for analysis to complete (polling)
+        await waitForAnalysisCompletion(sessionId, progressBar, statusText);
+        
+        // Hide the resume upload modal
+        const resumeUploadModal = bootstrap.Modal.getInstance(document.getElementById('resume-upload-modal'));
+        if (resumeUploadModal) {
+            resumeUploadModal.hide();
+        }
+        
+        // Proceed with payment and mock interview
+        initiatePaymentProcess(sessionId, job);
+        
+    } catch (error) {
+        console.error("Error in resume upload process:", error);
+        statusText.textContent = `Error: ${error.message}`;
+        progressBar.classList.remove('progress-bar-animated', 'progress-bar-striped');
+        progressBar.classList.add('bg-danger');
+        
+        // Re-enable submit button after error
+        submitButton.disabled = false;
     }
 }
 
-// Helper function to format dates
-function formatDate(dateString) {
-    const date = new Date(dateString);
-    if (isNaN(date.getTime())) return 'Invalid date';
-    
-    return date.toLocaleDateString('en-US', {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric'
+/**
+ * Waits for analysis completion by polling the server
+ * @param {string} sessionId - Analysis session ID 
+ * @param {HTMLElement} progressBar - Progress bar element to update
+ * @param {HTMLElement} statusText - Status text element to update
+ */
+async function waitForAnalysisCompletion(sessionId, progressBar, statusText) {
+    return new Promise((resolve, reject) => {
+        let attempts = 0;
+        const maxAttempts = 60; // 5 minutes timeout (5s * 60)
+        
+        const checkStatus = async () => {
+            try {
+                const response = await fetch(`/get-analysis-status/${sessionId}`);
+                if (!response.ok) {
+                    throw new Error('Failed to check analysis status');
+                }
+                
+                const data = await response.json();
+                
+                // Update progress based on analysis progress
+                if (data.progress) {
+                    // Scale progress from 60% to 90% (reserving 90-100% for next steps)
+                    const scaledProgress = 60 + (data.progress * 0.3);
+                    progressBar.style.width = `${scaledProgress}%`;
+                }
+                
+                // Update status text
+                if (data.statusDetail) {
+                    statusText.textContent = data.statusDetail;
+                }
+                
+                // Check completion status
+                if (data.status === 'completed') {
+                    progressBar.style.width = '90%';
+                    statusText.textContent = 'Analysis complete! Preparing interview...';
+                    resolve(data);
+                    return;
+                } else if (data.status === 'failed') {
+                    reject(new Error('Analysis failed: ' + (data.errors?.[0] || 'Unknown error')));
+                    return;
+                }
+                
+                // Check timeout
+                attempts++;
+                if (attempts >= maxAttempts) {
+                    reject(new Error('Analysis timeout. Please try again later.'));
+                    return;
+                }
+                
+                // Continue polling
+                setTimeout(checkStatus, 5000); // Check every 5 seconds
+                
+            } catch (error) {
+                reject(error);
+            }
+        };
+        
+        // Start polling
+        checkStatus();
     });
 }
 
-// Helper function to show messages (reusing from app.js)
-function showMessage(message, type = 'info') {
-    const errorContainer = document.getElementById('error-messages');
-    if (!errorContainer) {
-        console.warn('Error messages container not found');
-        alert(message); // Fallback to alert
-        return;
+/**
+ * Initiates payment process for mock interview
+ * @param {string} sessionId - Analysis session ID
+ * @param {Object} job - The job object
+ */
+function initiatePaymentProcess(sessionId, job) {
+    // Create payment confirmation modal if it doesn't exist
+    if (!document.getElementById('mock-payment-modal')) {
+        const modalHTML = `
+            <div class="modal fade" id="mock-payment-modal" tabindex="-1" aria-labelledby="mockPaymentModalLabel" aria-hidden="true">
+                <div class="modal-dialog">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title" id="mockPaymentModalLabel">Interview Preparation</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <div class="modal-body">
+                            <div class="text-center mb-4">
+                                <i class="fas fa-check-circle text-success fa-3x"></i>
+                                <h4 class="mt-3">Resume Analysis Complete!</h4>
+                                <p>Your resume has been successfully analyzed against the job requirements.</p>
+                            </div>
+                            
+                            <div class="alert alert-info">
+                                <i class="fas fa-info-circle me-2"></i>
+                                <strong>Next Step:</strong> Continue to the mock interview for <strong class="job-title-placeholder"></strong>
+                            </div>
+                            
+                            <div id="mock-payment-details">
+                                <p class="text-center">This will use <strong>1 mock interview</strong> credit from your account.</p>
+                                <p class="text-center text-muted small">Your account will be charged based on your current plan.</p>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                            <button type="button" class="btn btn-primary" id="confirm-mock-payment-btn">
+                                Continue to Interview
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        document.body.insertAdjacentHTML('beforeend', modalHTML);
+        
+        // Add event listener for confirmation button
+        document.getElementById('confirm-mock-payment-btn').addEventListener('click', function() {
+            const confirmedSessionId = this.getAttribute('data-session-id');
+            if (confirmedSessionId) {
+                startMockInterview(confirmedSessionId);
+            }
+        });
     }
     
-    const messageDiv = document.createElement('div');
-    messageDiv.className = `alert alert-${type} alert-dismissible fade show`;
-    messageDiv.innerHTML = `
-        ${message}
-        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-    `;
-    errorContainer.appendChild(messageDiv);
+    // Update modal content with job info
+    const jobTitleElement = document.querySelector('#mock-payment-modal .job-title-placeholder');
+    if (jobTitleElement) {
+        jobTitleElement.textContent = job.title || 'this position';
+    }
     
-    // Auto-dismiss after 5 seconds
-    setTimeout(() => {
-        messageDiv.classList.remove('show');
-        setTimeout(() => messageDiv.remove(), 500);
-    }, 5000);
+    // Store session ID in confirm button
+    const confirmBtn = document.getElementById('confirm-mock-payment-btn');
+    if (confirmBtn) {
+        confirmBtn.setAttribute('data-session-id', sessionId);
+    }
+    
+    // Show the modal
+    const mockPaymentModal = new bootstrap.Modal(document.getElementById('mock-payment-modal'));
+    mockPaymentModal.show();
+}
+
+/**
+ * Starts the mock interview process
+ * @param {string} sessionId - Analysis session ID
+ */
+async function startMockInterview(sessionId) {
+    // Hide the payment modal
+    const mockPaymentModal = bootstrap.Modal.getInstance(document.getElementById('mock-payment-modal'));
+    if (mockPaymentModal) {
+        mockPaymentModal.hide();
+    }
+    
+    try {
+        // Make API call to start mock interview
+        const response = await fetch('/start-mock-interview', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                sessionId: sessionId,
+                interviewType: 'general' // Using general type for job practice
+            })
+        });
+        
+        if (!response.ok) {
+            // Check if it's a limit reached error
+            const data = await response.json();
+            if (data.limitReached) {
+                // Show upgrade modal
+                if (typeof showLimitReachedModal === 'function') {
+                    showLimitReachedModal('mockInterviews', data);
+                } else {
+                    alert(`You've reached your limit for mock interviews. Please upgrade your plan to continue.`);
+                }
+                throw new Error('Usage limit reached');
+            }
+            throw new Error('Server error: ' + (response.statusText || 'Failed to start mock interview'));
+        }
+        
+        // Get interview ID from response
+        const data = await response.json();
+        const interviewId = data.interviewId;
+        
+        // Navigate to mock interview UI
+        navigateToMockInterview(interviewId);
+        
+    } catch (error) {
+        console.error("Error starting mock interview:", error);
+        alert(`Error: ${error.message}`);
+    }
+}
+
+/**
+ * Navigates to the mock interview UI
+ * @param {string} interviewId - Interview ID
+ */
+function navigateToMockInterview(interviewId) {
+    // Check if we're in the public or app view
+    const isPublicView = document.getElementById('public-view').style.display !== 'none';
+    
+    if (isPublicView) {
+        // Switch to app view
+        document.getElementById('public-view').style.display = 'none';
+        document.getElementById('app-view').style.display = 'flex';
+        
+        // Activate the mock interview tab
+        const mockInterviewNav = document.querySelector('.nav-item[data-target="mock-interview"]');
+        if (mockInterviewNav) {
+            document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
+            mockInterviewNav.classList.add('active');
+            
+            // Activate corresponding content section
+            document.querySelectorAll('.content-section').forEach(section => section.classList.remove('active'));
+            document.getElementById('mock-interview').classList.add('active');
+        }
+    } else {
+        // Already in app view, just navigate to the mock interview section
+        document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
+        document.querySelector('.nav-item[data-target="mock-interview"]')?.classList.add('active');
+        
+        document.querySelectorAll('.content-section').forEach(section => section.classList.remove('active'));
+        document.getElementById('mock-interview')?.classList.add('active');
+    }
+    
+    // Trigger the interview initialization in the app-specific code
+    if (typeof initializeMockInterview === 'function') {
+        initializeMockInterview(interviewId);
+    } else {
+        console.warn("initializeMockInterview function not found. Interview might not start properly.");
+        // As a fallback, reload the page with the interview ID in the URL
+        window.location.href = `/index.html?interviewId=${interviewId}#mock-interview`;
+    }
+}
+
+/**
+ * Sets loading state for job listings container
+ * @param {boolean} isLoading - Whether content is loading
+ */
+function setLoadingState(isLoading) {
+    if (!jobListingsContainer) return;
+    
+    if (isLoading) {
+        jobListingsContainer.innerHTML = `
+            <div class="col-12 text-center py-5">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+                <p class="mt-2">Loading job listings...</p>
+            </div>
+        `;
+    }
+}
+
+/**
+ * Formats a Firestore timestamp to a readable date
+ * @param {FirebaseFirestore.Timestamp} timestamp - Firestore timestamp
+ * @returns {string} Formatted date string
+ */
+function formatFirestoreDate(timestamp) {
+    if (!timestamp || typeof timestamp.toDate !== 'function') {
+        return 'Date not available';
+    }
+    
+    try {
+        const date = timestamp.toDate();
+        return date.toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric'
+        });
+    } catch (error) {
+        console.error("Error formatting date:", error);
+        return 'Invalid date';
+    }
 }
