@@ -1191,133 +1191,305 @@ function startJobSpecificResumeUpload(jobId) {
     resumeUploadModal.show();
 }
 
-function processJobSpecificResumeUpload() {
+/**
+ * Handles the submission of the job-specific resume upload form.
+ * Performs initial checks and then hands off to continueJobSpecificResumeUploadAfterChecks.
+ */
+async function processJobSpecificResumeUpload() {
     const resumeFile = document.getElementById('job-resume-file').files[0];
     if (!resumeFile) {
         alert('Please select a resume file.');
         return;
     }
-    
-    const jobId = document.getElementById('job-resume-upload-form').getAttribute('data-job-id');
+
+    const formElement = document.getElementById('job-resume-upload-form');
+    if (!formElement) {
+        console.error('Job resume upload form not found.');
+        alert('An unexpected error occurred. Please try again.');
+        return;
+    }
+    const jobId = formElement.getAttribute('data-job-id');
     if (!jobId) {
         alert('Job information is missing. Please try again.');
         return;
     }
-    
-    // Show progress UI
+
+    // UI elements
     const progressContainer = document.getElementById('job-resume-upload-progress');
-    const progressBar = progressContainer.querySelector('.progress-bar');
+    const progressBar = progressContainer ? progressContainer.querySelector('.progress-bar') : null;
     const statusText = document.getElementById('job-resume-upload-status');
     const submitButton = document.getElementById('submit-resume-btn');
-    
+
+    if (!progressContainer || !progressBar || !statusText || !submitButton) {
+        console.error('One or more UI elements for resume upload progress are missing.');
+        alert('An unexpected UI error occurred. Please try again.');
+        return;
+    }
+
     progressContainer.style.display = 'block';
     submitButton.disabled = true;
-    progressBar.style.width = '10%';
-    statusText.textContent = 'Uploading resume...';
-    
+    progressBar.style.width = '5%'; // Initial small progress
+    progressBar.classList.remove('bg-danger');
+    progressBar.classList.add('progress-bar-striped', 'progress-bar-animated');
+    statusText.textContent = 'Validating...';
+
     // Check if user can use resumeAnalyses feature
     if (window.irisAuth && typeof window.irisAuth.canUseFeature === 'function') {
         if (!window.irisAuth.canUseFeature('resumeAnalyses')) {
-            // Update status message
             progressBar.style.width = '0%';
             progressBar.classList.add('bg-danger');
-            statusText.textContent = 'Resume analysis limit reached. Please upgrade your plan.';
+            statusText.textContent = 'Resume analysis limit reached.';
             
-            // Show limit reached modal
             setTimeout(() => {
-                // Hide the upload modal
                 const resumeUploadModal = bootstrap.Modal.getInstance(document.getElementById('job-resume-upload-modal'));
                 if (resumeUploadModal) {
-                    resumeUploadModal.hide();
+                    try { resumeUploadModal.hide(); } catch(e) { /* ignore */ }
                 }
-                
                 showLimitReachedModal('resumeAnalyses', {
                     used: window.irisAuth.getUserProfile()?.usage?.resumeAnalyses?.used || 0,
                     limit: window.irisAuth.getUserProfile()?.usage?.resumeAnalyses?.limit || 0,
                     plan: window.irisAuth.getUserProfile()?.plan || 'free'
                 });
-                
-                // Re-enable submit button
                 submitButton.disabled = false;
-            }, 1000);
-            
+            }, 500);
             return;
         }
     }
-    
-    // Get the current user ID
+
     const currentUser = firebase.auth().currentUser;
     if (!currentUser) {
         statusText.textContent = 'Error: You must be logged in to continue.';
+        progressBar.style.width = '0%';
         progressBar.classList.add('bg-danger');
+        submitButton.disabled = false;
+        
+        // Show login modal if available
+        if (typeof showAuthModal === 'function') {
+            showAuthModal('signin');
+        } else if (window.irisAuth && typeof window.irisAuth.showSignInModal === 'function') {
+            window.irisAuth.showSignInModal();
+        } else {
+            alert('Please sign in to continue.');
+        }
         return;
     }
-    
+
     // Increment usage counter for resumeAnalyses
     if (window.irisAuth && typeof window.irisAuth.incrementUsageCounter === 'function') {
-        window.irisAuth.incrementUsageCounter('resumeAnalyses')
-            .then(incrementResult => {
-                console.log("Resume analysis usage incremented:", incrementResult);
-                
-                // Continue with uploading
-                continueWithUpload();
-            })
-            .catch(error => {
-                console.error("Error incrementing usage:", error);
-                statusText.textContent = `Error: ${error.message}`;
-                progressBar.classList.add('bg-danger');
-                submitButton.disabled = false;
-            });
-    } else {
-        // No usage tracking, continue with upload
-        continueWithUpload();
-    }
-    
-    function continueWithUpload() {
-        // Prepare form data
-        const formData = new FormData();
-        formData.append('resumeFile', resumeFile);
-        formData.append('userId', currentUser.uid);
-        formData.append('jobId', jobId);
-        
-        // Make API call to backend
-        fetch('/analyze-resume-for-job', {
-            method: 'POST',
-            body: formData
-        })
-        .then(response => {
-            if (!response.ok) {
-                return response.json().then(data => {
-                    throw new Error(data.error || 'Failed to analyze resume');
-                });
-            }
-            return response.json();
-        })
-        .then(data => {
-            // Update progress
-            progressBar.style.width = '50%';
-            statusText.textContent = 'Analysis complete! Preparing interview...';
-            
-            // Hide the resume upload modal
-            const resumeUploadModal = bootstrap.Modal.getInstance(document.getElementById('job-resume-upload-modal'));
-            if (resumeUploadModal) {
-                resumeUploadModal.hide();
-            }
-            
-            // Continue with job-specific mock interview
-            initiateJobSpecificInterview(data.sessionId, jobId);
-        })
-        .catch(error => {
-            console.error("Error in resume upload process:", error);
-            statusText.textContent = `Error: ${error.message}`;
-            progressBar.classList.remove('progress-bar-animated', 'progress-bar-striped');
+        try {
+            statusText.textContent = 'Updating usage credits...';
+            progressBar.style.width = '7%';
+            const incrementResult = await window.irisAuth.incrementUsageCounter('resumeAnalyses');
+            console.log("Resume analysis usage incremented:", incrementResult);
+            // Now call the main upload and polling logic
+            await continueJobSpecificResumeUploadAfterChecks(resumeFile, jobId, currentUser, progressBar, statusText, submitButton, progressContainer);
+        } catch (error) {
+            console.error("Error incrementing usage for resumeAnalyses:", error);
+            statusText.textContent = `Error updating usage: ${error.message}`;
+            progressBar.style.width = '0%';
             progressBar.classList.add('bg-danger');
-            
-            // Re-enable submit button after error
             submitButton.disabled = false;
-        });
+        }
+    } else {
+        console.warn("Usage tracking (irisAuth.incrementUsageCounter) not available for resumeAnalyses. Proceeding without increment.");
+        await continueJobSpecificResumeUploadAfterChecks(resumeFile, jobId, currentUser, progressBar, statusText, submitButton, progressContainer);
     }
 }
+
+/**
+ * Continues the resume upload process after initial checks (auth, usage).
+ * Makes the API call to analyze the resume and then starts polling for results.
+ * @param {File} resumeFile - The resume file object.
+ * @param {string} jobId - The ID of the job.
+ * @param {firebase.User} currentUser - The currently authenticated Firebase user.
+ * @param {HTMLElement} progressBar - The progress bar element.
+ * @param {HTMLElement} statusText - The status text element.
+ * @param {HTMLElement} submitButton - The submit button element.
+ * @param {HTMLElement} progressContainer - The container for progress UI.
+ */
+async function continueJobSpecificResumeUploadAfterChecks(resumeFile, jobId, currentUser, progressBar, statusText, submitButton, progressContainer) {
+    // Prepare form data
+    const formData = new FormData();
+    formData.append('resumeFile', resumeFile);
+    formData.append('userId', currentUser.uid);
+    formData.append('jobId', jobId);
+
+    // Update UI: Initial Uploading
+    progressBar.style.width = '10%';
+    progressBar.classList.remove('bg-danger');
+    progressBar.classList.add('progress-bar-striped', 'progress-bar-animated');
+    statusText.textContent = 'Uploading resume...';
+    submitButton.disabled = true; // Should already be, but ensure
+
+    try {
+        const response = await fetch('/analyze-resume-for-job', {
+            method: 'POST',
+            body: formData
+        });
+
+        const responseBodyText = await response.text();
+
+        console.log('--- Response from /analyze-resume-for-job ---');
+        console.log('Status:', response.status);
+        console.log('StatusText:', response.statusText);
+        console.log('Headers:', Object.fromEntries(response.headers.entries()));
+        console.log('Raw Body Text (first 500 chars):', responseBodyText.substring(0, 500));
+        console.log('--- End Response ---');
+
+        if (!response.ok) { // Checks for 2xx status codes (202 is ok for this endpoint)
+            let errorMessage = `Server error ${response.status}.`;
+            let limitReachedData = null;
+
+            if (response.headers.get('Content-Type')?.includes('application/json')) {
+                try {
+                    const errorData = JSON.parse(responseBodyText);
+                    errorMessage = errorData.error || `Server error ${response.status} with JSON body`;
+                    if (errorData.limitReached && errorData.feature === 'resumeAnalyses') { // Check feature for safety
+                        limitReachedData = errorData;
+                    }
+                } catch (parseError) {
+                    console.error('Error parsing supposed JSON error response:', parseError);
+                    errorMessage = `Server error ${response.status}: Failed to parse JSON error. Response (first 100 chars): ${responseBodyText.substring(0, 100)}...`;
+                }
+            } else {
+                errorMessage = `Server error ${response.status}. Response (first 200 chars): ${responseBodyText.substring(0, 200)}...`;
+            }
+
+            if (limitReachedData) {
+                const resumeUploadModal = bootstrap.Modal.getInstance(document.getElementById('job-resume-upload-modal'));
+                if (resumeUploadModal) { try { resumeUploadModal.hide(); } catch(e) { /* ignore */ } }
+                showLimitReachedModal('resumeAnalyses', limitReachedData);
+                submitButton.disabled = false;
+                progressBar.style.width = '0%';
+                statusText.textContent = 'Usage limit reached for resume analysis.';
+                progressContainer.style.display = 'none'; // Hide progress bar area
+                return; // Exit function
+            }
+            throw new Error(errorMessage);
+        }
+
+        // If response.ok, verify Content-Type before parsing
+        let data;
+        if (response.headers.get('Content-Type')?.includes('application/json')) {
+            try {
+                data = JSON.parse(responseBodyText);
+            } catch (parseError) {
+                 console.error('Error parsing supposed JSON success response:', parseError);
+                 throw new Error(`Invalid JSON in success response from server. Response (first 100 chars): ${responseBodyText.substring(0,100)}...`);
+            }
+        } else {
+            console.error('Expected JSON from server for a successful response but received:', response.headers.get('Content-Type'));
+            throw new Error(`Unexpected response format for success. Expected JSON, got ${response.headers.get('Content-Type')}. Response (first 200 chars): ${responseBodyText.substring(0,200)}...`);
+        }
+
+        console.log('Successfully parsed JSON from /analyze-resume-for-job:', data);
+
+        if (!data.sessionId) {
+            throw new Error('Session ID not found in the server response.');
+        }
+
+        // Update UI: Analysis Started
+        progressBar.style.width = '20%';
+        statusText.textContent = 'Upload complete. Starting analysis...';
+
+        // Start polling for analysis completion
+        await waitForJobSpecificAnalysisCompletion(data.sessionId, data.jobId || jobId, progressBar, statusText, submitButton, progressContainer);
+
+        // If waitForJobSpecificAnalysisCompletion resolves, it means success, and it will call initiateJobSpecificInterview.
+        // If it rejects, the error will be caught by the catch block below.
+
+    } catch (error) {
+        console.error("Error in job-specific resume upload process (continueJobSpecificResumeUploadAfterChecks):", error);
+        statusText.textContent = `Error: ${error.message}`;
+        progressBar.style.width = '0%';
+        progressBar.classList.remove('progress-bar-animated', 'progress-bar-striped');
+        progressBar.classList.add('bg-danger');
+        if(submitButton) submitButton.disabled = false;
+        // Keep progressContainer visible to show the error message.
+    }
+}
+
+/**
+ * Waits for job-specific analysis completion by polling the server.
+ * @param {string} sessionId - Analysis session ID.
+ * @param {string} jobId - Job ID (for calling initiateJobSpecificInterview).
+ * @param {HTMLElement} progressBar - Progress bar element to update.
+ * @param {HTMLElement} statusText - Status text element to update.
+ * @param {HTMLElement} submitButton - Submit button from the upload modal (to re-enable on failure).
+ * @param {HTMLElement} progressContainer - The container for progress UI.
+ */
+async function waitForJobSpecificAnalysisCompletion(sessionId, jobId, progressBar, statusText, submitButton, progressContainer) {
+    return new Promise((resolve, reject) => {
+        let attempts = 0;
+        const maxAttempts = 90; // Approx 7.5 minutes (5s * 90), increase if analyses take longer
+        const initialProgress = 20; // Progress starts from 20% (after upload)
+        const analysisProgressRange = 70; // Analysis itself will fill from 20% up to 90%
+
+        const checkStatus = async () => {
+            try {
+                const response = await fetch(`/get-analysis-status/${sessionId}`);
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    console.error(`Polling: Failed to check analysis status (${response.status}): ${errorText.substring(0,100)}`);
+                    if (attempts < maxAttempts) {
+                        attempts++;
+                        setTimeout(checkStatus, 5000); // Retry
+                        return;
+                    }
+                    reject(new Error(`Polling: Failed to check analysis status after ${maxAttempts} attempts. Status: ${response.status}. ${errorText.substring(0,100)}`));
+                    return;
+                }
+
+                const data = await response.json();
+                console.log('Polling status for session', sessionId, data);
+
+                if (data.progress) {
+                    const uiProgress = initialProgress + (data.progress / 100) * analysisProgressRange;
+                    progressBar.style.width = `${Math.min(uiProgress, 90)}%`;
+                }
+
+                if (data.statusDetail) {
+                    statusText.textContent = data.statusDetail;
+                }
+
+                if (data.status === 'completed') {
+                    progressBar.style.width = '90%';
+                    statusText.textContent = 'Analysis complete! Preparing interview...';
+                    
+                    const resumeUploadModal = bootstrap.Modal.getInstance(document.getElementById('job-resume-upload-modal'));
+                    if (resumeUploadModal) {
+                        try { resumeUploadModal.hide(); } catch(e) { /* ignore */ }
+                    }
+                    
+                    // Reset progress UI for next potential use after modal closes
+                    // Or do this when the modal is re-shown next time
+                    // progressContainer.style.display = 'none'; 
+                    // submitButton.disabled = false;
+
+                    initiateJobSpecificInterview(sessionId, jobId); // Proceed to next step
+                    resolve(data);
+                    return;
+                } else if (data.status === 'failed') {
+                    const errorMessage = 'Resume analysis failed: ' + (data.errors?.[0] || data.statusDetail || 'Unknown error during analysis');
+                    reject(new Error(errorMessage));
+                    return;
+                }
+
+                attempts++;
+                if (attempts >= maxAttempts) {
+                    reject(new Error('Analysis timeout. The process took too long. Please try again later.'));
+                    return;
+                }
+
+                setTimeout(checkStatus, 5000);
+            } catch (error) {
+                console.error("Error during polling for analysis status:", error);
+                reject(error); // Reject on unexpected errors during polling
+            }
+        };
+        checkStatus(); // Start polling
+    });
+}                                                                    
 
 function initiateJobSpecificInterview(sessionId, jobId) {
     // Show payment confirmation modal

@@ -7016,129 +7016,140 @@ function initModalFixes() {
 }
 
 // Function to initialize a mock interview with a given ID
-function initializeMockInterview(interviewId) {
-    console.log(`Initializing mock interview: ${interviewId}`);
-    
-    // Store the current interview ID
-    currentInterviewId = interviewId;
-    
-    // Clear previous conversation
-    conversationContainer.innerHTML = '';
-    
-    // Reset recording status
-    isRecording = false;
-    if (recordingIndicator) {
-        recordingIndicator.style.display = 'none';
+function initializeMockInterview(interviewIdFromJobFlow) {
+    console.log(`[APP_DEBUG] Initializing mock interview specifically for ID: ${interviewIdFromJobFlow}`);
+
+    state.interviewId = interviewIdFromJobFlow; // Use the app's global state
+    state.isInterviewActive = true; // Mark interview as active conceptually
+    state.isAIResponding = false; // Reset AI responding state
+    state.conversationHistory = []; // Reset conversation history for the new interview
+
+    const conversationContainer = document.getElementById('conversationContainer');
+    if (conversationContainer) conversationContainer.innerHTML = ''; // Clear previous messages
+
+    // Reset other relevant UI or state for the interview screen
+    const userReplyInput = document.getElementById('userReplyInput');
+    const sendReplyBtn = document.getElementById('sendReplyBtn');
+    if (userReplyInput) {
+        userReplyInput.value = '';
+        userReplyInput.disabled = true; // Disable until conversation fully loads
     }
-    
-    // Reset timer if active
-    if (recordingTimer) {
-        clearInterval(recordingTimer);
-        recordingTimer = null;
-        recordingSeconds = 0;
-        if (recordingTimeDisplay) {
-            recordingTimeDisplay.textContent = '0:00';
-        }
-    }
-    
-    // Reset UI elements
-    userReplyInput.value = '';
-    
-    // Check if camera permissions were previously granted
-    if (localStream) {
-        // Already have camera/mic access, proceed with loading interview
-        loadInterviewConversation(interviewId);
+    if (sendReplyBtn) sendReplyBtn.disabled = true;
+
+    // Navigate to the mock interview section if not already there
+    // This ensures the UI is correct before attempting to load media/conversation
+    navigateTo('mock-interview');
+
+    // Handle media permissions and then load conversation
+    if (state.videoStream && state.mediaRecorder) { // If media already set up
+        console.log("[APP_DEBUG] Media already set up. Loading conversation for new interview ID.");
+        loadInterviewConversation(state.interviewId);
     } else {
-        // Show permissions modal to request camera/mic
-        const permissionsModal = new bootstrap.Modal(document.getElementById('permissionsModal'));
-        permissionsModal.show();
-        
-        // Set up the grant permissions button
-        document.getElementById('grantPermissionsBtn').onclick = function() {
-            permissionsModal.hide();
-            requestCameraAndMicAccess(function() {
-                // After permissions granted, load the interview
-                loadInterviewConversation(interviewId);
-            });
-        };
+        console.log("[APP_DEBUG] Media not yet set up. Showing permissions modal.");
+        const permissionsModalElement = document.getElementById('permissionsModal');
+        if (permissionsModalElement) {
+            const permissionsModal = new bootstrap.Modal(permissionsModalElement);
+            permissionsModal.show();
+
+            const grantBtn = document.getElementById('grantPermissionsBtn');
+            if (grantBtn) {
+                // Clone to remove previous listeners, if any, to avoid multiple executions
+                const newGrantBtn = grantBtn.cloneNode(true);
+                grantBtn.parentNode.replaceChild(newGrantBtn, grantBtn);
+
+                newGrantBtn.addEventListener('click', function grantPermissionsAndLoad() {
+                    permissionsModal.hide(); // Hide modal first
+                    
+                    navigator.mediaDevices.getUserMedia({ video: true, audio: true })
+                        .then(stream => {
+                            console.log("[APP_DEBUG] Media permissions granted for job-specific interview.");
+                            state.videoStream = stream;
+
+                            const videoElement = document.getElementById('candidateVideo');
+                            if (videoElement) {
+                                videoElement.srcObject = stream;
+                                videoElement.play().catch(e => console.warn("Autoplay for video element prevented:", e));
+                            }
+                            setupMediaRecorder(stream); // Initialize MediaRecorder and VAD from app.js
+                            
+                            // Crucially, load the *specific* interview conversation now
+                            loadInterviewConversation(state.interviewId);
+                        })
+                        .catch(error => {
+                            console.error('[APP_DEBUG] Error accessing media devices:', error);
+                            alert(`Could not access camera/microphone: ${error.message}`);
+                            navigateTo('upload'); // Fallback navigation
+                        });
+                }, { once: true }); // Ensure listener runs only once per display of modal for this flow
+            }
+        } else {
+            console.error("[APP_DEBUG] Permissions modal element not found!");
+            alert("An error occurred setting up interview permissions. Please try again.");
+        }
     }
 }
 
-// Function to load the interview conversation
-function loadInterviewConversation(interviewId) {
-    // Show loading state
+// Ensure loadInterviewConversation correctly loads the initial greeting and starts the flow
+function loadInterviewConversation(interviewIdToLoad) {
+    const conversationContainer = document.getElementById('conversationContainer');
+    const userReplyInput = document.getElementById('userReplyInput');
+    const sendReplyBtn = document.getElementById('sendReplyBtn');
+
+    if (!conversationContainer || !userReplyInput || !sendReplyBtn) {
+        console.error("Required DOM elements for conversation not found in loadInterviewConversation.");
+        return;
+    }
+
     conversationContainer.innerHTML = `
-        <div class="message system-message">
-            <div class="message-content">
-                <p><i class="fas fa-spinner fa-spin me-2"></i> Loading interview...</p>
-            </div>
-        </div>
-    `;
-    
-    // Fetch interview data to get the initial conversation
-    fetch(`/get-interview-data/${interviewId}`)
+        <div class="message system">
+            <div class="sender">System</div>
+            <div><i class="fas fa-spinner fa-spin me-2"></i> Loading interview questions...</div>
+        </div>`;
+    userReplyInput.disabled = true;
+    sendReplyBtn.disabled = true;
+
+    fetch(`${API_BASE_URL}/get-interview-data/${interviewIdToLoad}`) // Use API_BASE_URL
         .then(response => {
             if (!response.ok) {
-                throw new Error('Failed to load interview data');
+                return response.json().then(err => { throw new Error(err.error || `Failed to load interview data (${response.status})`); });
             }
             return response.json();
         })
         .then(data => {
-            // Store the interview type for reference
-            currentInterviewType = data.interviewType || 'general';
-            
-            // Update interview type selector if it exists
-            if (document.getElementById('interviewTypeSelector')) {
-                const buttons = document.getElementById('interviewTypeSelector').querySelectorAll('button');
-                buttons.forEach(btn => {
-                    btn.classList.toggle('active', btn.getAttribute('data-type') === currentInterviewType);
-                });
-            }
-            
-            // Clear the conversation container
-            conversationContainer.innerHTML = '';
-            
-            // Check if there are any messages to display
+            console.log("[APP_DEBUG] Interview data loaded:", data);
+            conversationContainer.innerHTML = ''; // Clear loading message
+
             if (data.conversation && data.conversation.length > 0) {
-                data.conversation.forEach(message => {
-                    const isUser = message.role === 'user';
-                    const messageHTML = `
-                        <div class="message ${isUser ? 'user-message' : 'interviewer-message'}">
-                            <div class="message-content">
-                                <p>${message.content}</p>
-                            </div>
-                        </div>
-                    `;
-                    conversationContainer.innerHTML += messageHTML;
+                data.conversation.forEach(msg => {
+                    addMessageToConversation(msg.role === 'assistant' ? 'interviewer' : 'candidate', msg.content);
                 });
-                
-                // Scroll to the bottom of the conversation
-                conversationContainer.scrollTop = conversationContainer.scrollHeight;
+
+                // Assuming the last message from the backend is the interviewer's first question/greeting
+                const lastMessage = data.conversation[data.conversation.length - 1];
+                if (lastMessage && lastMessage.role === 'assistant') {
+                    generateAndPlayTTS(lastMessage.content); // This will trigger automatic listening on end
+                } else {
+                    // If no initial assistant message, or last message was user (unlikely for new interview)
+                    console.warn("[APP_DEBUG] No initial interviewer greeting found in loaded data. Starting listening manually.");
+                    state.isAIResponding = false; // Ensure AI is not marked as responding
+                    if(state.isInterviewActive) startListeningAutomatically();
+                }
             } else {
-                // If no messages (rare case), show a default message
-                conversationContainer.innerHTML = `
-                    <div class="message system-message">
-                        <div class="message-content">
-                            <p>Interview ready to start. Waiting for the interviewer's first question...</p>
-                        </div>
-                    </div>
-                `;
+                addMessageToConversation("system", "Interview initialized. Waiting for the first question.");
+                // Potentially call backend again to explicitly start if no conversation was loaded
+                state.isAIResponding = false;
+                 if(state.isInterviewActive) startListeningAutomatically();
             }
-            
-            // Enable the UI
             userReplyInput.disabled = false;
             sendReplyBtn.disabled = false;
         })
         .catch(error => {
-            console.error('Error loading interview data:', error);
-            conversationContainer.innerHTML = `
-                <div class="message system-message">
-                    <div class="message-content">
-                        <p>There was an error loading the interview: ${error.message}</p>
-                        <p>Please try refreshing the page or starting a new interview.</p>
-                    </div>
-                </div>
-            `;
+            console.error('[APP_DEBUG] Error loading interview conversation:', error);
+            conversationContainer.innerHTML = ''; // Clear loading
+            addMessageToConversation("system", `Error loading interview: ${error.message}. Please try again or start a new interview.`);
+            userReplyInput.disabled = true;
+            sendReplyBtn.disabled = true;
+            state.isInterviewActive = false;
         });
 }
 
