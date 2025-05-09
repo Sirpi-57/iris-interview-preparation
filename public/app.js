@@ -7715,7 +7715,7 @@ function chunkArray(array, chunkSize) {
 }
 
 // Check and process pending mock interview after login
-ffunction checkPendingMockInterview() {
+function checkPendingMockInterview() {
     const pendingJobId = localStorage.getItem('pendingMockInterviewJobId');
     if (pendingJobId) {
         console.log("Found pending mock interview job ID:", pendingJobId);
