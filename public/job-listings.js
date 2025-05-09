@@ -1,7 +1,5 @@
 // job-listings.js - Handles Job Listings functionality for IRIS public website
 
-const API_BASE_URL = 'https://iris-ai-backend.onrender.com';
-
 // --- DOM Elements ---
 const jobListingsContainer = document.getElementById('public-job-listings-container');
 const categoryFilterDropdown = document.getElementById('public-category-filter-dropdown');
@@ -1310,28 +1308,21 @@ async function processJobSpecificResumeUpload() {
  * @param {HTMLElement} progressContainer - The container for progress UI.
  */
 async function continueJobSpecificResumeUploadAfterChecks(resumeFile, jobId, currentUser, progressBar, statusText, submitButton, progressContainer) {
+    // Prepare form data
     const formData = new FormData();
     formData.append('resumeFile', resumeFile);
     formData.append('userId', currentUser.uid);
     formData.append('jobId', jobId);
 
+    // Update UI: Initial Uploading
     progressBar.style.width = '10%';
     progressBar.classList.remove('bg-danger');
     progressBar.classList.add('progress-bar-striped', 'progress-bar-animated');
     statusText.textContent = 'Uploading resume...';
-    submitButton.disabled = true;
+    submitButton.disabled = true; // Should already be, but ensure
 
     try {
-        // *** THIS IS THE KEY CHANGE ***
-        if (typeof API_BASE_URL === 'undefined') {
-            console.error("API_BASE_URL is not defined! This is required for API calls from job-listings.js.");
-            throw new Error("Application configuration error. Please contact support.");
-        }
-        const apiUrl = `${API_BASE_URL}/analyze-resume-for-job`;
-        console.log(`[JOB-LISTINGS] Sending request to: ${apiUrl}`);
-        // *****************************
-
-        const response = await fetch(apiUrl, { // Use the full URL
+        const response = await fetch('/analyze-resume-for-job', {
             method: 'POST',
             body: formData
         });
@@ -1345,7 +1336,7 @@ async function continueJobSpecificResumeUploadAfterChecks(resumeFile, jobId, cur
         console.log('Raw Body Text (first 500 chars):', responseBodyText.substring(0, 500));
         console.log('--- End Response ---');
 
-        if (!response.ok) {
+        if (!response.ok) { // Checks for 2xx status codes (202 is ok for this endpoint)
             let errorMessage = `Server error ${response.status}.`;
             let limitReachedData = null;
 
@@ -1353,7 +1344,7 @@ async function continueJobSpecificResumeUploadAfterChecks(resumeFile, jobId, cur
                 try {
                     const errorData = JSON.parse(responseBodyText);
                     errorMessage = errorData.error || `Server error ${response.status} with JSON body`;
-                    if (errorData.limitReached && errorData.feature === 'resumeAnalyses') {
+                    if (errorData.limitReached && errorData.feature === 'resumeAnalyses') { // Check feature for safety
                         limitReachedData = errorData;
                     }
                 } catch (parseError) {
@@ -1367,16 +1358,17 @@ async function continueJobSpecificResumeUploadAfterChecks(resumeFile, jobId, cur
             if (limitReachedData) {
                 const resumeUploadModal = bootstrap.Modal.getInstance(document.getElementById('job-resume-upload-modal'));
                 if (resumeUploadModal) { try { resumeUploadModal.hide(); } catch(e) { /* ignore */ } }
-                showLimitReachedModal('resumeAnalyses', limitReachedData); // Assumes showLimitReachedModal is global
+                showLimitReachedModal('resumeAnalyses', limitReachedData);
                 submitButton.disabled = false;
                 progressBar.style.width = '0%';
                 statusText.textContent = 'Usage limit reached for resume analysis.';
-                if(progressContainer) progressContainer.style.display = 'none';
-                return;
+                progressContainer.style.display = 'none'; // Hide progress bar area
+                return; // Exit function
             }
             throw new Error(errorMessage);
         }
 
+        // If response.ok, verify Content-Type before parsing
         let data;
         if (response.headers.get('Content-Type')?.includes('application/json')) {
             try {
@@ -1386,7 +1378,6 @@ async function continueJobSpecificResumeUploadAfterChecks(resumeFile, jobId, cur
                  throw new Error(`Invalid JSON in success response from server. Response (first 100 chars): ${responseBodyText.substring(0,100)}...`);
             }
         } else {
-            // This block should ideally not be hit if the API is working correctly and URL is fixed
             console.error('Expected JSON from server for a successful response but received:', response.headers.get('Content-Type'));
             throw new Error(`Unexpected response format for success. Expected JSON, got ${response.headers.get('Content-Type')}. Response (first 200 chars): ${responseBodyText.substring(0,200)}...`);
         }
@@ -1397,10 +1388,15 @@ async function continueJobSpecificResumeUploadAfterChecks(resumeFile, jobId, cur
             throw new Error('Session ID not found in the server response.');
         }
 
+        // Update UI: Analysis Started
         progressBar.style.width = '20%';
         statusText.textContent = 'Upload complete. Starting analysis...';
 
+        // Start polling for analysis completion
         await waitForJobSpecificAnalysisCompletion(data.sessionId, data.jobId || jobId, progressBar, statusText, submitButton, progressContainer);
+
+        // If waitForJobSpecificAnalysisCompletion resolves, it means success, and it will call initiateJobSpecificInterview.
+        // If it rejects, the error will be caught by the catch block below.
 
     } catch (error) {
         console.error("Error in job-specific resume upload process (continueJobSpecificResumeUploadAfterChecks):", error);
@@ -1409,6 +1405,7 @@ async function continueJobSpecificResumeUploadAfterChecks(resumeFile, jobId, cur
         progressBar.classList.remove('progress-bar-animated', 'progress-bar-striped');
         progressBar.classList.add('bg-danger');
         if(submitButton) submitButton.disabled = false;
+        // Keep progressContainer visible to show the error message.
     }
 }
 
