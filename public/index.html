@@ -104,6 +104,9 @@
                             <a class="nav-link tab-button" data-tab="showcase-tab" href="#">Showcase</a> 
                         </li>
                         <li class="nav-item">
+                            <a class="nav-link tab-button" data-tab="job-listings-tab" href="#">Job Listings</a>
+                        </li>
+                        <li class="nav-item">
                             <a class="nav-link tab-button" data-tab="pricing-tab" href="#">Pricing</a>
                         </li>
                         <li class="nav-item">
@@ -567,6 +570,87 @@
                         <h2>Ready to Master Your Interview Skills?</h2>
                         <p class="lead mb-4">Join IRIS today and gain the confidence you need to succeed in your next interview.</p>
                         <button class="btn btn-primary btn-lg" data-auth="signup">Try IRIS Now</button>
+                    </div>
+                </div>
+            </div>
+
+            <div id="job-listings-tab" class="public-tab">
+                <div class="container py-5">
+                    <h1 class="text-center mb-5">Job Listings</h1>
+                    <p class="text-center mb-5">Discover job opportunities and practice interviews tailored to specific roles.</p>
+
+                    <!-- Search and filter controls -->
+                    <div class="job-search-filters mt-4 mb-4">
+                        <div class="row g-3">
+                            <div class="col-md-4">
+                                <div class="input-group">
+                                    <span class="input-group-text"><i class="fas fa-search"></i></span>
+                                    <input type="text" id="publicJobSearchInput" class="form-control" placeholder="Search jobs...">
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <select id="publicJobCategoryFilter" class="form-select">
+                                    <option value="">All Categories</option>
+                                    <!-- Categories will be populated dynamically -->
+                                </select>
+                            </div>
+                            <div class="col-md-3">
+                                <select id="publicJobTechFilter" class="form-select">
+                                    <option value="">All Tech Stacks</option>
+                                    <!-- Tech stacks will be populated dynamically -->
+                                </select>
+                            </div>
+                            <div class="col-md-2">
+                                <button id="publicResetJobFilters" class="btn btn-outline-secondary w-100">
+                                    <i class="fas fa-undo-alt"></i> Reset
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Featured Jobs (Optional) -->
+                    <div class="featured-jobs mb-5">
+                        <h3 class="mb-4">Featured Opportunities</h3>
+                        <div id="featuredJobsCarousel" class="carousel slide" data-bs-ride="carousel">
+                            <div class="carousel-inner">
+                                <!-- Featured job cards will be added here dynamically -->
+                                <div class="text-center py-5">
+                                    <div class="spinner-border text-primary" role="status">
+                                        <span class="visually-hidden">Loading jobs...</span>
+                                    </div>
+                                    <p class="mt-2">Loading featured jobs...</p>
+                                </div>
+                            </div>
+                            <button class="carousel-control-prev" type="button" data-bs-target="#featuredJobsCarousel" data-bs-slide="prev">
+                                <span class="carousel-control-prev-icon" aria-hidden="true"></span>
+                                <span class="visually-hidden">Previous</span>
+                            </button>
+                            <button class="carousel-control-next" type="button" data-bs-target="#featuredJobsCarousel" data-bs-slide="next">
+                                <span class="carousel-control-next-icon" aria-hidden="true"></span>
+                                <span class="visually-hidden">Next</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Job listings grid -->
+                    <div class="all-jobs">
+                        <h3 class="mb-4">All Job Listings</h3>
+                        <div id="publicJobListingsGrid" class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4">
+                            <!-- Job cards will be added here dynamically -->
+                            <div class="col-12 text-center py-5">
+                                <div class="spinner-border text-primary" role="status">
+                                    <span class="visually-hidden">Loading jobs...</span>
+                                </div>
+                                <p class="mt-2">Loading job listings...</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- CTA Section -->
+                    <div class="text-center mt-5 pt-4">
+                        <h3>Ready to prepare for these opportunities?</h3>
+                        <p class="lead mb-4">Sign up to practice tailored interviews and get personalized feedback.</p>
+                        <button class="btn btn-primary btn-lg" data-auth="signup">Get Started</button>
                     </div>
                 </div>
             </div>
@@ -2314,7 +2398,33 @@
             </div>
           </div>
         </div>
-      </div>
+    </div>
+
+    <div class="modal fade" id="jobDetailsModal" tabindex="-1" aria-labelledby="jobDetailsModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="jobDetailsModalLabel">Job Details</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div id="jobDetailsContent">
+                        <!-- Job details will be added here dynamically -->
+                        <div class="text-center py-3">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="visually-hidden">Loading job details...</span>
+                            </div>
+                            <p class="mt-2">Loading job details...</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    <button type="button" class="btn btn-primary" id="takeMockInterviewBtn">Take Mock Interview</button>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <!-- Scripts -->
     <!-- Firebase SDK -->
