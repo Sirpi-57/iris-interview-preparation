@@ -7103,11 +7103,18 @@ function loadPublicJobListings() {
         return;
     }
     
+    // First, check if we're on the job listings page by looking for required elements
     const jobListingsGrid = document.getElementById('publicJobListingsGrid');
-    const carouselInner = document.querySelector('#featuredJobsCarousel .carousel-inner');
-    // Show loading state for both grid and carousel
-
-    // Show loading state
+    if (!jobListingsGrid) {
+        console.warn("Job listings grid not found, cannot load job listings");
+        return;
+    }
+    
+    // Get the carousel inner element, but don't fail if it doesn't exist
+    const featuredJobsCarousel = document.getElementById('featuredJobsCarousel');
+    const carouselInner = featuredJobsCarousel ? featuredJobsCarousel.querySelector('.carousel-inner') : null;
+    
+    // Show loading state for grid
     jobListingsGrid.innerHTML = `
         <div class="col-12 text-center py-5">
             <div class="spinner-border text-primary" role="status">
@@ -7117,16 +7124,19 @@ function loadPublicJobListings() {
         </div>
     `;
     
-    carouselInner.innerHTML = `
-        <div class="carousel-item active">
-            <div class="text-center py-5">
-                <div class="spinner-border text-primary" role="status">
-                    <span class="visually-hidden">Loading jobs...</span>
+    // Show loading state for carousel if it exists
+    if (carouselInner) {
+        carouselInner.innerHTML = `
+            <div class="carousel-item active">
+                <div class="text-center py-5">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Loading jobs...</span>
+                    </div>
+                    <p class="mt-2">Loading featured jobs...</p>
                 </div>
-                <p class="mt-2">Loading job listings...</p>
             </div>
-        </div>
-    `;
+        `;
+    }
     
     // Get job listings collection
     firebase.firestore().collection('jobPostings')
@@ -7141,13 +7151,16 @@ function loadPublicJobListings() {
                         <p class="text-muted">No job listings found.</p>
                     </div>
                 `;
-                carouselInner.innerHTML = `
-                    <div class="carousel-item active">
-                        <div class="text-center py-5">
-                            <p class="text-muted">No job listings found.</p>
+                
+                if (carouselInner) {
+                    carouselInner.innerHTML = `
+                        <div class="carousel-item active">
+                            <div class="text-center py-5">
+                                <p class="text-muted">No job listings found.</p>
+                            </div>
                         </div>
-                    </div>
-                `;
+                    `;
+                }
                 return;
             }
             
@@ -7161,30 +7174,63 @@ function loadPublicJobListings() {
                 window.allJobs.push(job);
             });
             
-            // Populate filters
-            populateFilters(window.allJobs);
-            
-            // Display jobs
-            displayJobListings(window.allJobs);
-            
-            // Initialize the carousel
-            const carouselElement = document.getElementById('jobListingsCarousel');
-            if (carouselElement) {
-                new bootstrap.Carousel(carouselElement, {
-                    interval: 5000 // 5 seconds per slide
-                });
+            try {
+                // Populate filters
+                if (typeof populateFilters === 'function') {
+                    populateFilters(window.allJobs);
+                } else if (typeof populateFilterOptions === 'function') {
+                    populateFilterOptions();
+                }
+                
+                // Display jobs
+                if (typeof displayJobListings === 'function') {
+                    displayJobListings(window.allJobs);
+                } else {
+                    console.error("displayJobListings function not found");
+                    jobListingsGrid.innerHTML = '<div class="alert alert-danger">Error: Display function not found</div>';
+                }
+                
+                // Initialize the carousel if it exists
+                if (featuredJobsCarousel && typeof bootstrap !== 'undefined') {
+                    try {
+                        new bootstrap.Carousel(featuredJobsCarousel, {
+                            interval: 5000 // 5 seconds per slide
+                        });
+                    } catch (carouselError) {
+                        console.warn("Error initializing carousel:", carouselError);
+                    }
+                }
+            } catch (displayError) {
+                console.error("Error displaying job listings:", displayError);
+                jobListingsGrid.innerHTML = `
+                    <div class="alert alert-danger">
+                        <i class="fas fa-exclamation-circle me-2"></i>Error displaying job listings: ${displayError.message}
+                    </div>
+                `;
             }
             
             console.log(`Loaded ${window.allJobs.length} job listings`);
             
             // Add this new code: Attach event listeners for Take Mock buttons
             setTimeout(() => {
-                attachJobListingEventListeners();
+                try {
+                    if (typeof attachJobListingEventListeners === 'function') {
+                        attachJobListingEventListeners();
+                    }
+                } catch (listenerError) {
+                    console.error("Error attaching job listing event listeners:", listenerError);
+                }
             }, 500);
         })
         .catch(error => {
             console.error("Error loading job listings:", error);
-            showErrorInJobSection("Failed to load job listings. Please try again later.");
+            jobListingsGrid.innerHTML = `
+                <div class="col-12">
+                    <div class="alert alert-danger">
+                        <i class="fas fa-exclamation-circle me-2"></i>Error loading job listings: ${error.message}
+                    </div>
+                </div>
+            `;
         });
 }
 
@@ -7201,7 +7247,9 @@ function showErrorInPublicJobSection(message) {
         `;
     }
     
-    const carouselInner = document.querySelector('#featuredJobsCarousel .carousel-inner');
+    const featuredJobsCarousel = document.getElementById('featuredJobsCarousel');
+    const carouselInner = featuredJobsCarousel ? featuredJobsCarousel.querySelector('.carousel-inner') : null;
+    
     if (carouselInner) {
         carouselInner.innerHTML = `
             <div class="carousel-item active">
@@ -7510,13 +7558,29 @@ function showJobDetails(jobId) {
 
 // Take Mock Interview function
 function takeMockInterview(jobId) {
+    if (!jobId) {
+        console.error("takeMockInterview called with no jobId");
+        showMessage("Error: Job ID not found", "danger");
+        return;
+    }
+
+    console.log(`Taking mock interview for job ID: ${jobId}`);
+    
     // First check if user is logged in
     const user = firebase.auth().currentUser;
     if (!user) {
+        console.log("User not logged in, storing job ID and showing sign up modal");
+        
         // Close job details modal if open
-        const jobModal = bootstrap.Modal.getInstance(document.getElementById('jobDetailsModal'));
-        if (jobModal) {
-            jobModal.hide();
+        try {
+            const jobModal = document.getElementById('jobDetailsModal');
+            if (jobModal) {
+                const modalInstance = bootstrap.Modal.getInstance(jobModal);
+                if (modalInstance) modalInstance.hide();
+            }
+        } catch (modalError) {
+            console.warn("Error closing job details modal:", modalError);
+            // Continue anyway - this isn't critical
         }
         
         // Store job ID in localStorage for retrieval after login
@@ -7528,33 +7592,52 @@ function takeMockInterview(jobId) {
             irisAuth.showSignUpModal();
             // Add a message to the sign-up modal
             setTimeout(() => {
-                const messageDiv = document.createElement('div');
-                messageDiv.className = 'alert alert-info mb-3';
-                messageDiv.innerHTML = `<i class="fas fa-info-circle me-2"></i>Sign up to practice mock interviews for this job.`;
-                
-                const authForm = document.getElementById('signup-form');
-                if (authForm) {
-                    authForm.insertBefore(messageDiv, authForm.firstChild);
+                try {
+                    const authForm = document.getElementById('signup-form');
+                    if (authForm) {
+                        const messageDiv = document.createElement('div');
+                        messageDiv.className = 'alert alert-info mb-3';
+                        messageDiv.innerHTML = `<i class="fas fa-info-circle me-2"></i>Sign up to practice mock interviews for this job.`;
+                        authForm.insertBefore(messageDiv, authForm.firstChild);
+                    }
+                } catch (authFormError) {
+                    console.warn("Error adding message to auth form:", authFormError);
                 }
             }, 300);
+        } else {
+            console.warn("irisAuth.showSignUpModal not available");
+            showMessage("Please sign in to take mock interviews", "info");
         }
         return;
     }
     
     // Close job details modal if open
-    const jobModal = bootstrap.Modal.getInstance(document.getElementById('jobDetailsModal'));
-    if (jobModal) {
-        jobModal.hide();
+    try {
+        const jobModal = document.getElementById('jobDetailsModal');
+        if (jobModal) {
+            const modalInstance = bootstrap.Modal.getInstance(jobModal);
+            if (modalInstance) modalInstance.hide();
+        }
+    } catch (modalError) {
+        console.warn("Error closing job details modal:", modalError);
+        // Continue anyway - this isn't critical
     }
     
     // Show loading message
-    showMessage("Loading job details for interview...", "info");
+    if (typeof showMessage === 'function') {
+        showMessage("Loading job details for interview...", "info");
+    }
+    
+    console.log("Fetching job details from Firestore");
     
     // Fetch job details to get the job description
     firebase.firestore().collection('jobPostings').doc(jobId).get()
         .then(doc => {
             if (!doc.exists) {
-                showMessage("Job listing not found.", "danger");
+                console.error("Job document not found:", jobId);
+                if (typeof showMessage === 'function') {
+                    showMessage("Job listing not found.", "danger");
+                }
                 return;
             }
             
@@ -7562,7 +7645,12 @@ function takeMockInterview(jobId) {
             console.log("Retrieved job data for interview:", job);
             
             // Navigate to the resume upload section
-            navigateTo('upload');
+            if (typeof navigateTo === 'function') {
+                navigateTo('upload');
+            } else {
+                console.error("navigateTo function not found");
+                return;
+            }
             
             // Pre-fill job description
             const jobDescTextarea = document.getElementById('jobDescription');
@@ -7576,48 +7664,61 @@ function takeMockInterview(jobId) {
                 if (resumeFileInput) {
                     setTimeout(() => {
                         resumeFileInput.focus();
-                        showMessage("Job description loaded. Please upload your resume to continue.", "success");
+                        if (typeof showMessage === 'function') {
+                            showMessage("Job description loaded. Please upload your resume to continue.", "success");
+                        }
                     }, 300);
                 }
             } else {
                 console.error("Could not find jobDescription textarea in the upload section");
+                if (typeof showMessage === 'function') {
+                    showMessage("Error: Could not find job description input field", "warning");
+                }
             }
         })
         .catch(error => {
             console.error("Error fetching job details for interview:", error);
-            showMessage("Error loading job details. Please try again later.", "danger");
+            if (typeof showMessage === 'function') {
+                showMessage("Error loading job details. Please try again later.", "danger");
+            }
         });
 }
 
 
 
 function formatJobToDescription(job) {
-    // Create a structured job description from the job fields
-    let jobDesc = `${job.title} at ${job.companyName}\n\n`;
-    
-    jobDesc += `Location: ${job.location || 'Not specified'}\n`;
-    jobDesc += `Experience: ${job.experienceLevel || 'Not specified'}\n`;
-    if (job.salaryRange) jobDesc += `Salary: ${job.salaryRange}\n`;
-    if (job.relocation) jobDesc += `Relocation: Offered\n`;
-    if (job.category && job.subCategory) jobDesc += `Category: ${job.category} / ${job.subCategory}\n`;
-    
-    jobDesc += `\nJOB DESCRIPTION:\n${job.description || 'No description provided.'}\n`;
-    
-    jobDesc += `\nREQUIREMENTS:\n${job.requirements || 'No specific requirements listed.'}\n`;
-    
-    if (job.techStacks && job.techStacks.length > 0) {
-        jobDesc += `\nTECH STACK: ${job.techStacks.join(', ')}\n`;
+    try {
+        // Create a structured job description from the job fields
+        let jobDesc = `${job.title || 'Job'} at ${job.companyName || 'Company'}\n\n`;
+        
+        jobDesc += `Location: ${job.location || 'Not specified'}\n`;
+        jobDesc += `Experience: ${job.experienceLevel || 'Not specified'}\n`;
+        if (job.salaryRange) jobDesc += `Salary: ${job.salaryRange}\n`;
+        if (job.relocation) jobDesc += `Relocation: Offered\n`;
+        if (job.category && job.subCategory) jobDesc += `Category: ${job.category} / ${job.subCategory}\n`;
+        
+        jobDesc += `\nJOB DESCRIPTION:\n${job.description || 'No description provided.'}\n`;
+        
+        jobDesc += `\nREQUIREMENTS:\n${job.requirements || 'No specific requirements listed.'}\n`;
+        
+        if (job.techStacks && job.techStacks.length > 0) {
+            jobDesc += `\nTECH STACK: ${job.techStacks.join(', ')}\n`;
+        }
+        
+        // Add custom fields if any
+        if (job.customFields && Object.keys(job.customFields).length > 0) {
+            jobDesc += `\nADDITIONAL INFORMATION:\n`;
+            Object.entries(job.customFields).forEach(([key, value]) => {
+                jobDesc += `${key}: ${value}\n`;
+            });
+        }
+        
+        return jobDesc;
+    } catch (error) {
+        console.error("Error formatting job description:", error);
+        // Return a simple fallback description if there's an error
+        return `${job?.title || 'Job Position'} at ${job?.companyName || 'Company'}\n\n${job?.description || 'Please check job details.'}\n\n${job?.requirements || ''}`;
     }
-    
-    // Add custom fields if any
-    if (job.customFields && Object.keys(job.customFields).length > 0) {
-        jobDesc += `\nADDITIONAL INFORMATION:\n`;
-        Object.entries(job.customFields).forEach(([key, value]) => {
-            jobDesc += `${key}: ${value}\n`;
-        });
-    }
-    
-    return jobDesc;
 }
 
 // Filter job listings based on search and filter inputs
@@ -7717,20 +7818,22 @@ function chunkArray(array, chunkSize) {
 // Check and process pending mock interview after login
 function checkPendingMockInterview() {
     const pendingJobId = localStorage.getItem('pendingMockInterviewJobId');
-    if (pendingJobId) {
-        console.log("Found pending mock interview job ID:", pendingJobId);
-        
-        // Clear from storage to prevent repeats
-        localStorage.removeItem('pendingMockInterviewJobId');
-        
-        // Check if user is now logged in
-        if (firebase.auth().currentUser) {
-            // Small delay to ensure everything is loaded
-            setTimeout(() => {
-                console.log("User is logged in, proceeding with mock interview for job:", pendingJobId);
-                takeMockInterview(pendingJobId);
-            }, 1000);
-        }
+    if (!pendingJobId) {
+        return; // No pending interview
+    }
+    
+    console.log("Found pending mock interview job ID:", pendingJobId);
+    
+    // Clear from storage to prevent repeats
+    localStorage.removeItem('pendingMockInterviewJobId');
+    
+    // Check if user is now logged in
+    if (firebase.auth().currentUser) {
+        // Small delay to ensure everything is loaded
+        setTimeout(() => {
+            console.log("User is logged in, proceeding with mock interview for job:", pendingJobId);
+            takeMockInterview(pendingJobId);
+        }, 1000);
     }
 }
 
@@ -8093,7 +8196,10 @@ function attachJobListingEventListeners() {
     console.log("Attaching job listing event listeners");
     
     // Add event listeners to "Take Mock" buttons in job cards
-    document.querySelectorAll('.take-mock-interview-btn').forEach(button => {
+    const mockButtons = document.querySelectorAll('.take-mock-interview-btn');
+    console.log(`Found ${mockButtons.length} 'Take Mock' buttons to attach listeners to`);
+    
+    mockButtons.forEach((button, index) => {
         // First remove any existing listeners by cloning and replacing the button
         const newButton = button.cloneNode(true);
         if (button.parentNode) {
@@ -8105,10 +8211,10 @@ function attachJobListingEventListeners() {
             e.preventDefault(); // Prevent default if it's an anchor
             const jobId = this.getAttribute('data-job-id');
             if (jobId) {
-                console.log("Take Mock Interview clicked for job ID:", jobId);
+                console.log(`Take Mock Interview clicked for job ID: ${jobId} (button ${index + 1})`);
                 takeMockInterview(jobId);
             } else {
-                console.error("No job ID found on Take Mock button");
+                console.error(`No job ID found on Take Mock button ${index + 1}`);
             }
         });
     });
