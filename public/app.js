@@ -5769,8 +5769,8 @@ function purchaseAddonItem(featureType, quantity) {
     const addonPrices = {
         'resumeAnalyses': 19,  // ₹19 per analysis
         'mockInterviews': 89,  // ₹89 per interview
-        'pdfDownloads': 9,     // ₹9 per 10 downloads
-        'aiEnhance': 9         // ₹9 per 5 enhancements
+        'pdfDownloads': 9,     // ₹9 per download
+        'aiEnhance': 9         // ₹9 per enhancement
     };
     
     // Calculate how many units the user actually gets
@@ -5784,9 +5784,10 @@ function purchaseAddonItem(featureType, quantity) {
     const totalPrice = basePrice * quantity;
     const effectiveQuantity = quantity * (quantityMultipliers[featureType] || 1);
     
-    // Show processing modal
-    // First safely close the addon purchase modal if open
-    safelyCloseModal('addonPurchaseModal');
+    // IMPROVED MODAL HANDLING: First forcefully close any existing modals
+    forceCloseModal('addonPurchaseModal');
+    forceCloseModal('paymentProcessingModal');
+    forceCloseModal('paymentSuccessModal');
     
     // Create processing modal
     const processingModalContent = document.createElement('div');
@@ -5814,6 +5815,12 @@ function purchaseAddonItem(featureType, quantity) {
             </div>
         </div>
     `;
+    
+    // IMPROVED: Clean up existing modal first before adding new one
+    const existingModal = document.getElementById('paymentProcessingModal');
+    if (existingModal && existingModal.parentNode) {
+        existingModal.parentNode.removeChild(existingModal);
+    }
     
     // Append and show processing modal
     document.body.appendChild(processingModalContent);
@@ -5875,7 +5882,8 @@ function purchaseAddonItem(featureType, quantity) {
             },
             modal: {
                 ondismiss: function() {
-                    safelyCloseModal('paymentProcessingModal');
+                    // IMPROVED: Use forced modal closure to ensure complete cleanup
+                    forceCloseModal('paymentProcessingModal');
                     showMessage("Add-on purchase cancelled.", "warning");
                 }
             },
@@ -5883,8 +5891,17 @@ function purchaseAddonItem(featureType, quantity) {
                 // This function runs after successful payment
                 if (progressBar) progressBar.style.width = '90%';
                 
-                // Verify payment with backend
-                verifyAddonPayment(response, orderResponse.razorpay_order_id, featureType, quantity, effectiveQuantity);
+                // IMPROVED: Store response in a variable to use after modal is closed
+                const paymentResponse = response;
+                
+                // IMPROVED: Force close the modal with a callback to verify payment after closure
+                forceCloseModal('paymentProcessingModal');
+                
+                // Add a slight delay to ensure DOM is updated before verification
+                setTimeout(() => {
+                    // Verify payment with backend
+                    verifyAddonPayment(paymentResponse, orderResponse.razorpay_order_id, featureType, quantity, effectiveQuantity);
+                }, 300);
             }
         };
         
@@ -5894,7 +5911,7 @@ function purchaseAddonItem(featureType, quantity) {
         
         // Add event handler for payment failure
         rzp.on('payment.failed', function(response) {
-            safelyCloseModal('paymentProcessingModal');
+            forceCloseModal('paymentProcessingModal');
             showMessage(`Payment failed: ${response.error.description}`, "danger");
             
             // Record failure for analytics
@@ -5913,7 +5930,7 @@ function purchaseAddonItem(featureType, quantity) {
     })
     .catch(error => {
         console.error("Addon order creation error:", error);
-        safelyCloseModal('paymentProcessingModal');
+        forceCloseModal('paymentProcessingModal');
         showMessage(`Error initiating payment: ${error.message}`, "danger");
     });
 }
@@ -5952,14 +5969,7 @@ function verifyAddonPayment(paymentResponse, orderId, featureType, quantity, eff
         return response.json();
     })
     .then(data => {
-        // Update progress bar to 100% if it exists
-        // const progressBar = document.getElementById('payment-progress-bar');
-        // if (progressBar) progressBar.style.width = '100%';
-        
-        // console.log("Payment verification successful:", data);
-        
-        // EXTREMELY AGGRESSIVE DIRECT APPROACH - Force removal of processing modal
-        // forceCloseModal('paymentProcessingModal');
+        console.log("Payment verification successful:", data);
         
         // Update local user profile immediately
         if (authState && authState.userProfile && authState.userProfile.usage && authState.userProfile.usage[featureType]) {
@@ -5973,40 +5983,55 @@ function verifyAddonPayment(paymentResponse, orderId, featureType, quantity, eff
         // Show success message
         showMessage(`Successfully purchased ${quantity} ${getFeatureDisplayName(featureType)} add-on${quantity > 1 ? 's' : ''}!`, 'success');
         
-        // Add a delay before showing the success modal
-        setTimeout(() => {
-            // Show success modal with full error handling
-            try {
-                // Create success modal content
-                const messageText = `You've successfully purchased ${quantity} ${getFeatureDisplayName(featureType)} add-on${quantity > 1 ? 's' : ''}. Your limit has been increased.`;
-                
-                // Update message in success modal
-                const messageEl = document.getElementById('paymentSuccessMessage');
-                if (messageEl) {
-                    messageEl.textContent = messageText;
-                }
-                
-                // Show the modal
-                const successModal = new bootstrap.Modal(document.getElementById('paymentSuccessModal'));
-                successModal.show();
-                
-                // Set new limits in success modal
-                setSuccessModalLimits(featureType, data.newLimit);
-            } catch (modalError) {
-                console.error("Error showing success modal:", modalError);
-                // We've already shown a success message as fallback
-            }
-        }, 500); // Increased to 500ms to ensure complete DOM cleanup
+        // IMPROVED: Show success modal only if processing modal is closed
+        showAddonPaymentSuccessModal(featureType, data.newLimit, quantity);
     })
     .catch(error => {
         console.error("Payment verification error:", error);
         
-        // Force close the processing modal
-        // forceCloseModal('paymentProcessingModal');
-        
         // Show error message
         showMessage(`Error verifying payment: ${error.message}`, "danger");
     });
+}
+
+// NEW FUNCTION: Dedicated function to show addon payment success modal
+function showAddonPaymentSuccessModal(featureType, newLimit, quantity) {
+    try {
+        // Ensure all other modals are closed
+        forceCloseModal('paymentProcessingModal');
+        forceCloseModal('addonPurchaseModal');
+        
+        // Update message in success modal
+        const messageText = `You've successfully purchased ${quantity} ${getFeatureDisplayName(featureType)} add-on${quantity > 1 ? 's' : ''}. Your limit has been increased.`;
+        const messageEl = document.getElementById('paymentSuccessMessage');
+        if (messageEl) {
+            messageEl.textContent = messageText;
+        }
+        
+        // Set new limits in success modal
+        setSuccessModalLimits(null, featureType, newLimit);
+        
+        // Give a slight delay to ensure DOM is ready
+        setTimeout(() => {
+            // Show the modal
+            const successModal = document.getElementById('paymentSuccessModal');
+            if (successModal) {
+                const bsSuccessModal = new bootstrap.Modal(successModal);
+                bsSuccessModal.show();
+                
+                // Add event listener to ensure proper cleanup on close
+                successModal.addEventListener('hidden.bs.modal', function() {
+                    document.body.classList.remove('modal-open');
+                    document.querySelectorAll('.modal-backdrop').forEach(el => el.remove());
+                }, { once: true });
+            } else {
+                console.error("Success modal element not found");
+            }
+        }, 400);
+    } catch (modalError) {
+        console.error("Error showing success modal:", modalError);
+        // We've already shown a success message as fallback
+    }
 }
 
 // Helper function to update usage display for a specific feature
@@ -6271,8 +6296,8 @@ function forceCloseModal(modalId) {
                 modalElement.style.overflow = "hidden";
                 modalElement.style.zIndex = "-9999";
                 
-                // Attempt to remove from DOM if possible
-                if (modalElement.parentNode && modalElement.id.includes('Processing')) {
+                // Attempt to remove from DOM if it's a dynamic modal
+                if (modalElement.parentNode && modalElement.classList.contains('dynamic-modal')) {
                     console.log(`[MODAL_DEBUG] Force approach: Completely removing modal from DOM`);
                     modalElement.parentNode.removeChild(modalElement);
                 }
@@ -6303,6 +6328,13 @@ function forceCloseModal(modalId) {
             modalElement.style.visibility = 'hidden';
             modalElement.style.opacity = '0';
         }
+        
+        // Remove any backdrops that might still exist
+        document.querySelectorAll('.modal-backdrop').forEach(el => el.remove());
+        
+        // Ensure body is fixed
+        document.body.classList.remove('modal-open');
+        document.body.style.overflow = 'auto';
     }
 }
 
@@ -6393,7 +6425,8 @@ function enhanceModalCloseHandlers() {
 }
 
 // Helper function to set limit values in success modal
-function setSuccessModalLimits(planName) {
+// IMPROVED: Modified setSuccessModalLimits function to handle both plan updates and addon updates
+function setSuccessModalLimits(planName, featureType = null, newLimit = null) {
     // If we're setting a plan name, we should reset all counters
     const isFullPlanUpgrade = !!planName;
     
@@ -6429,12 +6462,12 @@ function setSuccessModalLimits(planName) {
         }
     } 
     // For individual feature updates (add-ons), just update that specific feature
-    else {
+    else if (featureType && newLimit !== null) {
         if (limitElements[featureType]) {
             limitElements[featureType].textContent = newLimit;
         }
         
-        // Set current values for other features
+        // Set current values for other features based on user profile
         for (const [key, element] of Object.entries(limitElements)) {
             if (key !== featureType && element) {
                 const currentLimit = authState?.userProfile?.usage?.[key]?.limit || 0;
@@ -7155,7 +7188,6 @@ function patchAddonPurchaseModal() {
     };
 }
 
-// Initialize all modal fixes 
 function initModalFixes() {
     console.log("[INIT_DEBUG] Starting modal and UI fixes initialization");
     
@@ -7179,7 +7211,7 @@ function initModalFixes() {
     
     // Add observer to fix SVG attributes as they're added
     console.log("[INIT_DEBUG] Setting up MutationObserver for dynamic SVG fixes");
-    const observer = new MutationObserver(mutations => {
+    const svgObserver = new MutationObserver(mutations => {
         let svgNodesAdded = false;
         
         mutations.forEach(mutation => {
@@ -7203,10 +7235,124 @@ function initModalFixes() {
         }
     });
     
-    observer.observe(document.body, { childList: true, subtree: true });
+    svgObserver.observe(document.body, { childList: true, subtree: true });
     console.log("[INIT_DEBUG] MutationObserver started for SVG monitoring");
     
+    // NEW: Add a MutationObserver to watch for modal-related DOM changes
+    console.log("[INIT_DEBUG] Setting up MutationObserver for modal monitoring");
+    const modalObserver = new MutationObserver(mutations => {
+        // Check if any mutations affect modal elements
+        let modalRelatedChanges = false;
+        
+        mutations.forEach(mutation => {
+            if (mutation.addedNodes.length) {
+                // Check for modal-related elements being added
+                mutation.addedNodes.forEach(node => {
+                    if (node.nodeType === 1 && 
+                        (node.classList?.contains('modal') || 
+                         node.classList?.contains('modal-backdrop'))) {
+                        modalRelatedChanges = true;
+                    }
+                });
+            }
+        });
+        
+        // If modal-related changes detected, check for problematic states
+        if (modalRelatedChanges) {
+            // Check for multiple visible modals
+            const visibleModals = document.querySelectorAll('.modal.show');
+            if (visibleModals.length > 1) {
+                console.log(`[MODAL_DEBUG] Detected ${visibleModals.length} visible modals! Fixing...`);
+                
+                // Keep only the most recently added modal visible
+                const modalToKeep = visibleModals[visibleModals.length - 1];
+                
+                visibleModals.forEach(modal => {
+                    if (modal !== modalToKeep) {
+                        console.log(`[MODAL_DEBUG] Force closing extra modal: ${modal.id}`);
+                        forceCloseModal(modal.id);
+                    }
+                });
+            }
+            
+            // Check for orphaned backdrops without visible modals
+            const hasVisibleModals = document.querySelectorAll('.modal.show').length > 0;
+            const hasBackdrops = document.querySelectorAll('.modal-backdrop').length > 0;
+            
+            if (!hasVisibleModals && hasBackdrops) {
+                console.log(`[MODAL_DEBUG] Detected orphaned backdrops without visible modals! Cleaning up...`);
+                document.querySelectorAll('.modal-backdrop').forEach(el => el.remove());
+                document.body.classList.remove('modal-open');
+                document.body.style.removeProperty('padding-right');
+                document.body.style.removeProperty('overflow');
+            }
+            
+            // Check if body has modal-open but no visible modals
+            if (!hasVisibleModals && document.body.classList.contains('modal-open')) {
+                console.log(`[MODAL_DEBUG] Body has modal-open class but no visible modals! Fixing...`);
+                document.body.classList.remove('modal-open');
+                document.body.style.removeProperty('padding-right');
+                document.body.style.removeProperty('overflow');
+            }
+            
+            // Check for addon purchase processing modal and success modal showing simultaneously
+            const processingModal = document.getElementById('paymentProcessingModal');
+            const successModal = document.getElementById('paymentSuccessModal');
+            if (processingModal && successModal && 
+                processingModal.classList.contains('show') && 
+                successModal.classList.contains('show')) {
+                console.log(`[MODAL_DEBUG] Both processing and success modals showing! Fixing...`);
+                forceCloseModal('paymentProcessingModal');
+            }
+        }
+    });
+    
+    // Start observing with the modal observer
+    modalObserver.observe(document.body, { childList: true, subtree: true });
+    console.log("[INIT_DEBUG] MutationObserver started for modal monitoring");
+    
+    // Add special fix for addon purchase modal
+    fixAddonPurchaseModalSpecialCase();
+    
     console.log("[INIT_DEBUG] IRIS Modal Fixes initialized successfully!");
+}
+
+// Add this helper function for special case handling
+function fixAddonPurchaseModalSpecialCase() {
+    // Add a direct listener to check for the specific problematic state
+    setInterval(() => {
+        const processingModal = document.getElementById('paymentProcessingModal');
+        const successModal = document.getElementById('paymentSuccessModal');
+        
+        // If both modals are in the DOM and at least one is visible
+        if (processingModal && successModal && 
+            (processingModal.classList.contains('show') || 
+             successModal.classList.contains('show'))) {
+            
+            // Check if they're both showing (which is incorrect)
+            if (processingModal.classList.contains('show') && 
+                successModal.classList.contains('show')) {
+                console.log("[MODAL_FIX] Emergency fix: Both modals showing at once!");
+                
+                // Force close the processing modal
+                forceCloseModal('paymentProcessingModal');
+                
+                // Make sure success modal is properly visible
+                successModal.classList.add('show');
+                successModal.style.display = 'block';
+            }
+            
+            // Also check if there are multiple backdrops
+            const backdrops = document.querySelectorAll('.modal-backdrop');
+            if (backdrops.length > 1) {
+                console.log(`[MODAL_FIX] Found ${backdrops.length} backdrops, cleaning up extras`);
+                // Keep only one backdrop
+                for (let i = 1; i < backdrops.length; i++) {
+                    backdrops[i].remove();
+                }
+            }
+        }
+    }, 500); // Check every 500ms
 }
 
 
