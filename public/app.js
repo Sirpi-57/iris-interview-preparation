@@ -7095,105 +7095,118 @@ function initModalFixes() {
 }
 
 
+// Complete function to initialize job listings tab
 function initPublicJobListings() {
     console.log("Initializing public job listings");
     
-    // Add a visible loading indicator for the entire tab
-    const jobListingsTab = document.getElementById('job-listings-tab');
-    if (jobListingsTab) {
-        // Only add loading indicator if not already present
-        if (!jobListingsTab.querySelector('.full-page-loader')) {
-            const loadingIndicator = document.createElement('div');
-            loadingIndicator.className = 'full-page-loader';
-            loadingIndicator.innerHTML = `
-                <div class="d-flex justify-content-center align-items-center" style="min-height: 300px;">
-                    <div class="text-center">
-                        <div class="spinner-border text-primary" role="status" style="width: 3rem; height: 3rem;">
-                            <span class="visually-hidden">Loading...</span>
-                        </div>
-                        <p class="mt-3">Loading job listings...</p>
-                    </div>
-                </div>
-            `;
-            jobListingsTab.appendChild(loadingIndicator);
-        }
-    }
-    
-    // Elements 
+    // Get all necessary elements
     const jobListingsGrid = document.getElementById('publicJobListingsGrid');
-    const featuredJobsCarousel = document.getElementById('featuredJobsCarousel');
     const searchInput = document.getElementById('publicJobSearchInput');
     const categoryFilter = document.getElementById('publicJobCategoryFilter');
     const techFilter = document.getElementById('publicJobTechFilter');
     const resetFiltersBtn = document.getElementById('publicResetJobFilters');
     
-    // Add event listeners for filtering before loading data
-    if (searchInput) {
-        // Remove existing listeners first to prevent duplicates
-        const newSearchInput = searchInput.cloneNode(true);
-        if (searchInput.parentNode) {
-            searchInput.parentNode.replaceChild(newSearchInput, searchInput);
-        }
-        newSearchInput.addEventListener('input', function() {
-            if (typeof filterPublicJobListings === 'function') {
-                filterPublicJobListings();
-            } else if (typeof filterJobListings === 'function') {
-                filterJobListings();
-            }
-        });
+    // Check if we're on the job listings page
+    if (!jobListingsGrid) {
+        console.warn("Job listings grid not found, cannot initialize");
+        return false;
     }
     
-    if (categoryFilter) {
-        const newCategoryFilter = categoryFilter.cloneNode(true);
-        if (categoryFilter.parentNode) {
-            categoryFilter.parentNode.replaceChild(newCategoryFilter, categoryFilter);
-        }
-        newCategoryFilter.addEventListener('change', function() {
-            if (typeof filterPublicJobListings === 'function') {
-                filterPublicJobListings();
-            } else if (typeof filterJobListings === 'function') {
-                filterJobListings();
+    // Setup filter event listeners
+    const setupFilterListeners = () => {
+        // Search input with debounce
+        if (searchInput) {
+            // Remove existing listeners by cloning
+            const newSearchInput = searchInput.cloneNode(true);
+            if (searchInput.parentNode) {
+                searchInput.parentNode.replaceChild(newSearchInput, searchInput);
             }
-        });
-    }
-    
-    if (techFilter) {
-        const newTechFilter = techFilter.cloneNode(true);
-        if (techFilter.parentNode) {
-            techFilter.parentNode.replaceChild(newTechFilter, techFilter);
+            
+            // Setup debounced search input handler
+            let searchTimeout;
+            newSearchInput.addEventListener('input', function() {
+                clearTimeout(searchTimeout);
+                searchTimeout = setTimeout(() => {
+                    console.log("Search input changed to:", this.value);
+                    if (typeof filterPublicJobListings === 'function') {
+                        filterPublicJobListings();
+                    } else {
+                        console.warn("filterPublicJobListings function not found");
+                    }
+                }, 300); // 300ms debounce
+            });
         }
-        newTechFilter.addEventListener('change', function() {
-            if (typeof filterPublicJobListings === 'function') {
-                filterPublicJobListings();
-            } else if (typeof filterJobListings === 'function') {
-                filterJobListings();
+        
+        // Category filter
+        if (categoryFilter) {
+            const newCategoryFilter = categoryFilter.cloneNode(true);
+            if (categoryFilter.parentNode) {
+                categoryFilter.parentNode.replaceChild(newCategoryFilter, categoryFilter);
             }
-        });
-    }
-    
-    if (resetFiltersBtn) {
-        const newResetBtn = resetFiltersBtn.cloneNode(true);
-        if (resetFiltersBtn.parentNode) {
-            resetFiltersBtn.parentNode.replaceChild(newResetBtn, resetFiltersBtn);
+            
+            newCategoryFilter.addEventListener('change', function() {
+                console.log("Category filter changed to:", this.value);
+                if (typeof filterPublicJobListings === 'function') {
+                    filterPublicJobListings();
+                } else {
+                    console.warn("filterPublicJobListings function not found");
+                }
+            });
         }
-        newResetBtn.addEventListener('click', function() {
-            if (typeof resetPublicFilters === 'function') {
-                resetPublicFilters();
-            } else if (typeof resetFilters === 'function') {
-                resetFilters();
+        
+        // Tech stack filter
+        if (techFilter) {
+            const newTechFilter = techFilter.cloneNode(true);
+            if (techFilter.parentNode) {
+                techFilter.parentNode.replaceChild(newTechFilter, techFilter);
             }
-        });
-    }
+            
+            newTechFilter.addEventListener('change', function() {
+                console.log("Tech filter changed to:", this.value);
+                if (typeof filterPublicJobListings === 'function') {
+                    filterPublicJobListings();
+                } else {
+                    console.warn("filterPublicJobListings function not found");
+                }
+            });
+        }
+        
+        // Reset filters button
+        if (resetFiltersBtn) {
+            const newResetBtn = resetFiltersBtn.cloneNode(true);
+            if (resetFiltersBtn.parentNode) {
+                resetFiltersBtn.parentNode.replaceChild(newResetBtn, resetFiltersBtn);
+            }
+            
+            newResetBtn.addEventListener('click', function() {
+                console.log("Reset filters button clicked");
+                if (typeof resetPublicFilters === 'function') {
+                    resetPublicFilters();
+                } else {
+                    console.warn("resetPublicFilters function not found");
+                    // Fallback reset implementation
+                    if (searchInput) searchInput.value = '';
+                    if (categoryFilter) categoryFilter.value = '';
+                    if (techFilter) techFilter.value = '';
+                    
+                    // Reload all jobs
+                    loadPublicJobListingsOptimized();
+                }
+            });
+        }
+    };
     
-    // Initialize - load the job listings
-    // Use a small delay to ensure the UI is ready
-    setTimeout(() => {
-        loadPublicJobListingsOptimized();
-    }, 100);
+    // Call setupFilterListeners to initialize event handlers
+    setupFilterListeners();
+    
+    // Load job listings with improved error handling
+    loadPublicJobListingsOptimized();
+    
+    return true;
 }
 
 function loadPublicJobListingsOptimized() {
-    console.log("Loading public job listings (optimized - without featured carousel)");
+    console.log("Loading public job listings (optimized)");
     
     if (!firebase.firestore) {
         console.error("Firestore not available");
@@ -7207,9 +7220,6 @@ function loadPublicJobListingsOptimized() {
         console.warn("Job listings grid not found, cannot load job listings");
         return;
     }
-    
-    // Remove references to the carousel
-    const featuredJobsCarousel = null; // Don't use the carousel anymore
     
     // Show loading state for grid
     jobListingsGrid.innerHTML = `
@@ -7229,13 +7239,6 @@ function loadPublicJobListingsOptimized() {
         .get()
         .then(snapshot => {
             console.log(`Received ${snapshot.size} job listings from Firestore`);
-            
-            // Remove the full page loading indicator if it exists
-            const jobListingsTab = document.getElementById('job-listings-tab');
-            const fullPageLoader = jobListingsTab?.querySelector('.full-page-loader');
-            if (fullPageLoader) {
-                fullPageLoader.remove();
-            }
             
             if (snapshot.empty) {
                 jobListingsGrid.innerHTML = `
@@ -7265,19 +7268,13 @@ function loadPublicJobListingsOptimized() {
             try {
                 // Populate filters
                 const filtersStartTime = performance.now();
-                if (typeof populateFilters === 'function') {
-                    populateFilters(jobsData);
-                } else if (typeof populateFilterOptions === 'function') {
-                    populateFilterOptions();
-                }
+                populatePublicFilterOptions(jobsData);
                 console.log(`Populated filters in ${(performance.now() - filtersStartTime).toFixed(2)}ms`);
                 
                 // Display jobs with more efficient rendering
                 const displayStartTime = performance.now();
                 displayJobListingsEfficient(jobsData);
                 console.log(`Displayed jobs in ${(performance.now() - displayStartTime).toFixed(2)}ms`);
-                
-                // We no longer initialize the carousel
             } catch (displayError) {
                 console.error("Error displaying job listings:", displayError);
                 jobListingsGrid.innerHTML = `
@@ -7299,13 +7296,6 @@ function loadPublicJobListingsOptimized() {
         .catch(error => {
             console.error("Error loading job listings:", error);
             
-            // Remove the full page loading indicator if it exists
-            const jobListingsTab = document.getElementById('job-listings-tab');
-            const fullPageLoader = jobListingsTab?.querySelector('.full-page-loader');
-            if (fullPageLoader) {
-                fullPageLoader.remove();
-            }
-            
             jobListingsGrid.innerHTML = `
                 <div class="col-12">
                     <div class="alert alert-danger">
@@ -7314,6 +7304,51 @@ function loadPublicJobListingsOptimized() {
                 </div>
             `;
         });
+}
+
+function populatePublicFilterOptions(jobs) {
+    console.log("Populating public filter options");
+    
+    const categoryFilter = document.getElementById('publicJobCategoryFilter');
+    const techFilter = document.getElementById('publicJobTechFilter');
+    
+    if (!categoryFilter && !techFilter) {
+        console.warn("Filter dropdowns not found");
+        return;
+    }
+    
+    // Extract unique categories and tech stacks
+    const categories = new Set();
+    const techStacks = new Set();
+    
+    jobs.forEach(job => {
+        if (job.category) categories.add(job.category);
+        if (job.techStacks && Array.isArray(job.techStacks)) {
+            job.techStacks.forEach(tech => {
+                if (tech && tech.trim()) {
+                    techStacks.add(tech.trim());
+                }
+            });
+        }
+    });
+    
+    console.log(`Found ${categories.size} unique categories and ${techStacks.size} unique tech stacks`);
+    
+    // Populate category filter
+    if (categoryFilter) {
+        categoryFilter.innerHTML = '<option value="">All Categories</option>';
+        Array.from(categories).sort().forEach(category => {
+            categoryFilter.innerHTML += `<option value="${category}">${category}</option>`;
+        });
+    }
+    
+    // Populate tech stack filter
+    if (techFilter) {
+        techFilter.innerHTML = '<option value="">All Tech Stacks</option>';
+        Array.from(techStacks).sort().forEach(tech => {
+            techFilter.innerHTML += `<option value="${tech}">${tech}</option>`;
+        });
+    }
 }
 
 // More efficient display function that uses document fragments for better performance
@@ -7328,12 +7363,26 @@ function displayJobListingsEfficient(jobs) {
     // Clear the grid
     jobListingsGrid.innerHTML = '';
     
+    // Show message if no jobs found
     if (!jobs || jobs.length === 0) {
         jobListingsGrid.innerHTML = `
             <div class="col-12 text-center py-5">
                 <p class="text-muted">No job listings found matching your filters.</p>
+                <button class="btn btn-outline-primary mt-3" id="clearFiltersBtn">
+                    <i class="fas fa-undo me-2"></i>Clear Filters
+                </button>
             </div>
         `;
+        
+        // Add event listener to the clear filters button
+        const clearFiltersBtn = document.getElementById('clearFiltersBtn');
+        if (clearFiltersBtn) {
+            clearFiltersBtn.addEventListener('click', function() {
+                const resetBtn = document.getElementById('publicResetJobFilters');
+                if (resetBtn) resetBtn.click();
+            });
+        }
+        
         return;
     }
     
@@ -7342,14 +7391,127 @@ function displayJobListingsEfficient(jobs) {
     
     // Create grid items
     jobs.forEach(job => {
+        const jobId = job.id || 'unknown';
         const gridCol = document.createElement('div');
         gridCol.className = 'col';
-        gridCol.innerHTML = createJobCardHTML(job, false);
+        
+        // Format dates
+        let postedDate = 'N/A';
+        if (job.postedDate) {
+            try {
+                if (typeof job.postedDate.toDate === 'function') {
+                    postedDate = job.postedDate.toDate().toLocaleDateString();
+                } else if (job.postedDate instanceof Date) {
+                    postedDate = job.postedDate.toLocaleDateString();
+                } else if (typeof job.postedDate === 'string') {
+                    postedDate = new Date(job.postedDate).toLocaleDateString();
+                }
+            } catch (e) {
+                console.warn(`Error formatting date for job ${jobId}:`, e);
+            }
+        }
+        
+        // Process logo URL with fallback
+        const logoUrl = job.companyLogoUrl || 'images/default-company-logo.png';
+        
+        // Process tech stacks (limit to 3 for display)
+        let techStacksHtml = '';
+        if (job.techStacks && job.techStacks.length > 0) {
+            // Get up to 3 tech stacks for display
+            const displayTechs = job.techStacks.slice(0, 3);
+            techStacksHtml = displayTechs.map(tech => 
+                `<span class="tech-badge">${tech}</span>`
+            ).join('');
+            
+            // Show +X more if there are more tech stacks
+            if (job.techStacks.length > 3) {
+                techStacksHtml += `<span class="tech-badge">+${job.techStacks.length - 3} more</span>`;
+            }
+        }
+        
+        // Create job card HTML
+        gridCol.innerHTML = `
+            <div class="card job-card h-100">
+                <span class="job-status-badge badge bg-success">Active</span>
+                <img src="${logoUrl}" class="card-img-top" alt="${job.companyName || 'Company'} logo" 
+                     onerror="this.src='images/default-company-logo.png';this.onerror='';">
+                <div class="card-body d-flex flex-column">
+                    <h5 class="card-title">${job.title || 'Job Title'}</h5>
+                    <h6 class="card-subtitle mb-2 text-muted">${job.companyName || 'Company'}</h6>
+                    <p class="card-text">
+                        <i class="fas fa-map-marker-alt me-2"></i>${job.location || 'Location'}<br>
+                        <span class="posted-date"><i class="far fa-calendar-alt me-1"></i>Posted: ${postedDate}</span>
+                    </p>
+                    <div class="tech-stack mb-3">
+                        ${techStacksHtml}
+                    </div>
+                    <div class="mt-auto d-flex">
+                        <button class="btn btn-outline-primary me-2 view-job-details-btn" data-job-id="${jobId}">
+                            <i class="fas fa-info-circle me-1"></i> Know More
+                        </button>
+                        <button class="btn btn-primary take-mock-interview-btn" data-job-id="${jobId}">
+                            <i class="fas fa-microphone-alt me-1"></i> Take Mock
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+        
         gridFragment.appendChild(gridCol);
     });
     
     // Append all grid items at once
     jobListingsGrid.appendChild(gridFragment);
+}
+
+function attachJobListingEventListeners() {
+    console.log("Attaching job listing event listeners");
+    
+    // Add event listeners to "Know More" buttons in job cards
+    document.querySelectorAll('.view-job-details-btn').forEach(button => {
+        // First remove any existing listeners by cloning and replacing the button
+        const newButton = button.cloneNode(true);
+        if (button.parentNode) {
+            button.parentNode.replaceChild(newButton, button);
+        }
+        
+        // Add fresh event listener
+        newButton.addEventListener('click', function() {
+            const jobId = this.getAttribute('data-job-id');
+            if (jobId) {
+                console.log(`Know More clicked for job ID: ${jobId}`);
+                if (typeof showJobDetails === 'function') {
+                    showJobDetails(jobId);
+                } else {
+                    console.error("showJobDetails function not defined");
+                    alert("Cannot display job details at this time.");
+                }
+            }
+        });
+    });
+    
+    // Add event listeners to "Take Mock" buttons in job cards
+    document.querySelectorAll('.take-mock-interview-btn').forEach(button => {
+        // First remove any existing listeners by cloning and replacing the button
+        const newButton = button.cloneNode(true);
+        if (button.parentNode) {
+            button.parentNode.replaceChild(newButton, button);
+        }
+        
+        // Add fresh event listener
+        newButton.addEventListener('click', function() {
+            const jobId = this.getAttribute('data-job-id');
+            if (jobId) {
+                console.log(`Take Mock Interview clicked for job ID: ${jobId}`);
+                if (typeof takeMockInterview === 'function') {
+                    takeMockInterview(jobId);
+                } else {
+                    console.error("takeMockInterview function not defined");
+                    alert("This feature is currently unavailable.");
+                }
+            }
+        });
+    });
 }
 
 // Load job listings in the public view
@@ -7676,7 +7838,7 @@ function createJobCardHTML(job, isCarousel) {
 function showJobDetails(jobId) {
     if (!jobId) {
         console.error("showJobDetails called with no jobId");
-        return;
+        return false;
     }
     console.log(`Showing details for job ID: ${jobId}`);
     
@@ -7689,7 +7851,7 @@ function showJobDetails(jobId) {
     if (!modal || !contentDiv) {
         console.error("Job details modal elements not found");
         alert("Cannot display job details. Please try again later.");
-        return;
+        return false;
     }
     
     // Show loading state
@@ -7707,26 +7869,44 @@ function showJobDetails(jobId) {
         takeMockBtn.setAttribute('data-job-id', jobId);
     }
     
-    // Initialize Bootstrap modal and show it
+    // Close any existing modals first to prevent stacking issues
+    document.querySelectorAll('.modal-backdrop').forEach(backdrop => {
+        backdrop.remove();
+    });
+    document.body.classList.remove('modal-open');
+    document.body.style.removeProperty('padding-right');
+    
+    // Initialize Bootstrap modal with better error handling
     try {
-        const modalInstance = new bootstrap.Modal(modal);
+        // Try using getInstance first to see if it's already initialized
+        let modalInstance = bootstrap.Modal.getInstance(modal);
+        
+        if (!modalInstance) {
+            // If not initialized, create a new instance
+            modalInstance = new bootstrap.Modal(modal, {
+                backdrop: true,
+                keyboard: true,
+                focus: true
+            });
+        }
+        
+        // Show the modal
         modalInstance.show();
     } catch (error) {
         console.error("Error showing modal:", error);
-        // Try an alternative approach if the first fails
-        if (typeof bootstrap !== 'undefined') {
-            try {
-                bootstrap.Modal.getInstance(modal)?.show();
-            } catch (err) {
-                console.error("Both modal show methods failed:", err);
-                // Last resort: vanilla JS
-                modal.style.display = 'block';
-                modal.classList.add('show');
-            }
-        }
+        
+        // Fallback to direct manipulation if Bootstrap fails
+        modal.style.display = 'block';
+        modal.classList.add('show');
+        document.body.classList.add('modal-open');
+        
+        // Create backdrop manually if needed
+        const backdrop = document.createElement('div');
+        backdrop.className = 'modal-backdrop fade show';
+        document.body.appendChild(backdrop);
     }
     
-    // Fetch job details
+    // Fetch job details from Firestore
     firebase.firestore().collection('jobPostings').doc(jobId).get()
         .then(doc => {
             if (!doc.exists) {
@@ -7737,7 +7917,37 @@ function showJobDetails(jobId) {
             const job = doc.data();
             job.id = doc.id;
             
-            // Format date
+            // Format dates safely
+            const formatDate = (timestamp) => {
+                if (!timestamp) return 'N/A';
+                
+                try {
+                    if (typeof timestamp.toDate === 'function') {
+                        return timestamp.toDate().toLocaleDateString(undefined, {
+                            year: 'numeric',
+                            month: 'short',
+                            day: 'numeric'
+                        });
+                    } else if (timestamp instanceof Date) {
+                        return timestamp.toLocaleDateString(undefined, {
+                            year: 'numeric',
+                            month: 'short',
+                            day: 'numeric'
+                        });
+                    } else if (typeof timestamp === 'string') {
+                        return new Date(timestamp).toLocaleDateString(undefined, {
+                            year: 'numeric',
+                            month: 'short',
+                            day: 'numeric'
+                        });
+                    }
+                    return 'N/A';
+                } catch (e) {
+                    console.warn("Error formatting date:", e);
+                    return 'N/A';
+                }
+            };
+            
             const postedDate = formatDate(job.postedDate);
             const expiryDate = formatDate(job.expiryDate);
             
@@ -7763,7 +7973,7 @@ function showJobDetails(jobId) {
                 `
                 : '';
             
-            // Custom fields HTML
+            // Generate custom fields HTML
             let customFieldsHtml = '';
             if (job.customFields && Object.keys(job.customFields).length > 0) {
                 customFieldsHtml = `
@@ -7781,74 +7991,145 @@ function showJobDetails(jobId) {
                 `;
             }
             
-            // Source link HTML
+            // Generate source link HTML
             const sourceLinkHtml = job.sourceLink
                 ? `
-                    <div class="source-link">
-                        <a href="${job.sourceLink}" target="_blank" class="btn btn-outline-secondary">
+                    <div class="source-link mt-3">
+                        <a href="${job.sourceLink}" target="_blank" rel="noopener noreferrer" class="btn btn-outline-secondary">
                             <i class="fas fa-external-link-alt me-2"></i>View Original Job Posting
                         </a>
                     </div>
                 `
                 : '';
             
+            // Category and Subcategory badge
+            const categoryBadge = job.category 
+                ? `<span class="badge bg-primary me-2">${job.category}</span>` 
+                : '';
+            
+            const subCategoryBadge = job.subCategory 
+                ? `<span class="badge bg-info">${job.subCategory}</span>` 
+                : '';
+            
             // Generate full job details HTML
             contentDiv.innerHTML = `
-                <div class="company-header">
-                    <img src="${job.companyLogoUrl || 'images/default-company-logo.png'}" class="company-logo" alt="${job.companyName || 'Company'} logo" onerror="this.src='images/default-company-logo.png';this.onerror='';">
+                <div class="company-header mb-4">
+                    <img src="${job.companyLogoUrl || 'images/default-company-logo.png'}" class="company-logo me-3" 
+                         alt="${job.companyName || 'Company'} logo" 
+                         onerror="this.src='images/default-company-logo.png';this.onerror='';">
                     <div>
                         <h4>${job.companyName || 'Company'}</h4>
-                        <p class="text-muted mb-0">${job.location || 'Location'}</p>
+                        <p class="text-muted mb-0">
+                            <i class="fas fa-map-marker-alt me-1"></i>${job.location || 'Location'}
+                        </p>
+                        <div class="mt-2">
+                            ${categoryBadge}
+                            ${subCategoryBadge}
+                        </div>
                     </div>
                 </div>
                 
-                <div class="job-meta">
-                    <div class="job-meta-item">
-                        <i class="fas fa-briefcase"></i>
-                        <span>${job.experienceLevel || 'Experience not specified'}</span>
-                    </div>
-                    <div class="job-meta-item">
-                        <i class="far fa-calendar-alt"></i>
-                        <span>Posted: ${postedDate}</span>
-                    </div>
-                    ${job.salaryRange ? `
-                        <div class="job-meta-item">
-                            <i class="fas fa-money-bill-wave"></i>
-                            <span>${job.salaryRange}</span>
+                <div class="job-meta mb-4">
+                    <div class="row">
+                        <div class="col-md-4 mb-2">
+                            <div class="job-meta-item">
+                                <i class="fas fa-briefcase me-2"></i>
+                                <span>${job.experienceLevel || 'Experience not specified'}</span>
+                            </div>
                         </div>
-                    ` : ''}
-                    ${job.relocation ? `
-                        <div class="job-meta-item">
-                            <i class="fas fa-plane-departure"></i>
-                            <span>Relocation Offered</span>
+                        <div class="col-md-4 mb-2">
+                            <div class="job-meta-item">
+                                <i class="far fa-calendar-alt me-2"></i>
+                                <span>Posted: ${postedDate}</span>
+                            </div>
                         </div>
-                    ` : ''}
+                        ${job.salaryRange ? `
+                            <div class="col-md-4 mb-2">
+                                <div class="job-meta-item">
+                                    <i class="fas fa-money-bill-wave me-2"></i>
+                                    <span>${job.salaryRange}</span>
+                                </div>
+                            </div>
+                        ` : ''}
+                        ${job.relocation ? `
+                            <div class="col-md-4 mb-2">
+                                <div class="job-meta-item">
+                                    <i class="fas fa-plane-departure me-2"></i>
+                                    <span>Relocation Offered</span>
+                                </div>
+                            </div>
+                        ` : ''}
+                        ${job.expiryDate ? `
+                            <div class="col-md-4 mb-2">
+                                <div class="job-meta-item">
+                                    <i class="fas fa-hourglass-end me-2"></i>
+                                    <span>Expires: ${expiryDate}</span>
+                                </div>
+                            </div>
+                        ` : ''}
+                    </div>
                 </div>
                 
                 <h5 class="section-title">Job Description</h5>
-                <div class="description-text">
+                <div class="description-text mb-4">
                     ${job.description || 'No description provided.'}
                 </div>
                 
                 <h5 class="section-title">Requirements</h5>
-                <div class="requirements-list">
+                <div class="requirements-list mb-4">
                     ${job.requirements || 'No specific requirements listed.'}
                 </div>
                 
                 <h5 class="section-title">Tech Stack</h5>
-                <div class="tech-stacks">
+                <div class="tech-stacks mb-4">
                     ${techStacksHtml}
                 </div>
                 
                 ${questionsHtml}
                 ${customFieldsHtml}
                 ${sourceLinkHtml}
+                
+                <div class="mt-4 pt-3 border-top text-center">
+                    <button class="btn btn-lg btn-primary" id="modalTakeMockBtn" data-job-id="${job.id}">
+                        <i class="fas fa-microphone-alt me-2"></i>Take Mock Interview for This Job
+                    </button>
+                </div>
             `;
+            
+            // Add event listener to the Take Mock button in the modal
+            const modalTakeMockBtn = document.getElementById('modalTakeMockBtn');
+            if (modalTakeMockBtn) {
+                modalTakeMockBtn.addEventListener('click', function() {
+                    const jobId = this.getAttribute('data-job-id');
+                    if (jobId) {
+                        // Close the modal
+                        try {
+                            const modalInstance = bootstrap.Modal.getInstance(modal);
+                            if (modalInstance) modalInstance.hide();
+                        } catch (e) {
+                            console.warn("Error closing modal:", e);
+                            // Fallback close method
+                            modal.style.display = 'none';
+                            modal.classList.remove('show');
+                            document.querySelector('.modal-backdrop')?.remove();
+                            document.body.classList.remove('modal-open');
+                            document.body.style.removeProperty('padding-right');
+                        }
+                        
+                        // Wait for modal to close then trigger the mock interview
+                        setTimeout(() => {
+                            takeMockInterview(jobId);
+                        }, 300);
+                    }
+                });
+            }
         })
         .catch(error => {
             console.error("Error fetching job details:", error);
-            contentDiv.innerHTML = `<div class="alert alert-danger">Error loading job details. Please try again later.</div>`;
+            contentDiv.innerHTML = `<div class="alert alert-danger">Error loading job details: ${error.message}</div>`;
         });
+    
+    return true;
 }
 
 // Helper function to format date from Firestore timestamp
@@ -7891,7 +8172,7 @@ function takeMockInterview(jobId) {
     if (!jobId) {
         console.error("takeMockInterview called with no jobId");
         showMessage("Error: Job ID not found", "danger");
-        return;
+        return false;
     }
 
     console.log(`Taking mock interview for job ID: ${jobId}`);
@@ -7899,32 +8180,25 @@ function takeMockInterview(jobId) {
     // First check if user is logged in
     const user = firebase.auth().currentUser;
     if (!user) {
-        console.log("User not logged in, storing job ID and showing sign up modal");
+        console.log("User not logged in, storing job ID and showing sign-up modal");
         
-        // Close job details modal if open (with improved error handling)
+        // Close any open modals first with improved cleanup
         try {
+            // Close any job details modal
             const jobModal = document.getElementById('jobDetailsModal');
             if (jobModal) {
                 const modalInstance = bootstrap.Modal.getInstance(jobModal);
-                if (modalInstance) {
-                    modalInstance.hide();
-                    // Remove modal backdrop forcefully
-                    setTimeout(() => {
-                        document.querySelectorAll('.modal-backdrop').forEach(el => el.remove());
-                        document.body.classList.remove('modal-open');
-                        document.body.style.removeProperty('padding-right');
-                        document.body.style.overflow = '';
-                    }, 300);
-                }
+                if (modalInstance) modalInstance.hide();
             }
         } catch (modalError) {
             console.warn("Error closing job details modal:", modalError);
-            // Force cleanup of modals
-            document.querySelectorAll('.modal-backdrop').forEach(el => el.remove());
-            document.body.classList.remove('modal-open');
-            document.body.style.removeProperty('padding-right');
-            document.body.style.overflow = '';
         }
+        
+        // Force cleanup of all modals
+        document.querySelectorAll('.modal-backdrop').forEach(el => el.remove());
+        document.body.classList.remove('modal-open');
+        document.body.style.removeProperty('padding-right');
+        document.body.style.overflow = '';
         
         // Store job ID in localStorage for retrieval after login
         localStorage.setItem('pendingMockInterviewJobId', jobId);
@@ -7933,15 +8207,27 @@ function takeMockInterview(jobId) {
         if (typeof irisAuth !== 'undefined' && typeof irisAuth.showSignUpModal === 'function') {
             // Show sign up modal instead of sign in for better conversion
             irisAuth.showSignUpModal();
+            
             // Add a message to the sign-up modal
             setTimeout(() => {
                 try {
-                    const authForm = document.getElementById('signup-form');
+                    // Find the active auth form
+                    const authForm = document.querySelector('.auth-form.active');
                     if (authForm) {
-                        const messageDiv = document.createElement('div');
-                        messageDiv.className = 'alert alert-info mb-3';
-                        messageDiv.innerHTML = `<i class="fas fa-info-circle me-2"></i>Sign up to practice mock interviews for this job.`;
-                        authForm.insertBefore(messageDiv, authForm.firstChild);
+                        // Check if we've already added a message to avoid duplicates
+                        if (!authForm.querySelector('.job-auth-message')) {
+                            const messageDiv = document.createElement('div');
+                            messageDiv.className = 'alert alert-info mb-3 job-auth-message';
+                            messageDiv.innerHTML = `
+                                <i class="fas fa-info-circle me-2"></i>
+                                Sign up to practice mock interviews for this job position.
+                                <div class="mt-2 small">
+                                    After signing up, you'll be able to prepare for the interview with AI-generated questions based on this job description.
+                                </div>
+                            `;
+                            // Insert at the beginning of the form
+                            authForm.insertBefore(messageDiv, authForm.firstChild);
+                        }
                     }
                 } catch (authFormError) {
                     console.warn("Error adding message to auth form:", authFormError);
@@ -7951,44 +8237,59 @@ function takeMockInterview(jobId) {
             console.warn("irisAuth.showSignUpModal not available");
             showMessage("Please sign in to take mock interviews", "info");
         }
-        return;
+        return false;
     }
     
-    // Close job details modal if open (with improved error handling)
+    // Check if the user can access this feature (has enough credits/right plan)
+    if (typeof checkFeatureAccess === 'function' && !checkFeatureAccess('mockInterviews')) {
+        console.log("User doesn't have access to mock interviews feature");
+        return false;
+    }
+    
+    // Close any open modals first (with error handling)
     try {
+        // Close any job details modal
         const jobModal = document.getElementById('jobDetailsModal');
         if (jobModal) {
             const modalInstance = bootstrap.Modal.getInstance(jobModal);
-            if (modalInstance) {
-                modalInstance.hide();
-                // Remove modal backdrop forcefully
-                setTimeout(() => {
-                    document.querySelectorAll('.modal-backdrop').forEach(el => el.remove());
-                    document.body.classList.remove('modal-open');
-                    document.body.style.removeProperty('padding-right');
-                    document.body.style.overflow = '';
-                }, 300);
-            }
+            if (modalInstance) modalInstance.hide();
         }
     } catch (modalError) {
         console.warn("Error closing job details modal:", modalError);
-        // Force cleanup of modals
-        document.querySelectorAll('.modal-backdrop').forEach(el => el.remove());
-        document.body.classList.remove('modal-open');
-        document.body.style.removeProperty('padding-right');
-        document.body.style.overflow = '';
     }
+    
+    // Force cleanup of all modals
+    document.querySelectorAll('.modal-backdrop').forEach(el => el.remove());
+    document.body.classList.remove('modal-open');
+    document.body.style.removeProperty('padding-right');
+    document.body.style.overflow = '';
     
     // Show loading message
     if (typeof showMessage === 'function') {
-        showMessage("Loading job details for interview...", "info");
+        showMessage("Loading job details for interview preparation...", "info");
     }
     
-    console.log("Fetching job details from Firestore");
+    // Show loading overlay
+    const loadingOverlay = document.createElement('div');
+    loadingOverlay.className = 'loading-overlay';
+    loadingOverlay.innerHTML = `
+        <div class="loading-spinner">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <p>Loading job details...</p>
+        </div>
+    `;
+    document.body.appendChild(loadingOverlay);
+    
+    console.log("Fetching job details from Firestore for job ID:", jobId);
     
     // Fetch job details to get the job description
     firebase.firestore().collection('jobPostings').doc(jobId).get()
         .then(doc => {
+            // Remove loading overlay
+            document.body.removeChild(loadingOverlay);
+            
             if (!doc.exists) {
                 console.error("Job document not found:", jobId);
                 if (typeof showMessage === 'function') {
@@ -7999,6 +8300,13 @@ function takeMockInterview(jobId) {
             
             const job = doc.data();
             console.log("Retrieved job data for interview:", job);
+            
+            // Record this action in user's history
+            recordUserAction('mock_interview_start', {
+                jobId: jobId,
+                jobTitle: job.title,
+                companyName: job.companyName
+            });
             
             // Navigate to the resume upload section
             if (typeof navigateTo === 'function') {
@@ -8012,16 +8320,30 @@ function takeMockInterview(jobId) {
             const jobDescTextarea = document.getElementById('jobDescription');
             if (jobDescTextarea) {
                 // Format job details into a comprehensive job description
-                const jobDesc = formatJobToDescription(job);
+                const jobDesc = formatJobDescription(job);
                 jobDescTextarea.value = jobDesc;
+                
+                // Highlight textarea to show it was updated
+                jobDescTextarea.classList.add('highlight-update');
+                setTimeout(() => {
+                    jobDescTextarea.classList.remove('highlight-update');
+                }, 1500);
                 
                 // Focus on file upload since JD is already filled
                 const resumeFileInput = document.getElementById('resumeFile');
                 if (resumeFileInput) {
                     setTimeout(() => {
                         resumeFileInput.focus();
+                        
+                        // Show helpful tooltip
                         if (typeof showMessage === 'function') {
-                            showMessage("Job description loaded. Please upload your resume to continue.", "success");
+                            showMessage("Job description loaded! Upload your resume to start preparing for this interview.", "success");
+                        }
+                        
+                        // Scroll to the form
+                        const uploadForm = document.getElementById('resumeUploadForm');
+                        if (uploadForm) {
+                            uploadForm.scrollIntoView({ behavior: 'smooth', block: 'start' });
                         }
                     }, 300);
                 }
@@ -8033,32 +8355,64 @@ function takeMockInterview(jobId) {
             }
         })
         .catch(error => {
+            // Remove loading overlay
+            document.body.removeChild(loadingOverlay);
+            
             console.error("Error fetching job details for interview:", error);
             if (typeof showMessage === 'function') {
                 showMessage("Error loading job details. Please try again later.", "danger");
             }
         });
+        
+    return true;
 }
 
 
 
-function formatJobToDescription(job) {
+function formatJobDescription(job) {
     try {
         // Create a structured job description from the job fields
         let jobDesc = `${job.title || 'Job'} at ${job.companyName || 'Company'}\n\n`;
         
+        // Add metadata
         jobDesc += `Location: ${job.location || 'Not specified'}\n`;
-        jobDesc += `Experience: ${job.experienceLevel || 'Not specified'}\n`;
-        if (job.salaryRange) jobDesc += `Salary: ${job.salaryRange}\n`;
-        if (job.relocation) jobDesc += `Relocation: Offered\n`;
-        if (job.category && job.subCategory) jobDesc += `Category: ${job.category} / ${job.subCategory}\n`;
+        jobDesc += `Experience Level: ${job.experienceLevel || 'Not specified'}\n`;
         
+        // Add category information
+        if (job.category) {
+            jobDesc += `Category: ${job.category}`;
+            if (job.subCategory) {
+                jobDesc += ` / ${job.subCategory}`;
+            }
+            jobDesc += '\n';
+        }
+        
+        // Add salary if available
+        if (job.salaryRange) {
+            jobDesc += `Salary Range: ${job.salaryRange}\n`;
+        }
+        
+        // Add relocation info if offered
+        if (job.relocation) {
+            jobDesc += `Relocation: Offered\n`;
+        }
+        
+        // Add main sections with proper formatting
         jobDesc += `\nJOB DESCRIPTION:\n${job.description || 'No description provided.'}\n`;
         
         jobDesc += `\nREQUIREMENTS:\n${job.requirements || 'No specific requirements listed.'}\n`;
         
+        // Add tech stack information
         if (job.techStacks && job.techStacks.length > 0) {
-            jobDesc += `\nTECH STACK: ${job.techStacks.join(', ')}\n`;
+            jobDesc += `\nTECH STACK:\n${job.techStacks.join(', ')}\n`;
+        }
+        
+        // Add interview questions if available
+        if (job.previousInterviewQuestions && job.previousInterviewQuestions.length > 0) {
+            jobDesc += `\nCOMMON INTERVIEW QUESTIONS FOR THIS ROLE:\n`;
+            job.previousInterviewQuestions.forEach((question, index) => {
+                jobDesc += `${index + 1}. ${question}\n`;
+            });
         }
         
         // Add custom fields if any
@@ -8074,6 +8428,34 @@ function formatJobToDescription(job) {
         console.error("Error formatting job description:", error);
         // Return a simple fallback description if there's an error
         return `${job?.title || 'Job Position'} at ${job?.companyName || 'Company'}\n\n${job?.description || 'Please check job details.'}\n\n${job?.requirements || ''}`;
+    }
+}
+
+// Helper function to record user actions for analytics
+function recordUserAction(action, data = {}) {
+    // Only proceed if user is logged in
+    const user = firebase.auth().currentUser;
+    if (!user) return;
+    
+    try {
+        // Create activity record
+        const activityData = {
+            userId: user.uid,
+            action: action,
+            timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+            data: data
+        };
+        
+        // Add to user_activity collection
+        firebase.firestore().collection('user_activity').add(activityData)
+            .then(() => {
+                console.log(`Recorded user action: ${action}`);
+            })
+            .catch(error => {
+                console.error(`Error recording user action: ${action}`, error);
+            });
+    } catch (e) {
+        console.error("Error recording user action:", e);
     }
 }
 
@@ -8201,13 +8583,17 @@ function checkPendingMockInterview() {
 }
 
 function filterPublicJobListings() {
+    console.log("Filtering job listings");
+    
+    // Get filter elements
     const searchInput = document.getElementById('publicJobSearchInput');
     const categoryFilter = document.getElementById('publicJobCategoryFilter');
     const techFilter = document.getElementById('publicJobTechFilter');
     
+    // Check if jobs are loaded
     if (!window.allJobs || !Array.isArray(window.allJobs)) {
-        console.error("Job listings not loaded yet");
-        return;
+        console.error("Job listings not loaded yet, cannot filter");
+        return false;
     }
     
     // Get filter values
@@ -8215,28 +8601,43 @@ function filterPublicJobListings() {
     const categoryValue = categoryFilter?.value || '';
     const techValue = techFilter?.value || '';
     
-    // Filter jobs
+    console.log(`Filtering with: Search="${searchTerm}", Category="${categoryValue}", Tech="${techValue}"`);
+    
+    // Filter jobs with improved matching logic
     const filteredJobs = window.allJobs.filter(job => {
-        // Search term filter
+        // Search term filter - search across multiple fields
         const searchMatch = !searchTerm || 
             (job.title && job.title.toLowerCase().includes(searchTerm)) ||
             (job.companyName && job.companyName.toLowerCase().includes(searchTerm)) ||
             (job.location && job.location.toLowerCase().includes(searchTerm)) ||
-            (job.description && job.description.toLowerCase().includes(searchTerm));
+            (job.description && job.description.toLowerCase().includes(searchTerm)) ||
+            (job.category && job.category.toLowerCase().includes(searchTerm)) ||
+            (job.subCategory && job.subCategory.toLowerCase().includes(searchTerm)) ||
+            (job.experienceLevel && job.experienceLevel.toLowerCase().includes(searchTerm));
         
-        // Category filter
+        // Category filter - direct match
         const categoryMatch = !categoryValue || (job.category === categoryValue);
         
-        // Tech stack filter
+        // Tech stack filter - case-insensitive matching
         const techMatch = !techValue || 
             (job.techStacks && Array.isArray(job.techStacks) && 
              job.techStacks.some(tech => tech.toLowerCase() === techValue.toLowerCase()));
         
+        // All filters must match
         return searchMatch && categoryMatch && techMatch;
     });
     
+    console.log(`Filtered jobs: ${filteredJobs.length} out of ${window.allJobs.length}`);
+    
     // Display filtered jobs
-    displayJobListingsEfficient(filteredJobs);
+    if (typeof displayJobListingsEfficient === 'function') {
+        displayJobListingsEfficient(filteredJobs);
+    } else if (typeof displayJobListings === 'function') {
+        displayJobListings(filteredJobs);
+    } else {
+        console.error("No job display function found");
+        return false;
+    }
     
     // Reattach event listeners to the newly created job cards
     setTimeout(() => {
@@ -8244,32 +8645,53 @@ function filterPublicJobListings() {
             attachJobListingEventListeners();
         }
     }, 100);
+    
+    return true;
 }
 
 function resetPublicFilters() {
+    console.log("Resetting all job filters");
+    
+    // Get filter elements
     const searchInput = document.getElementById('publicJobSearchInput');
     const categoryFilter = document.getElementById('publicJobCategoryFilter');
     const techFilter = document.getElementById('publicJobTechFilter');
     
+    // Reset values
     if (searchInput) searchInput.value = '';
-    if (categoryFilter) categoryFilter.value = '';
+    if (categoryFilter) categoryValue = '';
     if (techFilter) techFilter.value = '';
     
-    // Display all jobs
-    if (window.allJobs && Array.isArray(window.allJobs)) {
-        displayJobListingsEfficient(window.allJobs);
-        
-        // Reattach event listeners
-        setTimeout(() => {
-            if (typeof attachJobListingEventListeners === 'function') {
-                attachJobListingEventListeners();
-            }
-        }, 100);
-    } else {
-        // If allJobs is not available, reload from Firebase
-        loadPublicJobListingsOptimized();
+    // Check if jobs are loaded
+    if (!window.allJobs || !Array.isArray(window.allJobs)) {
+        console.warn("Job listings not loaded yet, reloading");
+        if (typeof loadPublicJobListingsOptimized === 'function') {
+            loadPublicJobListingsOptimized();
+        } else if (typeof loadPublicJobListings === 'function') {
+            loadPublicJobListings();
+        }
+        return false;
     }
-}                                                   
+    
+    // Display all jobs
+    if (typeof displayJobListingsEfficient === 'function') {
+        displayJobListingsEfficient(window.allJobs);
+    } else if (typeof displayJobListings === 'function') {
+        displayJobListings(window.allJobs);
+    } else {
+        console.error("No job display function found");
+        return false;
+    }
+    
+    // Reattach event listeners
+    setTimeout(() => {
+        if (typeof attachJobListingEventListeners === 'function') {
+            attachJobListingEventListeners();
+        }
+    }, 100);
+    
+    return true;
+}                                                  
 
 
 
@@ -8769,6 +9191,394 @@ function initImprovedTabButtons() {
     console.log("Improved tab button handlers initialized");
 }
 
+// Complete function to populate and manage filters in main app
+function initializeJobFilters() {
+    const searchInput = document.getElementById('publicJobSearchInput');
+    const categoryFilter = document.getElementById('publicJobCategoryFilter');
+    const subCategoryFilter = document.getElementById('publicJobSubCategoryFilter');
+    const techFilter = document.getElementById('publicJobTechFilter');
+    const resetFiltersBtn = document.getElementById('publicResetJobFilters');
+    const resultsCountElement = document.getElementById('jobResultsCount');
+    
+    // Store filter state
+    const filterState = {
+        searchTerm: '',
+        category: '',
+        subCategory: '',
+        techStack: ''
+    };
+    
+    // Store subcategories for each category
+    let categorySubcategoriesMap = new Map();
+    
+    // Debounce function for search input
+    function debounce(func, wait) {
+        let timeout;
+        return function(...args) {
+            clearTimeout(timeout);
+            timeout = setTimeout(() => func.apply(this, args), wait);
+        };
+    }
+    
+    // Extract unique categories, subcategories and tech stacks from jobs
+    function extractFilterOptions(jobs) {
+        const categories = new Set();
+        categorySubcategoriesMap.clear();
+        const techStacks = new Set();
+        
+        jobs.forEach(job => {
+            // Add category if it exists
+            if (job.category) {
+                categories.add(job.category);
+                
+                // Track subcategories for each category
+                if (job.subCategory) {
+                    if (!categorySubcategoriesMap.has(job.category)) {
+                        categorySubcategoriesMap.set(job.category, new Set());
+                    }
+                    categorySubcategoriesMap.get(job.category).add(job.subCategory);
+                }
+            }
+            
+            // Add tech stacks
+            if (job.techStacks && Array.isArray(job.techStacks)) {
+                job.techStacks.forEach(tech => {
+                    if (tech && tech.trim()) {
+                        techStacks.add(tech.trim());
+                    }
+                });
+            }
+        });
+        
+        return {
+            categories: Array.from(categories).sort(),
+            techStacks: Array.from(techStacks).sort()
+        };
+    }
+    
+    // Populate category filter dropdown
+    function populateCategoryFilter(categories) {
+        if (!categoryFilter) return;
+        
+        // Clear and add default option
+        categoryFilter.innerHTML = '<option value="">All Categories</option>';
+        
+        // Add all unique categories
+        categories.forEach(category => {
+            categoryFilter.innerHTML += `<option value="${category}">${category}</option>`;
+        });
+    }
+    
+    // Update subcategory options based on selected category
+    function updateSubcategoryOptions(selectedCategory) {
+        if (!subCategoryFilter) return;
+        
+        // Clear and add default option
+        subCategoryFilter.innerHTML = '<option value="">All Sub-Categories</option>';
+        
+        // If no category selected, just leave the default option
+        if (!selectedCategory) return;
+        
+        // Get subcategories for selected category
+        const subcategories = categorySubcategoriesMap.get(selectedCategory);
+        if (subcategories && subcategories.size > 0) {
+            Array.from(subcategories).sort().forEach(subCategory => {
+                subCategoryFilter.innerHTML += `<option value="${subCategory}">${subCategory}</option>`;
+            });
+        }
+    }
+    
+    // Populate tech stack filter dropdown
+    function populateTechFilter(techStacks) {
+        if (!techFilter) return;
+        
+        // Clear and add default option
+        techFilter.innerHTML = '<option value="">All Tech Stacks</option>';
+        
+        // Add all unique tech stacks
+        techStacks.forEach(tech => {
+            techFilter.innerHTML += `<option value="${tech}">${tech}</option>`;
+        });
+    }
+    
+    // Apply filters to job listings
+    function applyFilters() {
+        if (!window.allJobs || !Array.isArray(window.allJobs)) {
+            console.error("Job listings not loaded yet");
+            return;
+        }
+        
+        // Get current filter values
+        const searchTerm = filterState.searchTerm.toLowerCase();
+        const categoryValue = filterState.category;
+        const subCategoryValue = filterState.subCategory;
+        const techValue = filterState.techStack;
+        
+        // Apply all filters
+        const filteredJobs = window.allJobs.filter(job => {
+            // Search term filter - search across multiple fields
+            const searchMatch = !searchTerm || 
+                (job.title && job.title.toLowerCase().includes(searchTerm)) ||
+                (job.companyName && job.companyName.toLowerCase().includes(searchTerm)) ||
+                (job.location && job.location.toLowerCase().includes(searchTerm)) ||
+                (job.description && job.description.toLowerCase().includes(searchTerm)) ||
+                (job.category && job.category.toLowerCase().includes(searchTerm)) ||
+                (job.subCategory && job.subCategory.toLowerCase().includes(searchTerm)) ||
+                (job.experienceLevel && job.experienceLevel.toLowerCase().includes(searchTerm));
+            
+            // Category filter
+            const categoryMatch = !categoryValue || (job.category === categoryValue);
+            
+            // Sub-category filter
+            const subCategoryMatch = !subCategoryValue || (job.subCategory === subCategoryValue);
+            
+            // Tech stack filter
+            const techMatch = !techValue || 
+                (job.techStacks && Array.isArray(job.techStacks) && 
+                 job.techStacks.some(tech => tech.toLowerCase() === techValue.toLowerCase()));
+            
+            // All filters must match
+            return searchMatch && categoryMatch && subCategoryMatch && techMatch;
+        });
+        
+        // Display filtered jobs
+        if (typeof displayJobListingsEfficient === 'function') {
+            displayJobListingsEfficient(filteredJobs);
+        } else if (typeof displayJobListings === 'function') {
+            displayJobListings(filteredJobs);
+        } else {
+            console.error("No job display function found");
+        }
+        
+        // Update results count
+        if (resultsCountElement) {
+            resultsCountElement.textContent = `${filteredJobs.length} job${filteredJobs.length !== 1 ? 's' : ''} found`;
+        }
+        
+        // Reattach event listeners to the newly created job cards
+        setTimeout(() => {
+            if (typeof attachJobListingEventListeners === 'function') {
+                attachJobListingEventListeners();
+            }
+        }, 100);
+        
+        return filteredJobs;
+    }
+    
+    // Setup event listeners for filter controls
+    function setupEventListeners() {
+        // Search input with debounce
+        if (searchInput) {
+            // Remove existing listeners
+            const newSearchInput = searchInput.cloneNode(true);
+            if (searchInput.parentNode) {
+                searchInput.parentNode.replaceChild(newSearchInput, searchInput);
+            }
+            
+            // Add debounced event listener
+            const debouncedSearch = debounce(function() {
+                filterState.searchTerm = this.value.trim();
+                applyFilters();
+            }, 300);
+            
+            newSearchInput.addEventListener('input', debouncedSearch);
+        }
+        
+        // Category filter
+        if (categoryFilter) {
+            // Remove existing listeners
+            const newCategoryFilter = categoryFilter.cloneNode(true);
+            if (categoryFilter.parentNode) {
+                categoryFilter.parentNode.replaceChild(newCategoryFilter, categoryFilter);
+            }
+            
+            // Add event listener
+            newCategoryFilter.addEventListener('change', function() {
+                filterState.category = this.value;
+                
+                // When category changes, reset subcategory filter
+                filterState.subCategory = '';
+                if (subCategoryFilter) {
+                    subCategoryFilter.value = '';
+                }
+                
+                // Update subcategory options
+                updateSubcategoryOptions(this.value);
+                
+                // Apply filters
+                applyFilters();
+            });
+        }
+        
+        // Subcategory filter
+        if (subCategoryFilter) {
+            // Remove existing listeners
+            const newSubCategoryFilter = subCategoryFilter.cloneNode(true);
+            if (subCategoryFilter.parentNode) {
+                subCategoryFilter.parentNode.replaceChild(newSubCategoryFilter, subCategoryFilter);
+            }
+            
+            // Add event listener
+            newSubCategoryFilter.addEventListener('change', function() {
+                filterState.subCategory = this.value;
+                applyFilters();
+            });
+        }
+        
+        // Tech stack filter
+        if (techFilter) {
+            // Remove existing listeners
+            const newTechFilter = techFilter.cloneNode(true);
+            if (techFilter.parentNode) {
+                techFilter.parentNode.replaceChild(newTechFilter, techFilter);
+            }
+            
+            // Add event listener
+            newTechFilter.addEventListener('change', function() {
+                filterState.techStack = this.value;
+                applyFilters();
+            });
+        }
+        
+        // Reset filters button
+        if (resetFiltersBtn) {
+            // Remove existing listeners
+            const newResetBtn = resetFiltersBtn.cloneNode(true);
+            if (resetFiltersBtn.parentNode) {
+                resetFiltersBtn.parentNode.replaceChild(newResetBtn, resetFiltersBtn);
+            }
+            
+            // Add event listener
+            newResetBtn.addEventListener('click', function() {
+                // Reset all filter states
+                filterState.searchTerm = '';
+                filterState.category = '';
+                filterState.subCategory = '';
+                filterState.techStack = '';
+                
+                // Reset UI elements
+                if (searchInput) searchInput.value = '';
+                if (categoryFilter) categoryFilter.value = '';
+                if (subCategoryFilter) {
+                    subCategoryFilter.value = '';
+                    // Reset subcategory options
+                    updateSubcategoryOptions('');
+                }
+                if (techFilter) techFilter.value = '';
+                
+                // Apply filters (show all)
+                applyFilters();
+            });
+        }
+    }
+    
+    // Initialize all filters
+    function initialize() {
+        if (!window.allJobs || !Array.isArray(window.allJobs)) {
+            console.warn("Jobs not loaded yet, cannot initialize filters");
+            return;
+        }
+        
+        // Extract filter options
+        const { categories, techStacks } = extractFilterOptions(window.allJobs);
+        
+        // Populate filter dropdowns
+        populateCategoryFilter(categories);
+        populateTechFilter(techStacks);
+        
+        // Setup event listeners
+        setupEventListeners();
+        
+        // Initialize with empty filters
+        applyFilters();
+        
+        console.log("Job filters initialized successfully");
+    }
+    
+    // Return functions for external use
+    return {
+        initialize,
+        applyFilters,
+        resetFilters: () => {
+            // Reset all filter states
+            filterState.searchTerm = '';
+            filterState.category = '';
+            filterState.subCategory = '';
+            filterState.techStack = '';
+            
+            // Reset UI elements
+            if (searchInput) searchInput.value = '';
+            if (categoryFilter) categoryFilter.value = '';
+            if (subCategoryFilter) {
+                subCategoryFilter.value = '';
+                updateSubcategoryOptions('');
+            }
+            if (techFilter) techFilter.value = '';
+            
+            // Apply filters (show all)
+            return applyFilters();
+        },
+        
+        // Function to update filters when new jobs are loaded
+        updateFilterOptions: (newJobs) => {
+            if (!newJobs || !Array.isArray(newJobs)) return;
+            
+            // Extract new filter options
+            const { categories, techStacks } = extractFilterOptions(newJobs);
+            
+            // Update filter dropdowns
+            populateCategoryFilter(categories);
+            populateTechFilter(techStacks);
+            
+            // Reset subcategory filter since category changed
+            if (subCategoryFilter) {
+                subCategoryFilter.value = '';
+                updateSubcategoryOptions('');
+            }
+            
+            // Apply current filters to new jobs
+            return applyFilters();
+        },
+        
+        // Function to programmatically set filters
+        setFilters: (filters) => {
+            if (!filters) return;
+            
+            // Update filter state
+            if (filters.searchTerm !== undefined) {
+                filterState.searchTerm = filters.searchTerm;
+                if (searchInput) searchInput.value = filters.searchTerm;
+            }
+            
+            if (filters.category !== undefined) {
+                filterState.category = filters.category;
+                if (categoryFilter) categoryFilter.value = filters.category;
+                
+                // Update subcategory options
+                updateSubcategoryOptions(filters.category);
+            }
+            
+            if (filters.subCategory !== undefined) {
+                filterState.subCategory = filters.subCategory;
+                if (subCategoryFilter) subCategoryFilter.value = filters.subCategory;
+            }
+            
+            if (filters.techStack !== undefined) {
+                filterState.techStack = filters.techStack;
+                if (techFilter) techFilter.value = filters.techStack;
+            }
+            
+            // Apply the new filters
+            return applyFilters();
+        },
+        
+        // Get current filter state
+        getFilters: () => {
+            return { ...filterState };
+        }
+    };
+}
+
 // Also try to enhance displayJobListings
 document.addEventListener('DOMContentLoaded', function() {
     if (typeof displayJobListings === 'function') {
@@ -8796,4 +9606,41 @@ document.addEventListener('DOMContentLoaded', function() {
       }, 200); // Small delay to ensure tab is visible
     });
   }
+});
+
+document.addEventListener('DOMContentLoaded', function() {
+    // Check if we're on the job listings page
+    const jobListingsTab = document.getElementById('job-listings-tab');
+    if (jobListingsTab) {
+        console.log("Found job listings tab, initializing");
+        
+        // Initialize job listings when the tab is shown
+        const tabButton = document.querySelector('.tab-button[data-tab="job-listings-tab"]');
+        if (tabButton) {
+            tabButton.addEventListener('click', function() {
+                console.log("Job listings tab button clicked");
+                
+                // Initialize public job listings if not already initialized
+                if (!window.publicJobListingsInitialized) {
+                    console.log("Initializing public job listings");
+                    if (typeof initPublicJobListings === 'function') {
+                        initPublicJobListings();
+                        window.publicJobListingsInitialized = true;
+                    } else {
+                        console.error("initPublicJobListings function not found");
+                    }
+                }
+            });
+        }
+        
+        // If job listings tab is visible on page load, initialize
+        if (jobListingsTab.classList.contains('active') || 
+            jobListingsTab.style.display !== 'none') {
+            console.log("Job listings tab is active on page load, initializing");
+            if (typeof initPublicJobListings === 'function') {
+                initPublicJobListings();
+                window.publicJobListingsInitialized = true;
+            }
+        }
+    }
 });
