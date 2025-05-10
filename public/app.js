@@ -5958,11 +5958,27 @@ function verifyAddonPayment(paymentResponse, orderId, featureType, quantity, eff
         
         console.log("Payment verification successful:", data);
         
-        // Close processing modal BEFORE showing success modal
-        safelyCloseModal('paymentProcessingModal');
-        
-        // Give a short delay to ensure DOM is ready
+        // Give a short delay to ensure DOM is ready, then close processing BEFORE showing success
         setTimeout(() => {
+            // First, properly close the processing modal
+            try {
+                const processingModalEl = document.getElementById('paymentProcessingModal');
+                if (processingModalEl) {
+                    const bsProcessingModal = bootstrap.Modal.getInstance(processingModalEl);
+                    if (bsProcessingModal) {
+                        bsProcessingModal.hide();
+                    } else {
+                        // Fallback if getInstance doesn't work
+                        safelyCloseModal('paymentProcessingModal');
+                    }
+                }
+            } catch (closeError) {
+                console.error("Error closing processing modal:", closeError);
+                // Try direct approach if bootstrap API fails
+                document.getElementById('paymentProcessingModal')?.classList.remove('show');
+                document.querySelectorAll('.modal-backdrop').forEach(el => el.remove());
+            }
+            
             // Update local user profile
             if (authState && authState.userProfile && authState.userProfile.usage && authState.userProfile.usage[featureType]) {
                 authState.userProfile.usage[featureType].limit = data.newLimit;
