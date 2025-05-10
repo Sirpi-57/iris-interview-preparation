@@ -5953,13 +5953,13 @@ function verifyAddonPayment(paymentResponse, orderId, featureType, quantity, eff
     })
     .then(data => {
         // Update progress bar to 100% if it exists
-        const progressBar = document.getElementById('payment-progress-bar');
-        if (progressBar) progressBar.style.width = '100%';
+        // const progressBar = document.getElementById('payment-progress-bar');
+        // if (progressBar) progressBar.style.width = '100%';
         
-        console.log("Payment verification successful:", data);
+        // console.log("Payment verification successful:", data);
         
         // EXTREMELY AGGRESSIVE DIRECT APPROACH - Force removal of processing modal
-        forceCloseModal('paymentProcessingModal');
+        // forceCloseModal('paymentProcessingModal');
         
         // Update local user profile immediately
         if (authState && authState.userProfile && authState.userProfile.usage && authState.userProfile.usage[featureType]) {
@@ -6002,7 +6002,7 @@ function verifyAddonPayment(paymentResponse, orderId, featureType, quantity, eff
         console.error("Payment verification error:", error);
         
         // Force close the processing modal
-        forceCloseModal('paymentProcessingModal');
+        // forceCloseModal('paymentProcessingModal');
         
         // Show error message
         showMessage(`Error verifying payment: ${error.message}`, "danger");
