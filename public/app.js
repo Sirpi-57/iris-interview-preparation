@@ -8107,7 +8107,6 @@ function showJobDetails(jobId) {
     const modal = document.getElementById('jobDetailsModal');
     const contentDiv = document.getElementById('jobDetailsContent');
     const modalTitle = document.getElementById('jobDetailsModalLabel');
-    const takeMockBtn = document.getElementById('takeMockInterviewBtn');
     
     if (!modal || !contentDiv) {
         console.error("Job details modal elements not found");
@@ -8124,11 +8123,6 @@ function showJobDetails(jobId) {
             <p class="mt-2">Loading job details...</p>
         </div>
     `;
-    
-    // Set job ID on the Take Mock button if it exists
-    if (takeMockBtn) {
-        takeMockBtn.setAttribute('data-job-id', jobId);
-    }
     
     // Close any existing modals first to prevent stacking issues
     document.querySelectorAll('.modal-backdrop').forEach(backdrop => {
