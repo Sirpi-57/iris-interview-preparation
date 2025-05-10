@@ -5958,23 +5958,23 @@ function verifyAddonPayment(paymentResponse, orderId, featureType, quantity, eff
         
         console.log("Payment verification successful:", data);
         
-        // First make sure to fully close the processing modal
-        safelyCloseModal('paymentProcessingModal');
+        // EXTREMELY AGGRESSIVE DIRECT APPROACH - Force removal of processing modal
+        forceCloseModal('paymentProcessingModal');
         
-        // Give a longer delay to ensure processing modal is fully closed before showing success
+        // Update local user profile immediately
+        if (authState && authState.userProfile && authState.userProfile.usage && authState.userProfile.usage[featureType]) {
+            authState.userProfile.usage[featureType].limit = data.newLimit;
+        }
+        
+        // Update UI if function exists
+        updateUsageDisplay();
+        updateResumeBuilderUsageUI();
+        
+        // Show success message
+        showMessage(`Successfully purchased ${quantity} ${getFeatureDisplayName(featureType)} add-on${quantity > 1 ? 's' : ''}!`, 'success');
+        
+        // Add a delay before showing the success modal
         setTimeout(() => {
-            // Update local user profile
-            if (authState && authState.userProfile && authState.userProfile.usage && authState.userProfile.usage[featureType]) {
-                authState.userProfile.usage[featureType].limit = data.newLimit;
-            }
-            
-            // Update UI if function exists
-            updateUsageDisplay();
-            updateResumeBuilderUsageUI();
-            
-            // Show success message
-            showMessage(`Successfully purchased ${quantity} ${getFeatureDisplayName(featureType)} add-on${quantity > 1 ? 's' : ''}!`, 'success');
-            
             // Show success modal with full error handling
             try {
                 // Create success modal content
@@ -5996,13 +5996,13 @@ function verifyAddonPayment(paymentResponse, orderId, featureType, quantity, eff
                 console.error("Error showing success modal:", modalError);
                 // We've already shown a success message as fallback
             }
-        }, 500); // Increased to 500ms to ensure complete closing of the previous modal
+        }, 500); // Increased to 500ms to ensure complete DOM cleanup
     })
     .catch(error => {
         console.error("Payment verification error:", error);
         
-        // Safely close any processing modals
-        safelyCloseModal('paymentProcessingModal');
+        // Force close the processing modal
+        forceCloseModal('paymentProcessingModal');
         
         // Show error message
         showMessage(`Error verifying payment: ${error.message}`, "danger");
@@ -6238,6 +6238,71 @@ function safelyCloseModal(modalId) {
         document.body.style.removeProperty('padding-right');
         document.body.style.removeProperty('overflow');
         console.log(`[MODAL_DEBUG] Emergency cleanup complete`);
+    }
+}
+
+// Add a new extremely aggressive function to force close a modal
+function forceCloseModal(modalId) {
+    console.log(`[MODAL_DEBUG] Force closing modal: ${modalId}`);
+    
+    try {
+        // First try the safe method
+        safelyCloseModal(modalId);
+        
+        // Then take very aggressive measures
+        setTimeout(() => {
+            // Get the modal element
+            const modalElement = document.getElementById(modalId);
+            if (modalElement) {
+                console.log(`[MODAL_DEBUG] Force approach: Modal element still exists, removing all classes`);
+                
+                // Remove all Bootstrap modal classes
+                modalElement.classList.remove('modal');
+                modalElement.classList.remove('fade');
+                modalElement.classList.remove('show');
+                
+                // Set display to none with !important
+                modalElement.style.cssText = "display: none !important; visibility: hidden !important;";
+                
+                // Remove it from the DOM Flow
+                modalElement.style.position = "absolute";
+                modalElement.style.width = "0";
+                modalElement.style.height = "0";
+                modalElement.style.overflow = "hidden";
+                modalElement.style.zIndex = "-9999";
+                
+                // Attempt to remove from DOM if possible
+                if (modalElement.parentNode && modalElement.id.includes('Processing')) {
+                    console.log(`[MODAL_DEBUG] Force approach: Completely removing modal from DOM`);
+                    modalElement.parentNode.removeChild(modalElement);
+                }
+            }
+            
+            // Aggressively remove all backdrop elements
+            document.querySelectorAll('.modal-backdrop').forEach(el => {
+                console.log(`[MODAL_DEBUG] Force approach: Removing backdrop element`);
+                el.style.display = 'none !important';
+                el.remove();
+            });
+            
+            // Fix body
+            document.body.classList.remove('modal-open');
+            document.body.style.removeProperty('padding-right');
+            document.body.style.removeProperty('overflow');
+            document.body.style.overflow = 'auto'; // Force auto
+            
+            console.log(`[MODAL_DEBUG] Force modal cleanup complete`);
+        }, 50);
+    } catch (error) {
+        console.error(`[MODAL_DEBUG] Error in force close modal approach: ${error}`);
+        
+        // Last resort - try to make it invisible
+        const modalElement = document.getElementById(modalId);
+        if (modalElement) {
+            modalElement.style.display = 'none';
+            modalElement.style.visibility = 'hidden';
+            modalElement.style.opacity = '0';
+        }
     }
 }
 
