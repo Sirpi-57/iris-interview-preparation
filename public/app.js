@@ -8055,7 +8055,38 @@ function createJobCardHTML(job, isCarousel) {
     const jobId = job.id || 'unknown';
     const cardClass = isCarousel ? 'carousel-job-card' : '';
     const logoUrl = job.companyLogoUrl || 'images/default-company-logo.png'; // Fallback logo
-    const postedDate = formatDate(job.postedDate);
+    
+    // Format the posted date
+    let postedDate = 'N/A';
+    if (job.postedDate) {
+        try {
+            if (typeof job.postedDate.toDate === 'function') {
+                postedDate = job.postedDate.toDate().toLocaleDateString();
+            } else if (job.postedDate instanceof Date) {
+                postedDate = job.postedDate.toLocaleDateString();
+            } else if (typeof job.postedDate === 'string') {
+                postedDate = new Date(job.postedDate).toLocaleDateString();
+            }
+        } catch (e) {
+            console.warn("Error formatting date:", e);
+        }
+    }
+    
+    // Safely extract experience
+    const experience = job.experienceLevel || 'Not specified';
+    
+    // Extract a short requirements summary (first 100 characters)
+    let requirementsSummary = '';
+    if (job.requirements) {
+        // Remove any bullet points or special characters
+        const cleanRequirements = job.requirements.replace(/^[\s•\-\*]+/gm, '');
+        // Take first 100 characters and add ellipsis if longer
+        requirementsSummary = cleanRequirements.length > 100 
+            ? cleanRequirements.substring(0, 100) + '...' 
+            : cleanRequirements;
+    } else {
+        requirementsSummary = 'No specific requirements listed.';
+    }
     
     // Limit tech stacks to 3 for display
     const techStacksHtml = job.techStacks && job.techStacks.length > 0
@@ -8076,17 +8107,25 @@ function createJobCardHTML(job, isCarousel) {
                 <h6 class="card-subtitle mb-2 text-muted">${job.companyName || 'Company'}</h6>
                 <p class="card-text">
                     <i class="fas fa-map-marker-alt me-2"></i>${job.location || 'Location'}<br>
+                    <i class="fas fa-briefcase me-2"></i>${experience}<br>
                     <span class="posted-date"><i class="far fa-calendar-alt me-1"></i>Posted: ${postedDate}</span>
                 </p>
+                
+                <div class="requirements-summary mb-2">
+                    <small class="text-muted d-block">Requirements:</small>
+                    <small class="d-block">${requirementsSummary}</small>
+                </div>
+                
                 <div class="tech-stack mb-3">
                     ${techStacksHtml}
                     ${moreStacksHtml}
                 </div>
+                
                 <div class="mt-auto d-flex">
-                    <button class="btn btn-outline-primary me-2 view-job-details-btn" data-job-id="${jobId}" onclick="showJobDetails('${jobId}')">
+                    <button class="btn btn-outline-primary me-2 view-job-details-btn" data-job-id="${jobId}">
                         <i class="fas fa-info-circle me-1"></i> Know More
                     </button>
-                    <button class="btn btn-primary take-mock-interview-btn" data-job-id="${jobId}" onclick="takeMockInterview('${jobId}')">
+                    <button class="btn btn-primary take-mock-interview-btn" data-job-id="${jobId}">
                         <i class="fas fa-microphone-alt me-1"></i> Take Mock
                     </button>
                 </div>
@@ -8094,6 +8133,43 @@ function createJobCardHTML(job, isCarousel) {
         </div>
     `;
 }
+
+// Add some CSS to properly format the enhanced card
+const style = document.createElement('style');
+style.textContent = `
+    .job-card .requirements-summary {
+        background: #f8f9fa;
+        padding: 8px;
+        border-radius: 4px;
+        font-size: 0.85rem;
+        margin-bottom: 12px;
+    }
+    
+    .job-card .tech-badge {
+        display: inline-block;
+        background: #e9ecef;
+        color: #495057;
+        padding: 2px 8px;
+        border-radius: 12px;
+        font-size: 0.75rem;
+        margin-right: 5px;
+        margin-bottom: 5px;
+    }
+    
+    /* Make sure cards have a minimum height but can expand */
+    .job-card {
+        min-height: 400px;
+        height: 100%;
+        transition: transform 0.2s;
+    }
+    
+    /* Add subtle hover effect */
+    .job-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+    }
+`;
+document.head.appendChild(style);
 
 // Show job details in modal
 function showJobDetails(jobId) {
