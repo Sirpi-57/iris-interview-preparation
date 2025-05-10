@@ -8107,6 +8107,7 @@ function showJobDetails(jobId) {
     const modal = document.getElementById('jobDetailsModal');
     const contentDiv = document.getElementById('jobDetailsContent');
     const modalTitle = document.getElementById('jobDetailsModalLabel');
+    const takeMockBtn = document.getElementById('takeMockInterviewBtn');
     
     if (!modal || !contentDiv) {
         console.error("Job details modal elements not found");
@@ -8123,6 +8124,45 @@ function showJobDetails(jobId) {
             <p class="mt-2">Loading job details...</p>
         </div>
     `;
+    
+    // Set job ID on the Take Mock button if it exists
+    if (takeMockBtn) {
+        takeMockBtn.setAttribute('data-job-id', jobId);
+        // Ensure it has the right styling
+        takeMockBtn.className = 'btn btn-primary';
+        takeMockBtn.innerHTML = '<i class="fas fa-microphone-alt me-2"></i>Take Mock Interview';
+        
+        // Remove any existing event listeners by cloning the button
+        const newTakeMockBtn = takeMockBtn.cloneNode(true);
+        if (takeMockBtn.parentNode) {
+            takeMockBtn.parentNode.replaceChild(newTakeMockBtn, takeMockBtn);
+        }
+        
+        // Add fresh event listener
+        newTakeMockBtn.addEventListener('click', function() {
+            const jobId = this.getAttribute('data-job-id');
+            if (jobId) {
+                // Close the modal
+                try {
+                    const modalInstance = bootstrap.Modal.getInstance(modal);
+                    if (modalInstance) modalInstance.hide();
+                } catch (e) {
+                    console.warn("Error closing modal:", e);
+                    // Fallback close method
+                    modal.style.display = 'none';
+                    modal.classList.remove('show');
+                    document.querySelector('.modal-backdrop')?.remove();
+                    document.body.classList.remove('modal-open');
+                    document.body.style.removeProperty('padding-right');
+                }
+                
+                // Wait for modal to close then trigger the mock interview
+                setTimeout(() => {
+                    takeMockInterview(jobId);
+                }, 300);
+            }
+        });
+    }
     
     // Close any existing modals first to prevent stacking issues
     document.querySelectorAll('.modal-backdrop').forEach(backdrop => {
@@ -8171,6 +8211,53 @@ function showJobDetails(jobId) {
             
             const job = doc.data();
             job.id = doc.id;
+            
+            // Format description with proper paragraphs
+            const formatDescription = (text) => {
+                if (!text) return 'No description provided.';
+                
+                // Split by double newlines first (for paragraphs)
+                let formattedText = text.replace(/\n\s*\n/g, '</p><p>');
+                
+                // Replace single newlines with line breaks
+                formattedText = formattedText.replace(/\n/g, '<br>');
+                
+                // Wrap in paragraph tags if not already
+                if (!formattedText.startsWith('<p>')) {
+                    formattedText = '<p>' + formattedText;
+                }
+                if (!formattedText.endsWith('</p>')) {
+                    formattedText = formattedText + '</p>';
+                }
+                
+                return formattedText;
+            };
+            
+            // Format requirements with bullet points
+            const formatRequirements = (text) => {
+                if (!text) return 'No specific requirements listed.';
+                
+                // Check if the text already has bullet points or line items
+                if (text.includes('•') || text.includes('-') || text.includes('*')) {
+                    // Text already has bullet indicators, format them into a list
+                    const lines = text.split('\n').filter(line => line.trim());
+                    
+                    let formattedText = '<ul class="job-requirements-list">';
+                    lines.forEach(line => {
+                        // Clean up existing bullet points
+                        const cleanLine = line.trim().replace(/^[\s•\-\*]+/, '').trim();
+                        if (cleanLine) {
+                            formattedText += `<li>${cleanLine}</li>`;
+                        }
+                    });
+                    formattedText += '</ul>';
+                    
+                    return formattedText;
+                } else {
+                    // No explicit bullets, still use paragraphs with better spacing
+                    return formatDescription(text);
+                }
+            };
             
             // Format dates safely
             const formatDate = (timestamp) => {
@@ -8266,7 +8353,7 @@ function showJobDetails(jobId) {
                 ? `<span class="badge bg-info">${job.subCategory}</span>` 
                 : '';
             
-            // Generate full job details HTML
+            // Generate full job details HTML - WITHOUT the extra Take Mock button at the bottom
             contentDiv.innerHTML = `
                 <div class="company-header mb-4">
                     <img src="${job.companyLogoUrl || 'images/default-company-logo.png'}" class="company-logo me-3" 
@@ -8327,12 +8414,12 @@ function showJobDetails(jobId) {
                 
                 <h5 class="section-title">Job Description</h5>
                 <div class="description-text mb-4">
-                    ${job.description || 'No description provided.'}
+                    ${formatDescription(job.description || 'No description provided.')}
                 </div>
                 
                 <h5 class="section-title">Requirements</h5>
                 <div class="requirements-list mb-4">
-                    ${job.requirements || 'No specific requirements listed.'}
+                    ${formatRequirements(job.requirements || 'No specific requirements listed.')}
                 </div>
                 
                 <h5 class="section-title">Tech Stack</h5>
@@ -8343,40 +8430,11 @@ function showJobDetails(jobId) {
                 ${questionsHtml}
                 ${customFieldsHtml}
                 ${sourceLinkHtml}
-                
-                <div class="mt-4 pt-3 border-top text-center">
-                    <button class="btn btn-lg btn-primary" id="modalTakeMockBtn" data-job-id="${job.id}">
-                        <i class="fas fa-microphone-alt me-2"></i>Take Mock Interview for This Job
-                    </button>
-                </div>
             `;
             
-            // Add event listener to the Take Mock button in the modal
-            const modalTakeMockBtn = document.getElementById('modalTakeMockBtn');
-            if (modalTakeMockBtn) {
-                modalTakeMockBtn.addEventListener('click', function() {
-                    const jobId = this.getAttribute('data-job-id');
-                    if (jobId) {
-                        // Close the modal
-                        try {
-                            const modalInstance = bootstrap.Modal.getInstance(modal);
-                            if (modalInstance) modalInstance.hide();
-                        } catch (e) {
-                            console.warn("Error closing modal:", e);
-                            // Fallback close method
-                            modal.style.display = 'none';
-                            modal.classList.remove('show');
-                            document.querySelector('.modal-backdrop')?.remove();
-                            document.body.classList.remove('modal-open');
-                            document.body.style.removeProperty('padding-right');
-                        }
-                        
-                        // Wait for modal to close then trigger the mock interview
-                        setTimeout(() => {
-                            takeMockInterview(jobId);
-                        }, 300);
-                    }
-                });
+            // Update the Take Mock button in the footer with the current job ID
+            if (takeMockBtn) {
+                takeMockBtn.setAttribute('data-job-id', job.id);
             }
         })
         .catch(error => {
