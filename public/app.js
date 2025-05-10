@@ -5958,27 +5958,11 @@ function verifyAddonPayment(paymentResponse, orderId, featureType, quantity, eff
         
         console.log("Payment verification successful:", data);
         
-        // Give a short delay to ensure DOM is ready, then close processing BEFORE showing success
+        // First make sure to fully close the processing modal
+        safelyCloseModal('paymentProcessingModal');
+        
+        // Give a longer delay to ensure processing modal is fully closed before showing success
         setTimeout(() => {
-            // First, properly close the processing modal
-            try {
-                const processingModalEl = document.getElementById('paymentProcessingModal');
-                if (processingModalEl) {
-                    const bsProcessingModal = bootstrap.Modal.getInstance(processingModalEl);
-                    if (bsProcessingModal) {
-                        bsProcessingModal.hide();
-                    } else {
-                        // Fallback if getInstance doesn't work
-                        safelyCloseModal('paymentProcessingModal');
-                    }
-                }
-            } catch (closeError) {
-                console.error("Error closing processing modal:", closeError);
-                // Try direct approach if bootstrap API fails
-                document.getElementById('paymentProcessingModal')?.classList.remove('show');
-                document.querySelectorAll('.modal-backdrop').forEach(el => el.remove());
-            }
-            
             // Update local user profile
             if (authState && authState.userProfile && authState.userProfile.usage && authState.userProfile.usage[featureType]) {
                 authState.userProfile.usage[featureType].limit = data.newLimit;
@@ -6012,7 +5996,7 @@ function verifyAddonPayment(paymentResponse, orderId, featureType, quantity, eff
                 console.error("Error showing success modal:", modalError);
                 // We've already shown a success message as fallback
             }
-        }, 300);
+        }, 500); // Increased to 500ms to ensure complete closing of the previous modal
     })
     .catch(error => {
         console.error("Payment verification error:", error);
@@ -6159,6 +6143,13 @@ function safelyCloseModal(modalId) {
             modalInstance.hide();
         } else {
             console.log(`[MODAL_DEBUG] No Bootstrap instance found, will rely on DOM cleanup only`);
+            
+            // Force direct DOM-based hiding of the modal
+            if (modalElement.classList.contains('show')) {
+                modalElement.classList.remove('show');
+            }
+            modalElement.style.display = 'none';
+            modalElement.setAttribute('aria-hidden', 'true');
         }
         
         // Check for modal-open class on body
@@ -6170,6 +6161,26 @@ function safelyCloseModal(modalId) {
         console.log(`[MODAL_DEBUG] Found ${backdropElements.length} backdrop elements`);
         
         // Remove any lingering backdrops immediately
+        backdropElements.forEach((backdrop) => {
+            backdrop.classList.remove('show');
+            backdrop.remove();
+        });
+        
+        // Remove modal-open class from body immediately
+        if (bodyHasModalOpenClass) {
+            document.body.classList.remove('modal-open');
+        }
+        
+        // Remove padding-right style immediately
+        if (document.body.style.paddingRight) {
+            document.body.style.removeProperty('padding-right');
+        }
+        
+        // Remove overflow style immediately
+        if (document.body.style.overflow) {
+            document.body.style.removeProperty('overflow');
+        }
+        
         console.log(`[MODAL_DEBUG] Setting timeout to clean up DOM`);
         setTimeout(() => {
             console.log(`[MODAL_DEBUG] Executing DOM cleanup for modal ${modalId}`);
