@@ -2680,3 +2680,45 @@ overflow: hidden; /* Ensures iframe respects rounded corners */
   margin-top: 20px;
   text-align: center;
 }
+
+.carousel-job-card {
+    max-height: 550px;
+    overflow: hidden;
+}
+
+.carousel-job-card .requirements-summary {
+    max-height: 80px;
+    overflow: hidden;
+}
+
+.job-card .requirements-summary {
+    background: #f8f9fa;
+    padding: 8px;
+    border-radius: 4px;
+    font-size: 0.85rem;
+    margin-bottom: 12px;
+}
+
+.job-card .tech-badge {
+    display: inline-block;
+    background: #e9ecef;
+    color: #495057;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    margin-right: 5px;
+    margin-bottom: 5px;
+}
+
+/* Make sure cards have a minimum height but can expand */
+.job-card {
+    min-height: 400px;
+    height: 100%;
+    transition: transform 0.2s;
+}
+
+/* Add subtle hover effect */
+.job-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+}

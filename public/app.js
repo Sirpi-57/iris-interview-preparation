@@ -7675,6 +7675,22 @@ function displayJobListingsEfficient(jobs) {
         // Process logo URL with fallback
         const logoUrl = job.companyLogoUrl || 'images/default-company-logo.png';
         
+        // Get experience level
+        const experience = job.experienceLevel || 'Not specified';
+        
+        // Extract a short requirements summary
+        let requirementsSummary = '';
+        if (job.requirements) {
+            // Remove any bullet points or special characters
+            const cleanRequirements = job.requirements.replace(/^[\s•\-\*]+/gm, '');
+            // Take first 80 characters and add ellipsis if longer
+            requirementsSummary = cleanRequirements.length > 80 
+                ? cleanRequirements.substring(0, 80) + '...' 
+                : cleanRequirements;
+        } else {
+            requirementsSummary = 'No specific requirements listed.';
+        }
+        
         // Process tech stacks (limit to 3 for display)
         let techStacksHtml = '';
         if (job.techStacks && job.techStacks.length > 0) {
@@ -7701,11 +7717,19 @@ function displayJobListingsEfficient(jobs) {
                     <h6 class="card-subtitle mb-2 text-muted">${job.companyName || 'Company'}</h6>
                     <p class="card-text">
                         <i class="fas fa-map-marker-alt me-2"></i>${job.location || 'Location'}<br>
+                        <i class="fas fa-briefcase me-2"></i>${experience}<br>
                         <span class="posted-date"><i class="far fa-calendar-alt me-1"></i>Posted: ${postedDate}</span>
                     </p>
+                    
+                    <div class="requirements-summary mt-2 mb-2">
+                        <small class="text-muted d-block">Requirements:</small>
+                        <small class="d-block">${requirementsSummary}</small>
+                    </div>
+                    
                     <div class="tech-stack mb-3">
                         ${techStacksHtml}
                     </div>
+                    
                     <div class="mt-auto d-flex">
                         <button class="btn btn-outline-primary me-2 view-job-details-btn" data-job-id="${jobId}">
                             <i class="fas fa-info-circle me-1"></i> Know More
