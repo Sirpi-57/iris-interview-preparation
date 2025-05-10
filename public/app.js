@@ -5950,38 +5950,44 @@ function verifyAddonPayment(paymentResponse, orderId, featureType, quantity, eff
         const progressBar = document.getElementById('payment-progress-bar');
         if (progressBar) progressBar.style.width = '100%';
         
-        // Close processing modal
+        // *** FIX #1: Close processing modal FIRST, before any other operations ***
         safelyCloseModal('paymentProcessingModal');
         
-        if (data.success) {
-            // Show success message
-            showMessage(`Successfully purchased ${quantity} ${getFeatureDisplayName(featureType)} add-on${quantity > 1 ? 's' : ''}!`, 'success');
-            
-            // Update local state
-            if (authState && authState.userProfile && authState.userProfile.usage && authState.userProfile.usage[featureType]) {
-                authState.userProfile.usage[featureType].limit = data.newLimit;
+        // *** FIX #2: Add small delay to ensure processing modal is fully removed ***
+        setTimeout(() => {
+            if (data.success) {
+                // Show success message
+                showMessage(`Successfully purchased ${quantity} ${getFeatureDisplayName(featureType)} add-on${quantity > 1 ? 's' : ''}!`, 'success');
+                
+                // Update local state
+                if (authState && authState.userProfile && authState.userProfile.usage && authState.userProfile.usage[featureType]) {
+                    authState.userProfile.usage[featureType].limit = data.newLimit;
+                }
+                
+                // Update UI
+                updateUsageDisplay();
+                updateResumeBuilderUsageUI();
+                
+                // Show success modal
+                const successModal = new bootstrap.Modal(document.getElementById('paymentSuccessModal'));
+                document.getElementById('paymentSuccessMessage').textContent = 
+                    `You've successfully purchased ${quantity} ${getFeatureDisplayName(featureType)} add-on${quantity > 1 ? 's' : ''}. Your limit has been increased.`;
+                
+                // Set new limits in success modal
+                setSuccessModalLimits(featureType, data.newLimit);
+                
+                successModal.show();
+            } else {
+                showMessage(`Add-on purchase verification failed: ${data.error || 'Unknown error'}`, 'danger');
             }
-            
-            // Update UI
-            updateUsageDisplay();
-            updateResumeBuilderUsageUI();
-            
-            // Show success modal
-            const successModal = new bootstrap.Modal(document.getElementById('paymentSuccessModal'));
-            document.getElementById('paymentSuccessMessage').textContent = 
-                `You've successfully purchased ${quantity} ${getFeatureDisplayName(featureType)} add-on${quantity > 1 ? 's' : ''}. Your limit has been increased.`;
-            
-            // Set new limits in success modal
-            setSuccessModalLimits(featureType, data.newLimit);
-            
-            successModal.show();
-        } else {
-            showMessage(`Add-on purchase verification failed: ${data.error || 'Unknown error'}`, 'danger');
-        }
+        }, 300); // 300ms delay for modal transition
     })
     .catch(error => {
         console.error("Addon payment verification error:", error);
+        
+        // *** FIX #3: Ensure processing modal is closed on error too ***
         safelyCloseModal('paymentProcessingModal');
+        
         showMessage(`Error verifying payment: ${error.message}`, "danger");
     });
 }
