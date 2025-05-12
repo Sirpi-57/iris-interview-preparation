@@ -446,9 +446,20 @@ Extract the following information and return it as a valid JSON object only (no 
 "name": "...", "email": "...", "phoneNumber": "...", "location": "...",
 "yearsOfExperience": "...", "technicalSkills": [...], "companiesWorkedAt": [...],
 "projects": [...], "education": [...], "languages": [...], "frameworks": [...],
-"certifications": [...], "otherRelevantInfo": "...", "currentPosition": "..."
+"certifications": [...], "otherRelevantInfo": "...", "currentPosition": "...",
+"hasSummarySection": true/false
 }}
-If a field is not found, use null, "", or []. Ensure name, email, phoneNumber are present if found.
+
+For "yearsOfExperience", follow these steps:
+1. Look for explicit statements like "X years of experience" in the resume
+2. If not found, calculate total years across all work experiences based on start and end dates
+3. For current positions, calculate up to the present date
+4. Round to the nearest whole number or use ranges like "2-3 years" if appropriate
+5. If it's less than 1 year, use "<1" or "less than 1 year"
+6. If you cannot determine the exact years, infer from job titles (e.g., "Senior" typically requires 5+ years)
+7. If there is no work experience section or only internships/academic projects, set as "fresher" or "0"
+
+Set "hasSummarySection" to true if there is a summary or professional profile paragraph at the beginning of the resume (typically 2-5 lines describing skills and experience). If a field is not found, use null, "", or []. Ensure name, email, phoneNumber are present if found.
 """
     messages = [{"role": "user", "content": "Parse this resume."}]
     try:
@@ -470,6 +481,7 @@ If a field is not found, use null, "", or []. Ensure name, email, phoneNumber ar
         # Defaulting key fields
         parsed_json.setdefault("name", None)
         parsed_json.setdefault("email", None)
+        parsed_json.setdefault("hasSummarySection", False)  # Default to false if not provided
         # ... add other setdefaults if needed ...
         print("Resume parsed successfully by Claude.")
         return parsed_json
@@ -499,6 +511,10 @@ def match_resume_jd_with_openai(resume_data, job_description):
                      sections_overview += f"- {key}: Present\n"
             elif key == "summary" and value:
                  sections_overview += f"- {key}: Present\n"
+    
+    # Add indicator if summary section is detected
+    if resume_data.get("hasSummarySection") == True:
+        sections_overview += "- summary: Present (Detected in introduction paragraph)\n"
 
     prompt = f"""
 Act as an expert AI resume writer and career coach with 15+ years of experience, specializing in tailoring resumes for competitive roles.
@@ -610,6 +626,13 @@ MANDATORY INSTRUCTIONS:
             ["section", "issue", "recommendation", "currentContent", "improvedVersion", "explanation"],
             "resumeImprovements"
         )
+        
+        # If resume already has a summary section, remove any suggestions to add one
+        if resume_data.get("hasSummarySection") == True:
+            match_result_obj["resumeImprovements"] = [
+                imp for imp in match_result_obj["resumeImprovements"] 
+                if not (imp["section"] == "summary" and "lack" in imp["issue"].lower())
+            ]
 
         print(f"OpenAI analysis complete. Match Score: {match_result_obj.get('matchScore')}, Strengths: {len(match_result_obj.get('keyStrengths', []))}, Gaps: {len(match_result_obj.get('skillGaps', []))}, Improvements: {len(match_result_obj.get('resumeImprovements', []))}")
         return match_result_obj
