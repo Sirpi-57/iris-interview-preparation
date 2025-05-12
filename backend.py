@@ -483,28 +483,23 @@ If a field is not found, use null, "", or []. Ensure name, email, phoneNumber ar
 def match_resume_jd_with_openai(resume_data, job_description):
     """Matches resume (JSON) with job description using OpenAI to produce specific, actionable improvements."""
     print("--- Matching Resume/JD with OpenAI (Requesting Specific Improvements) ---")
-    # Ensure OPENAI_API_KEY is configured - replace with your actual check
+    # Ensure OPENAI_API_KEY is configured
     if not globals().get("OPENAI_API_KEY"): raise ValueError("OpenAI API Key is not configured.")
 
     resume_data_str = json.dumps(resume_data, indent=2) if isinstance(resume_data, dict) else str(resume_data)
 
     # Create sections overview for easier reference
     sections_overview = ""
-    if isinstance(resume_data, dict): # Check if it's a dict before iterating
+    if isinstance(resume_data, dict):
         for key, value in resume_data.items():
             if key in ["projects", "education", "workExperience", "skills", "certifications", "languages"]:
                 if isinstance(value, list):
                     sections_overview += f"- {key}: Contains {len(value)} entries\n"
-                elif value: # Check if value is not empty/None
+                elif value:
                      sections_overview += f"- {key}: Present\n"
             elif key == "summary" and value:
                  sections_overview += f"- {key}: Present\n"
-            # Add other key sections if needed
-    else:
-        sections_overview = "Resume data is not in expected dictionary format."
 
-
-    # --- Start of Modified Prompt ---
     prompt = f"""
 Act as an expert AI resume writer and career coach with 15+ years of experience, specializing in tailoring resumes for competitive roles.
 Your task is to perform a rigorous analysis of the provided resume against the job description and generate SPECIFIC, DETAILED, and ACTIONABLE improvements.
@@ -522,69 +517,62 @@ Candidate Resume Data (JSON):
 Resume Sections Overview:
 {sections_overview}
 
-CRITICAL TASK: Perform a detailed analysis and return ONLY a valid JSON object adhering precisely to the structure and minimum count requirements specified below. NO extra text, markdown, or explanations outside the JSON format.
+CRITICAL TASK: Perform a detailed analysis and return ONLY a valid JSON object adhering precisely to the structure and minimum count requirements specified below.
 
 JSON Output Structure:
 {{
   "matchScore": integer (0-100, honest assessment of CURRENT fit based *only* on provided data),
-  "matchAnalysis": string (MUST be **at least 3-4 detailed paragraphs**. Go beyond surface-level summary. Discuss specific alignments and mismatches between resume sections and JD requirements. Mention nuances, quantify alignment where possible (e.g., 'possesses 6/8 key required skills'), and clearly articulate the core strengths/weaknesses relative to *this specific role*.),
-  "keyStrengths": array of objects (MUST contain **at least 5 distinct strengths** derived directly from the resume) [
+  "matchAnalysis": string (MUST be **at least 3-4 detailed paragraphs**. Discuss specific alignments and mismatches between resume sections and JD requirements. Quantify alignment where possible),
+  "keyStrengths": array of objects (MUST contain **at least 5 distinct strengths** from the resume) [
     {{
       "strength": "<Specific skill, experience, or achievement from resume>",
-      "relevance": "<Detailed explanation connecting this strength *directly* to a specific requirement, responsibility, or keyword in the Job Description>",
-      "howToEmphasize": "<Concrete suggestion on making this strength more prominent or impactful in the resume (e.g., move higher, add metrics, use specific keywords from JD)>"
+      "relevance": "<Detailed explanation connecting this strength *directly* to a specific requirement or keyword in the Job Description>",
+      "howToEmphasize": "<Concrete suggestion on making this strength more prominent or impactful in the resume>"
     }}
   ],
-  "skillGaps": array of objects (MUST identify **at least 3 distinct skill gaps**, aim for 4 if clearly applicable based on JD 'Required' or 'Preferred' qualifications) [
+  "skillGaps": array of objects (MUST identify **at least 3 distinct skill gaps** based on JD qualifications) [
     {{
       "missingSkill": "<Specific required or preferred skill/experience from JD NOT EVIDENT in the resume>",
       "importance": "high/medium/low" (Based on JD emphasis),
-      "suggestion": "<Actionable advice on how to address this gap - e.g., acquire skill, reframe existing experience, mention relevant coursework/projects, or acknowledge it in cover letter>",
-      "alternateSkillToHighlight": "<Identify a related skill the candidate *does* possess that could partially compensate or show related aptitude (or state 'None apparent')>"
+      "suggestion": "<Actionable advice on how to address this gap>",
+      "alternateSkillToHighlight": "<Identify a related skill the candidate *does* possess that could partially compensate>"
     }}
   ],
   "jobRequirements": object {{
     "jobTitle": "<Accurately extracted Job Title from JD>",
     "requiredSkills": ["<List of specific key skills explicitly stated as required in JD>"],
     "experienceLevel": "<Required years/level (e.g., '5+ years', 'Senior Level', 'Entry Level')>",
-    "educationNeeded": "<Minimum education requirements mentioned in JD (e.g., 'Bachelor's degree in CS', 'Master's preferred')>"
+    "educationNeeded": "<Minimum education requirements mentioned in JD>"
   }},
-  "resumeImprovements": array of objects (MUST contain **at least 7 distinct improvements**, aim for 8. **Minimum 5 improvements must target 'workExperience' or 'projects' sections**) [
+  "resumeImprovements": array of objects (MUST contain **at least 7 distinct improvements**, with **at least 5 targeting 'workExperience' or 'projects' sections**) [
     {{
       "section": "<Specific resume section (e.g., 'workExperience[0].description', 'projects[1].bulletPoints', 'summary', 'skills')>",
-      "issue": "<Precise problem with the current content (e.g., 'Vague description lacks metrics', 'Bullet point uses weak verb', 'Skill listed without context', 'Project outcome unclear')>",
-      "recommendation": "<Detailed, specific change needed (e.g., 'Quantify achievement with estimated impact', 'Rewrite bullet using STAR method', 'Group skills by category', 'Add specific technologies used')>",
+      "issue": "<Precise problem with the current content (e.g., 'Vague description lacks metrics', 'Bullet point uses weak verb')>",
+      "recommendation": "<Detailed, specific change needed>",
       "currentContent": "<Exact text snippet from the resume that needs changing>",
-      "improvedVersion": "<COMPLETE rewritten version of the content (e.g., the full bullet point, the revised project description block, the updated skills list section). MUST be ready to copy-paste. If improving bullets, provide the complete set of improved bullets for that entry.>",
-      "explanation": "<Crucial: Explain *precisely why* this improvement makes the candidate a stronger fit for *this specific job*, referencing JD keywords or requirements>"
+      "improvedVersion": "<COMPLETE rewritten version of the content, ready to copy-paste>",
+      "explanation": "<Explain *precisely why* this improvement makes the candidate a stronger fit for this specific job>"
     }}
   ]
 }}
 
 MANDATORY INSTRUCTIONS:
-1.  **Strict Minimum Counts:** Ensure `keyStrengths` has >= 5 items, `skillGaps` has >= 3 items, and `resumeImprovements` has >= 7 items (with >= 5 targeting work/projects). Failure to meet counts results in an invalid response.
-2.  **Complete Rewrites:** For `resumeImprovements.improvedVersion`, provide the FULLY rewritten text, not just instructions or partial edits. Ensure it's copy-paste ready.
-3.  **Job Specificity:** All suggestions, analysis, and improvements MUST be tailored directly to the provided Job Description.
-4.  **Substance over Style:** Focus on improvements that add quantifiable results, impact, relevant keywords, and stronger alignment with the JD, not just minor grammatical or formatting changes.
-5.  **Action Verbs & Metrics:** Ensure `improvedVersion` for work/project bullets uses strong action verbs and incorporates metrics/quantifiable achievements whenever possible.
-6.  **Validity:** The final output MUST be a single, valid JSON object with no preceding/succeeding text or markdown. Double-check structure and types.
+1. Every improvement must be SPECIFIC to THIS resume and THIS job description, not generic advice.
+2. For `resumeImprovements.improvedVersion`, provide the FULLY rewritten text, not just instructions or partial edits.
+3. Ensure all recommendations directly align with keywords and requirements from the job description.
+4. Focus on improvements that add quantifiable results, impact, relevant keywords, and stronger alignment with the JD.
+5. Use strong action verbs and incorporate metrics/quantifiable achievements whenever possible.
 """
-    # --- End of Modified Prompt ---
 
     try:
-        result_text = call_openai_api(prompt=prompt, model=OPENAI_MODEL, temperature=0.2) # Assume call_openai_api exists
+        result_text = call_openai_api(prompt=prompt, model=OPENAI_MODEL, temperature=0.2)
         # Clean potential markdown backticks
         if result_text.strip().startswith("```json"): result_text = result_text.strip()[7:]
         if result_text.strip().endswith("```"): result_text = result_text.strip()[:-3]
 
         match_result_obj = json.loads(result_text.strip(), strict=False)
 
-        # --- Start: Enhanced Validation & Defaulting ---
-        # Basic structure check
-        if not isinstance(match_result_obj, dict):
-             raise ValueError("OpenAI response is not a JSON object.")
-
-        # Set defaults for top-level keys
+        # Enhanced validation & defaulting
         match_result_obj.setdefault("matchScore", 0)
         match_result_obj.setdefault("matchAnalysis", "[Analysis not provided or failed validation]")
         match_result_obj.setdefault("keyStrengths", [])
@@ -592,7 +580,7 @@ MANDATORY INSTRUCTIONS:
         match_result_obj.setdefault("jobRequirements", {})
         match_result_obj.setdefault("resumeImprovements", [])
 
-        # Validate and clean list items
+        # Validate list items
         def validate_list_items(items, required_keys, list_name):
             validated_list = []
             if not isinstance(items, list):
@@ -603,7 +591,7 @@ MANDATORY INSTRUCTIONS:
                     print(f"Warning: Item {i} in '{list_name}' is not an object. Skipping.")
                     continue
                 for key in required_keys:
-                    item.setdefault(key, f"[Missing: {key}]") # Ensure key exists
+                    item.setdefault(key, f"[Missing: {key}]")
                 validated_list.append(item)
             return validated_list
 
@@ -622,25 +610,13 @@ MANDATORY INSTRUCTIONS:
             ["section", "issue", "recommendation", "currentContent", "improvedVersion", "explanation"],
             "resumeImprovements"
         )
-        # --- End: Enhanced Validation & Defaulting ---
-
-        # Add checks for minimum counts after parsing
-        if len(match_result_obj.get("keyStrengths", [])) < 5: print("Warning: Less than 5 key strengths provided.")
-        if len(match_result_obj.get("skillGaps", [])) < 3: print("Warning: Less than 3 skill gaps provided.")
-        if len(match_result_obj.get("resumeImprovements", [])) < 7: print("Warning: Less than 7 resume improvements provided.")
-        # Optional: Check work/project improvement count
 
         print(f"OpenAI analysis complete. Match Score: {match_result_obj.get('matchScore')}, Strengths: {len(match_result_obj.get('keyStrengths', []))}, Gaps: {len(match_result_obj.get('skillGaps', []))}, Improvements: {len(match_result_obj.get('resumeImprovements', []))}")
         return match_result_obj
-    except json.JSONDecodeError as e:
-        print(f"OpenAI analysis JSON decoding error: {e}. Response text (partial): {result_text[:1000]}")
-        # Return structure consistent with success, but with error info
-        return {"error": f"Invalid JSON from OpenAI analysis: {e}", "matchScore": 0, "matchAnalysis": f"[Error decoding JSON: {e}]\nResponse Text (start): {result_text[:200]}", "keyStrengths": [], "skillGaps": [], "jobRequirements": {}, "resumeImprovements": []}
     except Exception as e:
         print(f"OpenAI analysis error: {e}")
         traceback.print_exc()
         return {"error": str(e), "matchScore": 0, "matchAnalysis": f"[Error during analysis: {e}]", "keyStrengths": [], "skillGaps": [], "jobRequirements": {}, "resumeImprovements": []}
-
 
 def generate_interview_prep_plan(resume_match_data):
     """Generates a personalized interview prep plan using Claude (no timeline)."""

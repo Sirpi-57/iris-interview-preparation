@@ -7735,7 +7735,7 @@ function displayJobListingsEfficient(jobs) {
                             <i class="fas fa-info-circle me-1"></i> Know More
                         </button>
                         <button class="btn btn-primary take-mock-interview-btn" data-job-id="${jobId}">
-                            <i class="fas fa-microphone-alt me-1"></i> Take Mock
+                            <i class="fas fa-check-circle me-1"></i> Free Resume Analysis
                         </button>
                     </div>
                 </div>
@@ -8150,7 +8150,7 @@ function createJobCardHTML(job, isCarousel) {
                         <i class="fas fa-info-circle me-1"></i> Know More
                     </button>
                     <button class="btn btn-primary take-mock-interview-btn" data-job-id="${jobId}">
-                        <i class="fas fa-microphone-alt me-1"></i> Take Mock
+                        <i class="fas fa-check-circle me-1"></i> Free Resume Analysis
                     </button>
                 </div>
             </div>
@@ -8230,7 +8230,7 @@ function showJobDetails(jobId) {
         takeMockBtn.setAttribute('data-job-id', jobId);
         // Ensure it has the right styling
         takeMockBtn.className = 'btn btn-primary';
-        takeMockBtn.innerHTML = '<i class="fas fa-microphone-alt me-2"></i>Take Mock Interview';
+        takeMockBtn.innerHTML = '<i class="fas fa-check-circle me-1"></i>Free Resume Analysis';
         
         // Remove any existing event listeners by cloning the button
         const newTakeMockBtn = takeMockBtn.cloneNode(true);
