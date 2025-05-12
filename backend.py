@@ -546,7 +546,7 @@ JSON Output Structure:
       "howToEmphasize": "<Concrete suggestion on making this strength more prominent or impactful in the resume>"
     }}
   ],
-  "skillGaps": array of objects (MUST identify **at least 4 distinct skill gaps** based on JD qualifications) [
+  "skillGaps": array of objects (MUST identify **at least 3 distinct skill gaps** based on JD qualifications) [
     {{
       "missingSkill": "<Specific required or preferred skill/experience from JD NOT EVIDENT in the resume>",
       "importance": "high/medium/low" (Based on JD emphasis),
@@ -560,7 +560,7 @@ JSON Output Structure:
     "experienceLevel": "<Required years/level (e.g., '5+ years', 'Senior Level', 'Entry Level')>",
     "educationNeeded": "<Minimum education requirements mentioned in JD>"
   }},
-  "resumeImprovements": array of objects (MUST contain **at least 7 distinct improvements**, with **at least 5 targeting 'workExperience' or 'projects' sections**) [
+  "resumeImprovements": array of objects (MUST contain **at least 5 distinct improvements**, with **at least 3 targeting 'workExperience' or 'projects' sections**) [
     {{
       "section": "<Specific resume section (e.g., 'workExperience[0].description', 'projects[1].bulletPoints', 'summary', 'skills')>",
       "issue": "<Precise problem with the current content (e.g., 'Vague description lacks metrics', 'Bullet point uses weak verb')>",
@@ -1184,71 +1184,101 @@ def generate_suggested_answers(transcript, resume_data, job_data):
     }
     job_req_str = json.dumps(job_req_summary, indent=2)
 
-    # Extract actual questions from interviewer lines
+    # Extract actual questions from interviewer lines with improved extraction
     lines = transcript.split('\n')
     interviewer_questions = []
     
+    print(f"Extracting questions from transcript with {len(lines)} lines")
+    
     for i, line in enumerate(lines):
-        if line.startswith('Interviewer'):
+        if line.startswith('Interviewer') or 'Interviewer:' in line:
             # Skip lines that are not questions (like thank you, apologies, etc.)
             if any(skip in line.lower() for skip in ["thank you", "i apologize", "concluded", "this mock interview"]):
                 continue
                 
             # Extract the question text (might be on the same line or next line)
-            question_text = line.replace('Interviewer', '').strip()
+            question_text = line.replace('Interviewer', '').replace(':', '').strip()
             
             # If question is too short, check next line for the actual question
             if len(question_text) < 15 and i+1 < len(lines) and not lines[i+1].startswith(('Interviewer', 'Candidate')):
                 question_text = lines[i+1].strip()
+            
+            # More lenient question detection - include statements that are implicit questions
+            is_question = ('?' in question_text) or any(q in question_text.lower() for q in 
+                          ["could you", "can you", "would you", "tell me", "explain", "describe", "share", "walk me through"])
                 
-            if question_text and '?' in question_text:  # Make sure it's a question
+            if question_text and is_question and len(question_text) > 20:  # More robust question detection
                 interviewer_questions.append(question_text)
+                print(f"Extracted question: {question_text[:50]}...")
     
-    # Process questions in batches to avoid hitting token limits
+    # Log extracted questions count
+    print(f"Extracted {len(interviewer_questions)} questions from transcript")
+    if len(interviewer_questions) == 0:
+        print("WARNING: No questions extracted from transcript. Check transcript format.")
+        return {"suggestedAnswers": [], "error": "No questions extracted from transcript"}
+    
+    # Process all questions at once or in larger batches to maintain context
     all_suggested_answers = []
-    BATCH_SIZE = 3  # Process 3 questions at a time
+    BATCH_SIZE = 5  # Increased from 3 to 5 questions per batch
     
     for i in range(0, len(interviewer_questions), BATCH_SIZE):
         batch_questions = interviewer_questions[i:i+BATCH_SIZE]
+        batch_num = i//BATCH_SIZE + 1
+        total_batches = (len(interviewer_questions) + BATCH_SIZE - 1) // BATCH_SIZE
+        
+        print(f"Processing batch {batch_num}/{total_batches} with {len(batch_questions)} questions")
         
         system_prompt = f"""
-You are an expert interview coach reviewing a mock interview. For each significant interviewer question, provide ONE strong alternative answer the candidate could have given.
+You are an expert interview coach reviewing a mock interview for a {job_req_summary.get("jobTitle", "")} position. 
+For each interviewer question, provide ONE strong alternative answer that would impress interviewers.
 
 Interview Context:
-- Candidate: {resume_summary.get("name", "")}, {resume_summary.get("currentPosition", "")}
+- Candidate: {resume_summary.get("name", "")}, a {resume_summary.get("currentPosition", "")} with {resume_summary.get("yearsOfExperience", "")} experience
 - Job: {job_req_summary.get("jobTitle", "")}
 - Skills Required: {", ".join(job_req_summary.get("requiredSkills", []))}
+
+IMPORTANT GUIDELINES:
+- Give detailed, technically accurate answers that showcase expertise
+- Include specific examples, metrics, and technologies where appropriate
+- Keep answers concise but comprehensive
+- Focus on structure (problem-approach-solution-outcome format for technical/project questions)
+- Demonstrate both technical depth and business understanding
 
 Interview Questions:
 {json.dumps(batch_questions, indent=2)}
 
-For each question, provide ONLY ONE better sample answer. Format as valid JSON with NO control characters:
+Format your response as JSON with this structure (one better answer per question):
 {{
 "suggestedAnswers": [
   {{
     "question": "<Question text>",
     "suggestions": [
-      {{"answer": "<Better answer>", "rationale": "<Why this answer is strong>"}}
+      {{
+        "answer": "<Your detailed, improved answer>",
+        "rationale": "<Brief explanation of why this answer is effective>"
+      }}
     ]
   }}
+  // Repeat for each question
 ]
 }}
 
-Return ONLY valid JSON with NO additional text before or after. IMPORTANT: Do NOT include any control characters in the output.
+Return ONLY valid JSON with NO markdown formatting or additional text.
 """
 
-        messages = [{"role": "user", "content": "Provide one strong alternative answer for each interviewer question."}]
+        messages = [{"role": "user", "content": "Provide expert-level alternative answers for these interview questions."}]
 
         try:
-            # Lower temperature for more predictable JSON
+            # Increased max_tokens and reduced temperature for more reliable results
             response_content = call_claude_api(
                 messages=messages,
                 system_prompt=system_prompt,
                 model=CLAUDE_MODEL,
-                max_tokens=3000,
-                temperature=0.5
+                max_tokens=10000,  # Increased significantly from 3000
+                temperature=0.4    # Reduced from 0.5 for more reliable formatting
             )
 
+            print(f"Received response for batch {batch_num}, length: {len(response_content)} chars")
             response_text = response_content.strip()
 
             # Handle markdown code blocks
@@ -1263,8 +1293,9 @@ Return ONLY valid JSON with NO additional text before or after. IMPORTANT: Do NO
             json_end = response_text.rfind('}') + 1
             if json_start >= 0 and json_end > json_start:
                 json_text = response_text[json_start:json_end].strip()
+                print(f"Extracted JSON from response, length: {len(json_text)} chars")
             else:
-                print(f"Failed to extract JSON object for batch {i//BATCH_SIZE + 1}")
+                print(f"Failed to extract JSON object for batch {batch_num}, response starts with: {response_text[:100]}...")
                 continue
 
             # Aggressive sanitization of the entire JSON string before parsing
@@ -1273,15 +1304,18 @@ Return ONLY valid JSON with NO additional text before or after. IMPORTANT: Do NO
             try:
                 # First try to parse the sanitized JSON
                 raw_parsed_data = json.loads(sanitized_json_text)
+                print(f"Successfully parsed JSON for batch {batch_num}")
             except json.JSONDecodeError as e:
-                print(f"JSON decode error for batch {i//BATCH_SIZE + 1}: {e}")
+                print(f"JSON decode error for batch {batch_num}: {e}")
+                print(f"Problematic JSON (first 200 chars): {sanitized_json_text[:200]}...")
                 continue
 
             # Add answers from this batch to the full list
+            answers_count = 0
             if "suggestedAnswers" in raw_parsed_data and isinstance(raw_parsed_data.get("suggestedAnswers"), list):
                 for qa_item in raw_parsed_data["suggestedAnswers"]:
                     sanitized_qa = {}
-                    sanitized_qa["question"] = sanitize_string_for_json(qa_item.get("question"))
+                    sanitized_qa["question"] = sanitize_string_for_json(qa_item.get("question", ""))
 
                     sanitized_suggestions = []
                     # Ensure suggestions exist and keep only the first one
@@ -1290,15 +1324,19 @@ Return ONLY valid JSON with NO additional text before or after. IMPORTANT: Do NO
                         first_suggestion = suggestions[0]
                         if isinstance(first_suggestion, dict):
                             sanitized_suggestions.append({
-                                "answer": sanitize_string_for_json(first_suggestion.get("answer")),
-                                "rationale": sanitize_string_for_json(first_suggestion.get("rationale"))
+                                "answer": sanitize_string_for_json(first_suggestion.get("answer", "")),
+                                "rationale": sanitize_string_for_json(first_suggestion.get("rationale", ""))
                             })
+                            answers_count += 1
 
                     sanitized_qa["suggestions"] = sanitized_suggestions
                     all_suggested_answers.append(sanitized_qa)
+                print(f"Added {answers_count} answers from batch {batch_num}")
+            else:
+                print(f"No 'suggestedAnswers' found in response for batch {batch_num}")
 
         except Exception as e:
-            print(f"Error processing batch {i//BATCH_SIZE + 1}: {e}")
+            print(f"Error processing batch {batch_num}: {e}")
             traceback.print_exc()
             continue
 
@@ -1307,8 +1345,10 @@ Return ONLY valid JSON with NO additional text before or after. IMPORTANT: Do NO
 
     # Validate JSON serialization works
     try:
-        json.dumps(final_data)  # Test that it can be serialized
-        print(f"Suggested answers generated and sanitized successfully: {len(final_data.get('suggestedAnswers', []))} questions")
+        serialized = json.dumps(final_data)  # Test that it can be serialized
+        print(f"Suggested answers generated and sanitized successfully: {len(final_data.get('suggestedAnswers', []))} questions, total size: {len(serialized)} bytes")
+        if len(serialized) < 100:
+            print("WARNING: Serialized JSON is suspiciously small, might be empty or malformed")
         return final_data  # Return the sanitized data
     except Exception as json_err:
         print(f"Final JSON serialization test failed: {json_err}")
@@ -2594,16 +2634,31 @@ def get_suggested_answers_route(interview_id):
     """Retrieves suggested answers from Firestore or generates them if not available."""
     try:
         if not db: return jsonify({'error': 'Database unavailable'}), 503
+        
+        # Add force regenerate parameter
+        force_regenerate = request.args.get('force', 'false').lower() == 'true'
+        
         interview_data = get_interview_data(interview_id)
         if interview_data is None: return jsonify({'error': 'Interview session not found'}), 404
 
-        # Check if suggested answers are already stored in the document
-        if 'suggested_answers' in interview_data and interview_data['suggested_answers']:
-            print(f"[{interview_id}] Retrieving cached suggested answers from Firestore")
-            return jsonify(interview_data['suggested_answers'])
-        
-        # If not cached, generate them on-demand (as a fallback)
-        print(f"[{interview_id}] Suggested answers not found, generating on-demand...")
+        # Check if suggested answers are already stored and valid (only if not forcing regeneration)
+        if not force_regenerate and 'suggested_answers' in interview_data and interview_data['suggested_answers']:
+            # Verify it's not an empty structure
+            suggested_answers = interview_data['suggested_answers']
+            answers_count = len(suggested_answers.get('suggestedAnswers', []))
+            
+            if answers_count > 0:
+                print(f"[{interview_id}] Retrieving cached suggested answers from Firestore ({answers_count} answers)")
+                return jsonify(suggested_answers)
+            else:
+                print(f"[{interview_id}] Cached suggested answers exist but contain 0 answers. Will regenerate.")
+        else:
+            if force_regenerate:
+                print(f"[{interview_id}] Force regeneration requested")
+            else:
+                print(f"[{interview_id}] Suggested answers not found, generating on-demand...")
+                
+        # Generate new suggestions
         conversation = interview_data.get('conversation', [])
         resume_data = interview_data.get('resume_data_snapshot')
         job_data = interview_data.get('job_data_snapshot')
@@ -2615,27 +2670,31 @@ def get_suggested_answers_route(interview_id):
             for msg in conversation
         ])
         
+        print(f"[{interview_id}] Generating suggestions for transcript of {len(transcript_text)} characters")
+        
         # Generate suggestions
         suggestions = generate_suggested_answers(transcript_text, resume_data, job_data)
         
-        # Store for future requests (optional)
-        try:
-            update_interview_data(interview_id, {'suggested_answers': suggestions})
-            print(f"[{interview_id}] Cached newly generated suggested answers in Firestore")
-        except Exception as cache_err:
-            print(f"[{interview_id}] Warning: Could not cache suggested answers: {cache_err}")
-        
-        # Extra validation of the output before returning
-        try:
-            # Test serialization separately with dumps first
-            suggestions_json = json.dumps(suggestions)
-            # Now return the jsonify response
+        # Check if suggestions were successfully generated
+        answers_count = len(suggestions.get('suggestedAnswers', []))
+        if answers_count > 0:
+            print(f"[{interview_id}] Successfully generated {answers_count} suggested answers")
+            
+            # Store for future requests
+            try:
+                update_interview_data(interview_id, {'suggested_answers': suggestions})
+                print(f"[{interview_id}] Cached newly generated suggested answers in Firestore")
+            except Exception as cache_err:
+                print(f"[{interview_id}] Warning: Could not cache suggested answers: {cache_err}")
+                
+            # Return the generated suggestions
             return jsonify(suggestions)
-        except Exception as json_err:
-            print(f"Final JSON serialization failed in route: {json_err}")
+        else:
+            error_msg = suggestions.get('error', 'No suggestions could be generated')
+            print(f"[{interview_id}] Failed to generate suggestions: {error_msg}")
             return jsonify({
-                'error': f'Failed to serialize response: {str(json_err)}',
-                'suggestedAnswers': [] 
+                'error': error_msg,
+                'suggestedAnswers': []
             }), 500
             
     except Exception as e:
