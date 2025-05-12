@@ -642,7 +642,7 @@ def generate_interview_prep_plan(resume_match_data):
             "name": parsed_resume.get("name", parsed_resume.get("contactInfo", {}).get("name")),
             "currentPosition": parsed_resume.get("currentPosition", parsed_resume.get("workExperience", [{}])[0].get("jobTitle")),
             "yearsOfExperience": parsed_resume.get("yearsOfExperience", "[Not specified]"),
-            "technicalSkillsSummary": [s.get("skill") for s in parsed_resume.get("skills", []) if s.get("type") == "TECHNICAL"][:10] # Sample of tech skills
+            "technicalSkillsSummary": [s.get("skill") for s in parsed_resume.get("skills", []) if s.get("type") == "TECHNICAL"][:5] # Reduced from 10 to 5
         }
         resume_summary_str = json.dumps(resume_summary_dict, indent=2)
 
@@ -650,67 +650,60 @@ def generate_interview_prep_plan(resume_match_data):
         print(f"Warning: Could not serialize data cleanly for prep plan prompt - {json_err}")
         gaps_str, requirements_str, resume_summary_str = str(skill_gaps), str(job_requirements), str(parsed_resume) # Fallback to string
 
-    # --- Start of Modified Prompt ---
+    # --- Start of Modified Prompt with Reduced Content ---
     system_prompt = f"""
-You are an expert interview coach tasked with creating a highly targeted interview preparation plan. Base your plan *strictly* on the provided analysis data.
+You are an expert interview coach creating a targeted interview preparation plan based strictly on the provided analysis data.
 
 Candidate Summary:
-{resume_summary_str[:1000]}
+{resume_summary_str[:500]}  
 
 Job Requirements:
-{requirements_str[:2000]}
+{requirements_str[:1000]}
 
 Identified Skill Gaps:
-{gaps_str[:1500]}
+{gaps_str[:800]}
 
-Analysis Summary: Match Score: {match_score}/100. {match_analysis[:1500]}
+Analysis Summary: Match Score: {match_score}/100. {match_analysis[:500]}
 
-Your Task: Create a detailed preparation plan structured ONLY as a valid JSON object. Adhere precisely to the specified structure and content requirements below.
+Your Task: Create a detailed preparation plan as a valid JSON object with this structure:
 
 JSON Output Structure:
 {{
-  "focusAreas": [Array of 4-6 specific technical concepts, skills, or behavioral areas MOST critical for success in this interview. Each focus area must include:
+  "focusAreas": [Array of 4-5 specific technical concepts or skills critical for this interview. Each must include:
     {{
-      "area": "<Specific technical skill, concept, or behavioral attribute>",
-      "relevance": "<Why this area is critical for the role, citing specific JD requirements>",
+      "area": "<Specific technical skill or concept>",
       "priority": "high/medium/low"
     }}
   ],
-  "likelyQuestions": [Array of **exactly 15 to 20** question objects. CRITICAL: This list MUST contain **at least 13 technical/fundamental questions** directly related to the job's required skills (from `jobRequirements`) and the candidate's `skillGaps`. Include **only 1-2 behavioral questions**. For each question, provide detailed guidance.],
+  "likelyQuestions": [Array of exactly 12-15 question objects related to the job's required skills and the candidate's skill gaps, with at least 10 technical/fundamental questions and 1-2 behavioral questions.],
   "conceptsToStudy": {{
-    "fundamentals": [Array of essential baseline concepts the candidate must be comfortable with],
-    "advanced": [Array of more complex topics that would demonstrate expertise],
-    "technologies": [Array of specific tools, libraries, frameworks mentioned in or related to the JD],
-    "methodologies": [Array of processes, approaches, or methodologies relevant to the role],
-    "resources": [Array of 3-5 specific learning resources (books, courses, documentation) with brief description]
+    "fundamentals": [Array of 5-7 essential baseline concepts],
+    "advanced": [Array of 3-5 more complex topics],
+    "technologies": [Array of 3-5 specific tools or frameworks],
+    "methodologies": [Array of 2-3 processes or approaches]
   }},
   "gapStrategies": [Array containing one object for EACH identified skill gap from the input. If no gaps were identified, provide an empty array `[]`.]
 }}
 
 Detailed Structure Definitions:
-- "likelyQuestions": Each object must be `{{
-  "category": "Technical/Behavioral/Situational", 
-  "question": "<Specific interview question>", 
-  "guidance": "<2-3 sentences of SPECIFIC, actionable advice on how to structure a strong answer to this question>",
-  "sampleAnswerOutline": "<Brief bullet-point structure of an effective answer>"
-}}`.
-- "gapStrategies": Each object must be `{{"gap": "<The missingSkill from the input>", "strategy": "<Concrete advice on how to address this gap during the interview (e.g., 'Highlight project X which used related tech Y', 'Discuss relevant coursework Z', 'Acknowledge gap and express eagerness to learn')>", "focus_during_prep": "<Specific topic/skill to study beforehand to mitigate this gap>"}}`.
+- "likelyQuestions": Each object must be `{{"category": "Technical/Behavioral/Situational", "question": "<Specific interview question>"}}`
+- "gapStrategies": Each object must be `{{"gap": "<The missingSkill from the input>", "strategy": "<Concrete advice on how to address this gap during the interview (e.g., 'Highlight project X which used related tech Y', 'Discuss relevant coursework Z', 'Acknowledge gap and express eagerness to learn')>", "focus_during_prep": "<Specific topic/skill to study beforehand to mitigate this gap>"}}`
 
 MANDATORY INSTRUCTIONS:
-1.  **Strict Question Count & Mix:** Generate exactly 15-20 questions total for `likelyQuestions`. At least 13 must be technical/fundamental, max 2 behavioral.
-2.  **JSON Only:** Your response MUST be ONLY the valid JSON object described above. No introductory text, explanations, apologies, or markdown formatting.
-3.  **No Timeline:** **DO NOT INCLUDE** any form of timeline or schedule (e.g., `preparationTimeline`).
-4.  **Relevance:** All content MUST be directly derived from the provided context (Summary, Requirements, Gaps, Analysis).
-5.  **Specificity:** All guidance, concepts, and strategies must be concrete and actionable, not generic. Refer to specific technologies and techniques by name.
+1. Generate exactly 12-15 questions total for `likelyQuestions`. 
+2. Return ONLY valid JSON.
+3. DO NOT include any timeline or schedule.
+4. Keep all text fields brief and concise.
+5. All content must be directly derived from the provided context.
 """
     # --- End of Modified Prompt ---
 
-    messages = [{"role": "user", "content": "Generate the detailed interview preparation plan (excluding timeline) strictly following the JSON structure and content rules provided in the system prompt."}]
+    messages = [{"role": "user", "content": "Generate the interview preparation plan following the JSON structure provided."}]
     response_content = ""
     try:
         response_content = call_claude_api( # Assume call_claude_api exists
             messages=messages, system_prompt=system_prompt, model=CLAUDE_HAIKU_MODEL,
-            max_tokens=8192, temperature=0.5
+            max_tokens=4096, temperature=0.5
         )
 
         # --- Robust JSON extraction ---
@@ -725,12 +718,28 @@ MANDATORY INSTRUCTIONS:
             if json_start != -1 and json_end != -1 and json_end > json_start:
                 json_text = response_content[json_start:json_end].strip()
                 try:
+                    # Try basic repair if needed
+                    opening_braces = json_text.count('{')
+                    closing_braces = json_text.count('}')
+                    opening_brackets = json_text.count('[')
+                    closing_brackets = json_text.count(']')
+                    
+                    # Add missing closing braces/brackets if needed
+                    if opening_braces > closing_braces:
+                        json_text += '}' * (opening_braces - closing_braces)
+                        print(f"Added {opening_braces - closing_braces} missing closing braces to JSON")
+                    
+                    if opening_brackets > closing_brackets:
+                        json_text += ']' * (opening_brackets - closing_brackets)
+                        print(f"Added {opening_brackets - closing_brackets} missing closing brackets to JSON")
+                        
                     prep_plan = json.loads(json_text, strict=False)
+                    print("Successfully extracted and parsed JSON after repair.")
                 except json.JSONDecodeError as e_inner:
-                    print(f"Prep plan JSON decoding error after extraction: {e_inner}. Response text slice: {json_text[:1000]}")
-                    raise ValueError(f"Valid JSON object not found or parsable in prep plan response: {response_content[:1000]}") from e_inner
+                    print(f"Prep plan JSON decoding error after extraction and repair: {e_inner}. Response text slice: {json_text[:500]}")
+                    raise ValueError(f"Valid JSON object not found or parsable in prep plan response: {response_content[:500]}") from e_inner
             else:
-                 raise ValueError(f"Valid JSON object markers not found in prep plan response: {response_content[:1000]}")
+                 raise ValueError(f"Valid JSON object markers not found in prep plan response: {response_content[:500]}")
 
         # --- Validation and Cleanup ---
         if not isinstance(prep_plan, dict):
@@ -746,17 +755,16 @@ MANDATORY INSTRUCTIONS:
             del prep_plan["preparationTimeline"]
             print("Warning: Removed 'preparationTimeline' found in response.")
 
-        # Validate question count and rough mix (optional but good)
+        # Validate question count 
         q_count = len(prep_plan.get("likelyQuestions", []))
-        if not (15 <= q_count <= 20):
-             print(f"Warning: Generated question count ({q_count}) is outside the target range (15-20).")
-        # Add more detailed validation if needed (e.g., check question object structure)
+        if not (12 <= q_count <= 15):
+             print(f"Warning: Generated question count ({q_count}) is outside the target range (12-15).")
 
         print(f"Prep plan (no timeline) generated successfully. Questions: {q_count}")
         return prep_plan
 
     except json.JSONDecodeError as e: # Catch errors from the primary attempt if extraction wasn't needed
-        print(f"Prep plan JSON decoding error: {e}. Full response: {response_content[:1000]}")
+        print(f"Prep plan JSON decoding error: {e}. Full response: {response_content[:500]}")
         raise Exception("Claude API returned invalid JSON for prep plan.") from e
     except ValueError as e: # Catch errors from extraction/validation logic
         print(f"Prep plan generation error: {e}")
