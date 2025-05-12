@@ -1203,6 +1203,10 @@ def generate_suggested_answers(transcript, resume_data, job_data):
             if len(question_text) < 15 and i+1 < len(lines) and not lines[i+1].startswith(('Interviewer', 'Candidate')):
                 question_text = lines[i+1].strip()
                 
+            # Clean leading colon if present (addressing format variations)
+            if question_text and question_text.startswith(':'):
+                question_text = question_text[1:].strip()
+                
             if question_text and '?' in question_text:  # Make sure it's a question
                 interviewer_questions.append(question_text)
                 print(f"Extracted question: {question_text[:50]}...")
@@ -1215,7 +1219,7 @@ def generate_suggested_answers(transcript, resume_data, job_data):
     
     # Process questions in batches to avoid hitting token limits
     all_suggested_answers = []
-    BATCH_SIZE = 5  # Increased from 3 to 5 questions per batch
+    BATCH_SIZE = 4  # Adjusted to 4 for better balance between context and complexity
     
     for i in range(0, len(interviewer_questions), BATCH_SIZE):
         batch_questions = interviewer_questions[i:i+BATCH_SIZE]
@@ -1253,13 +1257,13 @@ Return ONLY valid JSON with NO additional text before or after. IMPORTANT: Do NO
         messages = [{"role": "user", "content": "Provide one strong alternative answer for each interviewer question."}]
 
         try:
-            # Increased max_tokens and reduced temperature
+            # Adjusted max_tokens to be within Claude 3.5 Sonnet's limit
             response_content = call_claude_api(
                 messages=messages,
                 system_prompt=system_prompt,
                 model=CLAUDE_MODEL,
-                max_tokens=12000,  # Increased from 3000 to 12000
-                temperature=0.4    # Reduced from 0.5 to 0.4
+                max_tokens=8000,  # Within Claude 3.5 Sonnet's limit (8192)
+                temperature=0.4    
             )
 
             print(f"Received response for batch {batch_num}, length: {len(response_content)} chars")
