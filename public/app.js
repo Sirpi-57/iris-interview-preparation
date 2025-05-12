@@ -1738,30 +1738,7 @@ function displayPreparationPlan(data) {
                     prepPlan.conceptsToStudy.methodologies, 'fas fa-sitemap');
                 if (methodSection) conceptsWrapper.appendChild(methodSection);
                 
-                // Resources section with different styling
-                if (prepPlan.conceptsToStudy.resources && prepPlan.conceptsToStudy.resources.length > 0) {
-                    const resourcesSection = document.createElement('div');
-                    resourcesSection.className = 'mt-4 pt-3 border-top';
-                    
-                    const heading = document.createElement('h5');
-                    heading.className = 'mb-3';
-                    heading.innerHTML = `<i class="fas fa-external-link-alt me-2"></i>Recommended Resources`;
-                    resourcesSection.appendChild(heading);
-                    
-                    const list = document.createElement('div');
-                    list.className = 'list-group';
-                    
-                    prepPlan.conceptsToStudy.resources.forEach((resource, index) => {
-                        const item = document.createElement('div');
-                        item.className = 'list-group-item border-start-0 border-end-0';
-                        if (index === 0) item.classList.add('border-top-0');
-                        item.innerHTML = resource;
-                        list.appendChild(item);
-                    });
-                    
-                    resourcesSection.appendChild(list);
-                    conceptsWrapper.appendChild(resourcesSection);
-                }
+                // We're no longer including the resources section since it's not in our backend
                 
                 if (conceptsWrapper.children.length > 0) {
                     conceptsToStudyContainer.appendChild(conceptsWrapper);
