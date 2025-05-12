@@ -710,7 +710,7 @@ MANDATORY INSTRUCTIONS:
     try:
         response_content = call_claude_api( # Assume call_claude_api exists
             messages=messages, system_prompt=system_prompt, model=CLAUDE_HAIKU_MODEL,
-            max_tokens=4096, temperature=0.5
+            max_tokens=8192, temperature=0.5
         )
 
         # --- Robust JSON extraction ---
