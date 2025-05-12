@@ -1439,13 +1439,11 @@ function displayAnalysisResults(data) {
             const section = improvement.section || 'General';
             const issue = improvement.issue || 'Suggestion';
             const recommendation = improvement.recommendation || 'N/A';
-            
-            // New fields from the enhanced backend
             const currentContent = improvement.currentContent || '';
             const improvedVersion = improvement.improvedVersion || '';
             const explanation = improvement.explanation || '';
 
-            // Use textContent for safety
+            // Use safer HTML construction with text content set separately
             item.innerHTML = `
                 <h2 class="accordion-header" id="${headerId}">
                     <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#${collapseId}" aria-expanded="false" aria-controls="${collapseId}">
@@ -1456,15 +1454,15 @@ function displayAnalysisResults(data) {
                     <div class="accordion-body">
                         <p><strong>Recommendation:</strong> <span class="recommendation-text"></span></p>
                         
-                        <!-- Before and After comparison -->
+                        <!-- Enhanced Before/After comparison -->
                         <div class="card mb-3">
                             <div class="card-header bg-light">
                                 <div class="row">
                                     <div class="col-6 border-end">
-                                        <strong><i class="fas fa-file-alt me-2"></i>Current Content</strong>
+                                        <i class="fas fa-file-alt me-1"></i> <strong>Current Content</strong>
                                     </div>
                                     <div class="col-6">
-                                        <strong><i class="fas fa-magic me-2"></i>Improved Version</strong>
+                                        <i class="fas fa-magic me-1"></i> <strong>Improved Version</strong>
                                     </div>
                                 </div>
                             </div>
@@ -1480,13 +1478,13 @@ function displayAnalysisResults(data) {
                             </div>
                         </div>
                         
-                        <!-- Explanation -->
+                        <!-- Enhanced "Why this matters" section -->
                         <div class="mt-2">
-                            <strong><i class="fas fa-lightbulb me-2 text-warning"></i>Why this matters:</strong>
-                            <p class="explanation-text fst-italic mt-1"></p>
+                            <p class="mb-2"><i class="fas fa-lightbulb text-warning me-1"></i> <strong>Why this matters:</strong></p>
+                            <p class="explanation-text fst-italic ps-3 border-start border-warning"></p>
                         </div>
 
-                        <!-- Copy button for improved version -->
+                        <!-- Enhanced Copy button -->
                         <button class="btn btn-sm btn-outline-primary mt-2 copy-improvement-btn">
                             <i class="fas fa-copy me-1"></i> Copy Improved Version
                         </button>
@@ -1521,7 +1519,6 @@ function displayAnalysisResults(data) {
                     })
                     .catch(err => {
                         console.error('Could not copy text: ', err);
-                        // Indicate failure
                         copyBtn.textContent = 'Copy failed';
                         setTimeout(() => {
                             copyBtn.innerHTML = '<i class="fas fa-copy me-1"></i> Copy Improved Version';
@@ -1551,23 +1548,55 @@ function displayPreparationPlan(data) {
     }
     const prepPlan = data.prepPlan;
 
-    // --- Focus Areas --- (Keep as before)
+    // --- Focus Areas (Improved) ---
     const focusAreasList = document.getElementById('focusAreasList');
     if (focusAreasList) {
         focusAreasList.innerHTML = '';
         if (prepPlan.focusAreas?.length > 0) {
-            prepPlan.focusAreas.forEach(area => {
-                const li = document.createElement('li');
-                li.innerHTML = `<i class="fas fa-bullseye me-2"></i>`;
-                li.appendChild(document.createTextNode(area || 'N/A')); // Handle potential null/undefined
-                focusAreasList.appendChild(li);
-            });
+            // Check if focusAreas are in the new format (objects) or old format (strings)
+            const isNewFormat = typeof prepPlan.focusAreas[0] === 'object' && prepPlan.focusAreas[0] !== null;
+            
+            if (isNewFormat) {
+                // Handle the new format with more details
+                prepPlan.focusAreas.forEach(focus => {
+                    const li = document.createElement('li');
+                    li.className = 'mb-3';
+                    
+                    // Set priority badge color
+                    let priorityColor = 'secondary';
+                    if (focus.priority?.toLowerCase() === 'high') priorityColor = 'danger';
+                    else if (focus.priority?.toLowerCase() === 'medium') priorityColor = 'warning';
+                    else if (focus.priority?.toLowerCase() === 'low') priorityColor = 'info';
+                    
+                    li.innerHTML = `
+                        <div class="d-flex align-items-start mb-1">
+                            <i class="fas fa-bullseye mt-1 me-2 text-primary"></i>
+                            <div>
+                                <strong class="d-flex align-items-center">
+                                    ${focus.area || 'N/A'} 
+                                    <span class="badge bg-${priorityColor} ms-2 small">${focus.priority || 'N/A'}</span>
+                                </strong>
+                                <div class="text-muted small mt-1">${focus.relevance || 'N/A'}</div>
+                            </div>
+                        </div>
+                    `;
+                    focusAreasList.appendChild(li);
+                });
+            } else {
+                // Fallback to the original format
+                prepPlan.focusAreas.forEach(area => {
+                    const li = document.createElement('li');
+                    li.innerHTML = `<i class="fas fa-bullseye me-2"></i>`;
+                    li.appendChild(document.createTextNode(area || 'N/A'));
+                    focusAreasList.appendChild(li);
+                });
+            }
         } else {
             focusAreasList.innerHTML = '<li class="text-muted">No specific focus areas provided.</li>';
         }
     }
 
-    // --- Likely Questions (Updated) --- (Keep as before)
+    // --- Likely Questions (Improved) ---
     const likelyQuestionsContainer = document.getElementById('likelyQuestions');
     if (likelyQuestionsContainer) {
         likelyQuestionsContainer.innerHTML = ''; // Clear previous
@@ -1584,6 +1613,7 @@ function displayPreparationPlan(data) {
                 const category = item.category || "General";
                 const question = item.question || "No question text.";
                 const guidance = item.guidance || "No specific guidance provided.";
+                const sampleAnswerOutline = item.sampleAnswerOutline || null;
 
                 // Create button and content safely
                 const button = document.createElement('button');
@@ -1593,7 +1623,14 @@ function displayPreparationPlan(data) {
                 button.dataset.bsTarget = `#${collapseId}`;
                 button.setAttribute('aria-expanded', 'false');
                 button.setAttribute('aria-controls', collapseId);
-                button.innerHTML = `<span class="badge bg-secondary me-2"></span> `; // Placeholder for category
+                
+                // Category badge color
+                let categoryColor = 'secondary';
+                if (category?.toLowerCase().includes('technical')) categoryColor = 'primary';
+                else if (category?.toLowerCase().includes('behavioral')) categoryColor = 'success';
+                else if (category?.toLowerCase().includes('situational')) categoryColor = 'info';
+                
+                button.innerHTML = `<span class="badge bg-${categoryColor} me-2"></span> `; // Placeholder for category
                 button.querySelector('.badge').textContent = category; // Set category safely
                 button.appendChild(document.createTextNode(question)); // Set question safely
 
@@ -1610,12 +1647,30 @@ function displayPreparationPlan(data) {
 
                 const bodyDiv = document.createElement('div');
                 bodyDiv.className = 'accordion-body';
-                bodyDiv.innerHTML = `<strong><i class="fas fa-info-circle me-1"></i>Guidance:</strong>`;
+                
+                // Guidance section
+                const guidanceDiv = document.createElement('div');
+                guidanceDiv.className = 'mb-3';
+                guidanceDiv.innerHTML = `<strong><i class="fas fa-info-circle me-1 text-primary"></i>How to Answer:</strong>`;
                 const guidanceP = document.createElement('p');
+                guidanceP.className = 'mt-1 mb-0';
                 guidanceP.textContent = guidance; // Set guidance safely
-                bodyDiv.appendChild(guidanceP);
+                guidanceDiv.appendChild(guidanceP);
+                bodyDiv.appendChild(guidanceDiv);
+                
+                // Sample Answer Outline (if available)
+                if (sampleAnswerOutline) {
+                    const sampleDiv = document.createElement('div');
+                    sampleDiv.className = 'mt-3 pt-2 border-top';
+                    sampleDiv.innerHTML = `<strong><i class="fas fa-lightbulb me-1 text-warning"></i>Sample Answer Structure:</strong>`;
+                    const sampleP = document.createElement('p');
+                    sampleP.className = 'mt-1 mb-0 fst-italic';
+                    sampleP.textContent = sampleAnswerOutline;
+                    sampleDiv.appendChild(sampleP);
+                    bodyDiv.appendChild(sampleDiv);
+                }
+                
                 collapseDiv.appendChild(bodyDiv);
-
                 accordionItem.appendChild(header);
                 accordionItem.appendChild(collapseDiv);
                 accordion.appendChild(accordionItem);
@@ -1626,16 +1681,102 @@ function displayPreparationPlan(data) {
         }
     }
 
-    // --- Concepts to Study --- (Keep as before)
+    // --- Concepts to Study (Improved) ---
     const conceptsToStudyContainer = document.getElementById('conceptsToStudy');
     if (conceptsToStudyContainer) {
         conceptsToStudyContainer.innerHTML = ''; // Clear
+        
+        // Check if conceptsToStudy is the new format (object with categories) or old format (array)
         if (prepPlan.conceptsToStudy) {
-            const conceptsContent = formatConcepts(prepPlan.conceptsToStudy); // Use existing helper
-            if (conceptsContent) {
-                conceptsToStudyContainer.appendChild(conceptsContent);
+            const isNewFormat = typeof prepPlan.conceptsToStudy === 'object' && !Array.isArray(prepPlan.conceptsToStudy);
+            
+            if (isNewFormat) {
+                // Handle the new structured format
+                const conceptsWrapper = document.createElement('div');
+                
+                // Function to create a section for each concept category
+                const createConceptSection = (title, concepts, iconClass) => {
+                    if (!concepts || concepts.length === 0) return null;
+                    
+                    const section = document.createElement('div');
+                    section.className = 'mb-4';
+                    
+                    const heading = document.createElement('h5');
+                    heading.className = 'mb-2';
+                    heading.innerHTML = `<i class="${iconClass} me-2"></i>${title}`;
+                    section.appendChild(heading);
+                    
+                    const list = document.createElement('ul');
+                    list.className = 'list-group list-group-flush border-0';
+                    
+                    concepts.forEach(concept => {
+                        const item = document.createElement('li');
+                        item.className = 'list-group-item border-0 py-1 ps-4';
+                        item.innerHTML = `<i class="fas fa-check text-success me-2"></i>`;
+                        item.appendChild(document.createTextNode(concept));
+                        list.appendChild(item);
+                    });
+                    
+                    section.appendChild(list);
+                    return section;
+                };
+                
+                // Create each category section with appropriate icons
+                const fundamentalsSection = createConceptSection('Fundamental Concepts', 
+                    prepPlan.conceptsToStudy.fundamentals, 'fas fa-book');
+                if (fundamentalsSection) conceptsWrapper.appendChild(fundamentalsSection);
+                
+                const advancedSection = createConceptSection('Advanced Topics', 
+                    prepPlan.conceptsToStudy.advanced, 'fas fa-graduation-cap');
+                if (advancedSection) conceptsWrapper.appendChild(advancedSection);
+                
+                const techSection = createConceptSection('Technologies & Tools', 
+                    prepPlan.conceptsToStudy.technologies, 'fas fa-tools');
+                if (techSection) conceptsWrapper.appendChild(techSection);
+                
+                const methodSection = createConceptSection('Methodologies & Processes', 
+                    prepPlan.conceptsToStudy.methodologies, 'fas fa-sitemap');
+                if (methodSection) conceptsWrapper.appendChild(methodSection);
+                
+                // Resources section with different styling
+                if (prepPlan.conceptsToStudy.resources && prepPlan.conceptsToStudy.resources.length > 0) {
+                    const resourcesSection = document.createElement('div');
+                    resourcesSection.className = 'mt-4 pt-3 border-top';
+                    
+                    const heading = document.createElement('h5');
+                    heading.className = 'mb-3';
+                    heading.innerHTML = `<i class="fas fa-external-link-alt me-2"></i>Recommended Resources`;
+                    resourcesSection.appendChild(heading);
+                    
+                    const list = document.createElement('div');
+                    list.className = 'list-group';
+                    
+                    prepPlan.conceptsToStudy.resources.forEach((resource, index) => {
+                        const item = document.createElement('div');
+                        item.className = 'list-group-item border-start-0 border-end-0';
+                        if (index === 0) item.classList.add('border-top-0');
+                        item.innerHTML = resource;
+                        list.appendChild(item);
+                    });
+                    
+                    resourcesSection.appendChild(list);
+                    conceptsWrapper.appendChild(resourcesSection);
+                }
+                
+                if (conceptsWrapper.children.length > 0) {
+                    conceptsToStudyContainer.appendChild(conceptsWrapper);
+                } else {
+                    // Fallback if all sections were empty
+                    conceptsToStudyContainer.innerHTML = '<div class="alert alert-light">No specific concepts to study listed.</div>';
+                }
             } else {
-                conceptsToStudyContainer.innerHTML = '<div class="alert alert-light">No specific concepts to study listed.</div>';
+                // Fallback to original format
+                const conceptsContent = formatConcepts(prepPlan.conceptsToStudy); // Use existing helper
+                if (conceptsContent) {
+                    conceptsToStudyContainer.appendChild(conceptsContent);
+                } else {
+                    conceptsToStudyContainer.innerHTML = '<div class="alert alert-light">No specific concepts to study listed.</div>';
+                }
             }
         } else {
             conceptsToStudyContainer.innerHTML = '<div class="alert alert-light">No specific concepts to study listed.</div>';
@@ -1676,7 +1817,6 @@ function displayPreparationPlan(data) {
         }
     }
 
-
     // --- REMOVE Old Timeline Display Logic ---
     const preparationTimelineContainer = document.getElementById('preparationTimeline');
     if (preparationTimelineContainer) {
@@ -1706,7 +1846,6 @@ function displayPreparationPlan(data) {
     } else {
         console.error("Dynamic timeline controls container not found!");
     }
-
 }
 
 // --- Add NEW Handler function ---

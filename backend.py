@@ -650,7 +650,6 @@ def generate_interview_prep_plan(resume_match_data):
         print(f"Warning: Could not serialize data cleanly for prep plan prompt - {json_err}")
         gaps_str, requirements_str, resume_summary_str = str(skill_gaps), str(job_requirements), str(parsed_resume) # Fallback to string
 
-
     # --- Start of Modified Prompt ---
     system_prompt = f"""
 You are an expert interview coach tasked with creating a highly targeted interview preparation plan. Base your plan *strictly* on the provided analysis data.
@@ -670,14 +669,31 @@ Your Task: Create a detailed preparation plan structured ONLY as a valid JSON ob
 
 JSON Output Structure:
 {{
-  "focusAreas": [Array of 4-6 specific technical concepts, skills, or behavioral areas MOST critical for success in this interview, derived from JD and gaps],
-  "likelyQuestions": [Array of **exactly 15 to 20** question objects. CRITICAL: This list MUST contain **at least 13 technical/fundamental questions** directly related to the job's required skills (from `jobRequirements`) and the candidate's `skillGaps`. Include **only 1-2 behavioral questions**. For each question, provide tailored guidance.],
-  "conceptsToStudy": [Array of strings listing specific technical concepts, tools, algorithms, or methodologies the candidate MUST review, based heavily on `jobRequirements.requiredSkills` and `skillGaps`],
+  "focusAreas": [Array of 4-6 specific technical concepts, skills, or behavioral areas MOST critical for success in this interview. Each focus area must include:
+    {{
+      "area": "<Specific technical skill, concept, or behavioral attribute>",
+      "relevance": "<Why this area is critical for the role, citing specific JD requirements>",
+      "priority": "high/medium/low"
+    }}
+  ],
+  "likelyQuestions": [Array of **exactly 15 to 20** question objects. CRITICAL: This list MUST contain **at least 13 technical/fundamental questions** directly related to the job's required skills (from `jobRequirements`) and the candidate's `skillGaps`. Include **only 1-2 behavioral questions**. For each question, provide detailed guidance.],
+  "conceptsToStudy": {{
+    "fundamentals": [Array of essential baseline concepts the candidate must be comfortable with],
+    "advanced": [Array of more complex topics that would demonstrate expertise],
+    "technologies": [Array of specific tools, libraries, frameworks mentioned in or related to the JD],
+    "methodologies": [Array of processes, approaches, or methodologies relevant to the role],
+    "resources": [Array of 3-5 specific learning resources (books, courses, documentation) with brief description]
+  }},
   "gapStrategies": [Array containing one object for EACH identified skill gap from the input. If no gaps were identified, provide an empty array `[]`.]
 }}
 
 Detailed Structure Definitions:
-- "likelyQuestions": Each object must be `{{"category": "Technical/Behavioral/Situational", "question": "<Specific interview question>", "guidance": "<1-2 sentences of SPECIFIC, actionable advice on how to approach *this* question, referencing candidate's potential experience or gaps>"}}`.
+- "likelyQuestions": Each object must be `{{
+  "category": "Technical/Behavioral/Situational", 
+  "question": "<Specific interview question>", 
+  "guidance": "<2-3 sentences of SPECIFIC, actionable advice on how to structure a strong answer to this question>",
+  "sampleAnswerOutline": "<Brief bullet-point structure of an effective answer>"
+}}`.
 - "gapStrategies": Each object must be `{{"gap": "<The missingSkill from the input>", "strategy": "<Concrete advice on how to address this gap during the interview (e.g., 'Highlight project X which used related tech Y', 'Discuss relevant coursework Z', 'Acknowledge gap and express eagerness to learn')>", "focus_during_prep": "<Specific topic/skill to study beforehand to mitigate this gap>"}}`.
 
 MANDATORY INSTRUCTIONS:
@@ -685,7 +701,7 @@ MANDATORY INSTRUCTIONS:
 2.  **JSON Only:** Your response MUST be ONLY the valid JSON object described above. No introductory text, explanations, apologies, or markdown formatting.
 3.  **No Timeline:** **DO NOT INCLUDE** any form of timeline or schedule (e.g., `preparationTimeline`).
 4.  **Relevance:** All content MUST be directly derived from the provided context (Summary, Requirements, Gaps, Analysis).
-5.  **Specificity:** Guidance, concepts, and strategies must be concrete and actionable, not generic.
+5.  **Specificity:** All guidance, concepts, and strategies must be concrete and actionable, not generic. Refer to specific technologies and techniques by name.
 """
     # --- End of Modified Prompt ---
 
@@ -722,7 +738,7 @@ MANDATORY INSTRUCTIONS:
 
         prep_plan.setdefault("focusAreas", [])
         prep_plan.setdefault("likelyQuestions", [])
-        prep_plan.setdefault("conceptsToStudy", [])
+        prep_plan.setdefault("conceptsToStudy", {})
         prep_plan.setdefault("gapStrategies", [])
 
         # Ensure no timeline sneaked in
