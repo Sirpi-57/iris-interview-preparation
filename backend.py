@@ -1184,30 +1184,26 @@ def generate_suggested_answers(transcript, resume_data, job_data):
     }
     job_req_str = json.dumps(job_req_summary, indent=2)
 
-    # Extract actual questions from interviewer lines with improved extraction
+    # Extract actual questions from interviewer lines
     lines = transcript.split('\n')
     interviewer_questions = []
     
     print(f"Extracting questions from transcript with {len(lines)} lines")
     
     for i, line in enumerate(lines):
-        if line.startswith('Interviewer') or 'Interviewer:' in line:
+        if line.startswith('Interviewer'):
             # Skip lines that are not questions (like thank you, apologies, etc.)
             if any(skip in line.lower() for skip in ["thank you", "i apologize", "concluded", "this mock interview"]):
                 continue
                 
             # Extract the question text (might be on the same line or next line)
-            question_text = line.replace('Interviewer', '').replace(':', '').strip()
+            question_text = line.replace('Interviewer', '').strip()
             
             # If question is too short, check next line for the actual question
             if len(question_text) < 15 and i+1 < len(lines) and not lines[i+1].startswith(('Interviewer', 'Candidate')):
                 question_text = lines[i+1].strip()
-            
-            # More lenient question detection - include statements that are implicit questions
-            is_question = ('?' in question_text) or any(q in question_text.lower() for q in 
-                          ["could you", "can you", "would you", "tell me", "explain", "describe", "share", "walk me through"])
                 
-            if question_text and is_question and len(question_text) > 20:  # More robust question detection
+            if question_text and '?' in question_text:  # Make sure it's a question
                 interviewer_questions.append(question_text)
                 print(f"Extracted question: {question_text[:50]}...")
     
@@ -1217,7 +1213,7 @@ def generate_suggested_answers(transcript, resume_data, job_data):
         print("WARNING: No questions extracted from transcript. Check transcript format.")
         return {"suggestedAnswers": [], "error": "No questions extracted from transcript"}
     
-    # Process all questions at once or in larger batches to maintain context
+    # Process questions in batches to avoid hitting token limits
     all_suggested_answers = []
     BATCH_SIZE = 5  # Increased from 3 to 5 questions per batch
     
@@ -1229,53 +1225,41 @@ def generate_suggested_answers(transcript, resume_data, job_data):
         print(f"Processing batch {batch_num}/{total_batches} with {len(batch_questions)} questions")
         
         system_prompt = f"""
-You are an expert interview coach reviewing a mock interview for a {job_req_summary.get("jobTitle", "")} position. 
-For each interviewer question, provide ONE strong alternative answer that would impress interviewers.
+You are an expert interview coach reviewing a mock interview. For each significant interviewer question, provide ONE strong alternative answer the candidate could have given.
 
 Interview Context:
-- Candidate: {resume_summary.get("name", "")}, a {resume_summary.get("currentPosition", "")} with {resume_summary.get("yearsOfExperience", "")} experience
+- Candidate: {resume_summary.get("name", "")}, {resume_summary.get("currentPosition", "")}
 - Job: {job_req_summary.get("jobTitle", "")}
 - Skills Required: {", ".join(job_req_summary.get("requiredSkills", []))}
-
-IMPORTANT GUIDELINES:
-- Give detailed, technically accurate answers that showcase expertise
-- Include specific examples, metrics, and technologies where appropriate
-- Keep answers concise but comprehensive
-- Focus on structure (problem-approach-solution-outcome format for technical/project questions)
-- Demonstrate both technical depth and business understanding
 
 Interview Questions:
 {json.dumps(batch_questions, indent=2)}
 
-Format your response as JSON with this structure (one better answer per question):
+For each question, provide ONLY ONE better sample answer. Format as valid JSON with NO control characters:
 {{
 "suggestedAnswers": [
   {{
     "question": "<Question text>",
     "suggestions": [
-      {{
-        "answer": "<Your detailed, improved answer>",
-        "rationale": "<Brief explanation of why this answer is effective>"
-      }}
+      {{"answer": "<Better answer>", "rationale": "<Why this answer is strong>"}}
     ]
   }}
-  // Repeat for each question
 ]
 }}
 
-Return ONLY valid JSON with NO markdown formatting or additional text.
+Return ONLY valid JSON with NO additional text before or after. IMPORTANT: Do NOT include any control characters in the output.
 """
 
-        messages = [{"role": "user", "content": "Provide expert-level alternative answers for these interview questions."}]
+        messages = [{"role": "user", "content": "Provide one strong alternative answer for each interviewer question."}]
 
         try:
-            # Increased max_tokens and reduced temperature for more reliable results
+            # Increased max_tokens and reduced temperature
             response_content = call_claude_api(
                 messages=messages,
                 system_prompt=system_prompt,
                 model=CLAUDE_MODEL,
-                max_tokens=10000,  # Increased significantly from 3000
-                temperature=0.4    # Reduced from 0.5 for more reliable formatting
+                max_tokens=12000,  # Increased from 3000 to 12000
+                temperature=0.4    # Reduced from 0.5 to 0.4
             )
 
             print(f"Received response for batch {batch_num}, length: {len(response_content)} chars")
@@ -1315,7 +1299,7 @@ Return ONLY valid JSON with NO markdown formatting or additional text.
             if "suggestedAnswers" in raw_parsed_data and isinstance(raw_parsed_data.get("suggestedAnswers"), list):
                 for qa_item in raw_parsed_data["suggestedAnswers"]:
                     sanitized_qa = {}
-                    sanitized_qa["question"] = sanitize_string_for_json(qa_item.get("question", ""))
+                    sanitized_qa["question"] = sanitize_string_for_json(qa_item.get("question"))
 
                     sanitized_suggestions = []
                     # Ensure suggestions exist and keep only the first one
@@ -1324,8 +1308,8 @@ Return ONLY valid JSON with NO markdown formatting or additional text.
                         first_suggestion = suggestions[0]
                         if isinstance(first_suggestion, dict):
                             sanitized_suggestions.append({
-                                "answer": sanitize_string_for_json(first_suggestion.get("answer", "")),
-                                "rationale": sanitize_string_for_json(first_suggestion.get("rationale", ""))
+                                "answer": sanitize_string_for_json(first_suggestion.get("answer")),
+                                "rationale": sanitize_string_for_json(first_suggestion.get("rationale"))
                             })
                             answers_count += 1
 
