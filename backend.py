@@ -1193,7 +1193,7 @@ def generate_suggested_answers(transcript, resume_data, job_data):
     for i, line in enumerate(lines):
         if line.startswith('Interviewer'):
             # Skip lines that are not questions (like thank you, apologies, etc.)
-            if any(skip in line.lower() for skip in ["thank you", "i apologize", "concluded", "this mock interview"]):
+            if any(skip in line.lower() for skip in ["i apologize", "concluded", "this mock interview"]):
                 continue
                 
             # Extract the question text (might be on the same line or next line)
