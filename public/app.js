@@ -1422,7 +1422,7 @@ function displayAnalysisResults(data) {
         skillGapsList.innerHTML = '<li class="list-group-item text-muted">No critical skill gaps identified.</li>';
     }
 
-    // --- Resume Improvements (Button Removed) ---
+    // --- Resume Improvements (Updated to display detailed information) ---
     const resumeImprovementsContainer = document.getElementById('resumeImprovements');
     resumeImprovementsContainer.innerHTML = ''; // Clear loading/previous
     if (matchResults.resumeImprovements?.length > 0) {
@@ -1439,7 +1439,11 @@ function displayAnalysisResults(data) {
             const section = improvement.section || 'General';
             const issue = improvement.issue || 'Suggestion';
             const recommendation = improvement.recommendation || 'N/A';
-            const example = improvement.example;
+            
+            // New fields from the enhanced backend
+            const currentContent = improvement.currentContent || '';
+            const improvedVersion = improvement.improvedVersion || '';
+            const explanation = improvement.explanation || '';
 
             // Use textContent for safety
             item.innerHTML = `
@@ -1451,51 +1455,86 @@ function displayAnalysisResults(data) {
                 <div id="${collapseId}" class="accordion-collapse collapse" aria-labelledby="${headerId}" data-bs-parent="#resumeImprovementsAccordion">
                     <div class="accordion-body">
                         <p><strong>Recommendation:</strong> <span class="recommendation-text"></span></p>
-                        ${example ? `<p><strong>Example:</strong> <em><span class="example-text"></span></em></p>` : ''}
+                        
+                        <!-- Before and After comparison -->
+                        <div class="card mb-3">
+                            <div class="card-header bg-light">
+                                <div class="row">
+                                    <div class="col-6 border-end">
+                                        <strong><i class="fas fa-file-alt me-2"></i>Current Content</strong>
+                                    </div>
+                                    <div class="col-6">
+                                        <strong><i class="fas fa-magic me-2"></i>Improved Version</strong>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="card-body p-0">
+                                <div class="row g-0">
+                                    <div class="col-6 border-end p-3">
+                                        <div class="current-content font-monospace small"></div>
+                                    </div>
+                                    <div class="col-6 p-3 bg-light">
+                                        <div class="improved-content font-monospace small"></div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
+                        
+                        <!-- Explanation -->
+                        <div class="mt-2">
+                            <strong><i class="fas fa-lightbulb me-2 text-warning"></i>Why this matters:</strong>
+                            <p class="explanation-text fst-italic mt-1"></p>
+                        </div>
+
+                        <!-- Copy button for improved version -->
+                        <button class="btn btn-sm btn-outline-primary mt-2 copy-improvement-btn">
+                            <i class="fas fa-copy me-1"></i> Copy Improved Version
+                        </button>
+                    </div>
                 </div>`;
 
             // Safely populate text content
-            item.querySelector('strong').textContent = section;
-            item.querySelector('h2 span').textContent = issue; // Assuming the span after strong is for the issue
+            item.querySelector('h2 strong').textContent = section;
+            item.querySelector('h2 span').textContent = issue;
             item.querySelector('.recommendation-text').textContent = recommendation;
-            if (example) {
-                 item.querySelector('.example-text').textContent = example;
-            }
+            item.querySelector('.current-content').textContent = currentContent;
+            item.querySelector('.improved-content').textContent = improvedVersion;
+            item.querySelector('.explanation-text').textContent = explanation;
+
+            // Add copy button functionality
+            const copyBtn = item.querySelector('.copy-improvement-btn');
+            copyBtn.addEventListener('click', function() {
+                const textToCopy = improvedVersion;
+                navigator.clipboard.writeText(textToCopy)
+                    .then(() => {
+                        // Temporarily change button text to indicate success
+                        const originalText = copyBtn.innerHTML;
+                        copyBtn.innerHTML = '<i class="fas fa-check me-1"></i> Copied!';
+                        copyBtn.classList.add('btn-success');
+                        copyBtn.classList.remove('btn-outline-primary');
+                        
+                        setTimeout(() => {
+                            copyBtn.innerHTML = originalText;
+                            copyBtn.classList.remove('btn-success');
+                            copyBtn.classList.add('btn-outline-primary');
+                        }, 2000);
+                    })
+                    .catch(err => {
+                        console.error('Could not copy text: ', err);
+                        // Indicate failure
+                        copyBtn.textContent = 'Copy failed';
+                        setTimeout(() => {
+                            copyBtn.innerHTML = '<i class="fas fa-copy me-1"></i> Copy Improved Version';
+                        }, 2000);
+                    });
+            });
 
             accordion.appendChild(item);
         });
         resumeImprovementsContainer.appendChild(accordion);
-        // No need to re-attach event listeners for the removed button
     } else {
         resumeImprovementsContainer.innerHTML = '<div class="alert alert-light">No specific resume improvement suggestions provided for this job.</div>';
     }
-
-    // const analysisSection = document.getElementById('analysis');
-    // if(analysisSection && !document.getElementById('resumeResourcesCard')) { // Prevent adding multiple times
-    //      const resourceCard = document.createElement('div');
-    //      resourceCard.id = 'resumeResourcesCard';
-    //      resourceCard.className = 'card mb-4';
-    //      resourceCard.innerHTML = `
-    //          <div class="card-header"><h3>Resume Resources</h3></div>
-    //          <div class="card-body">
-    //              <p>Consider these resources for professional resume templates:</p>
-    //              <ul>
-    //                  <li><a href="https://resumake.io/" target="_blank" rel="noopener noreferrer">Resumake</a></li>
-    //                  <li><a href="https://www.canva.com/resumes/templates/" target="_blank" rel="noopener noreferrer">Canva Resume Templates</a></li>
-    //                  <li><a href="https://zety.com/resume-templates" target="_blank" rel="noopener noreferrer">Zety Resume Templates</a></li>
-    //              </ul>
-    //          </div>`;
-    //      // Append after resume improvements, before the final button
-    //      const nextButton = analysisSection.querySelector('#viewPrepPlanBtn');
-    //      if(nextButton) {
-    //           nextButton.parentNode.insertBefore(resourceCard, nextButton);
-    //      } else {
-    //            analysisSection.querySelector('.container').appendChild(resourceCard); // Fallback append
-    //      }
-    // }
-
-
 }
 
 

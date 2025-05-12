@@ -617,7 +617,7 @@ MANDATORY INSTRUCTIONS:
         print(f"OpenAI analysis error: {e}")
         traceback.print_exc()
         return {"error": str(e), "matchScore": 0, "matchAnalysis": f"[Error during analysis: {e}]", "keyStrengths": [], "skillGaps": [], "jobRequirements": {}, "resumeImprovements": []}
-
+        
 def generate_interview_prep_plan(resume_match_data):
     """Generates a personalized interview prep plan using Claude (no timeline)."""
     print("--- Generating Prep Plan (No Timeline) ---")
