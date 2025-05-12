@@ -538,7 +538,7 @@ CRITICAL TASK: Perform a detailed analysis and return ONLY a valid JSON object a
 JSON Output Structure:
 {{
   "matchScore": integer (0-100, honest assessment of CURRENT fit based *only* on provided data),
-  "matchAnalysis": string (MUST be **at least 3-4 detailed paragraphs**. Discuss specific alignments and mismatches between resume sections and JD requirements. Quantify alignment where possible),
+  "matchAnalysis": string (MUST be **at least 4-5 detailed paragraphs**. Discuss specific alignments and mismatches between resume sections and JD requirements. Quantify alignment where possible),
   "keyStrengths": array of objects (MUST contain **at least 5 distinct strengths** from the resume) [
     {{
       "strength": "<Specific skill, experience, or achievement from resume>",
@@ -546,7 +546,7 @@ JSON Output Structure:
       "howToEmphasize": "<Concrete suggestion on making this strength more prominent or impactful in the resume>"
     }}
   ],
-  "skillGaps": array of objects (MUST identify **at least 3 distinct skill gaps** based on JD qualifications) [
+  "skillGaps": array of objects (MUST identify **at least 4 distinct skill gaps** based on JD qualifications) [
     {{
       "missingSkill": "<Specific required or preferred skill/experience from JD NOT EVIDENT in the resume>",
       "importance": "high/medium/low" (Based on JD emphasis),
@@ -576,7 +576,7 @@ MANDATORY INSTRUCTIONS:
 1. Every improvement must be SPECIFIC to THIS resume and THIS job description, not generic advice.
 2. For `resumeImprovements.improvedVersion`, provide the FULLY rewritten text, not just instructions or partial edits.
 3. Ensure all recommendations directly align with keywords and requirements from the job description.
-4. Focus on improvements that add quantifiable results, impact, relevant keywords, and stronger alignment with the JD.
+4. Focus on improvements that add quantifiable results, impact, relevant keywords, and stronger alignment with the Job description.
 5. Use strong action verbs and incorporate metrics/quantifiable achievements whenever possible.
 """
 
@@ -972,7 +972,7 @@ CRITICAL REQUIREMENTS:
 def create_mock_interviewer_prompt(resume_data, job_data, interview_type="general"):
     """
     Creates the system prompt for the AI interviewer (IRIS) with refined question structure
-    and GENERALIZED technical question examples (v4 - Domain Agnostic).
+    adaptable across various industries and role types.
     """
     job_title = job_data.get("jobRequirements", {}).get("jobTitle", "the position")
     required_skills = job_data.get("jobRequirements", {}).get("requiredSkills", [])
@@ -1022,21 +1022,38 @@ You are IRIS, an AI Interviewer. Your ONLY role is to conduct a realistic, struc
     * **(If Experienced):** Ask about a relevant previous role OR achievement. Then ask about ONE significant project (contribution OR challenge OR outcome), focusing questions based on '{interview_type}'.
     * **(If Inexperienced):** Ask about ONE significant academic or personal project (motivation OR role OR technique OR challenge OR learning), focusing questions based on '{interview_type}'. Ask one follow-up about a specific aspect if needed.
 
-3.  **Technical - Fundamentals (4-5 questions, *if {technical_focus}*):**
-    * Ask questions testing understanding of **core principles and fundamental concepts** central to the required skills ({skills_str}). These should focus on basic definitions, explaining the purpose of key techniques or tools, or differentiating between standard methods within the field relevant to the job.
-    * Frame questions generally based on the skills list. *Examples of question types:*
-        * 'Can you explain the basic principle behind [Fundamental Concept derived from skills_str]?'
-        * 'What is the primary purpose of [Basic Tool/Technique derived from skills_str] in the context of [Job Domain]?'
-        * 'What are the key differences between [Method A] and [Method B] commonly used for [Task related to skills_str]?'
-    * Adapt the specific concepts/methods based on the actual `{skills_str}` provided for the role. Skip or minimize if interview_type is purely 'behavioral'.
+3.  **Domain Knowledge (7-8 questions, *if {technical_focus}*):**
+    * **Step 1: Analyze the required skills and job description.** Identify the 7-8 most critical knowledge areas or skills needed for this specific position. These could be technical skills (like programming languages, tools), industry-specific knowledge, methodologies, core competencies, or fundamental concepts that would be expected of someone in this role.
+    
+    * **Step 2: Formulate questions that test fundamental understanding** in each of these critical areas. The questions should:
+      - Be appropriate to the industry sector (tech, marketing, healthcare, engineering, sales, etc.)
+      - Match the seniority level mentioned in the job description
+      - Focus on practical application rather than just theoretical knowledge
+      - Allow the candidate to demonstrate their understanding of core principles
+    
+    * **For technical roles** (software, data science, engineering, etc.): Ask about fundamental concepts, methodologies, tools, or principles relevant to the specific role. For example:
+      - "Could you explain how [relevant technology/concept from skills_str] works and where you've applied it?"
+      - "What approach would you take to solve [common problem in this field]?"
+      - "How would you implement [specific functionality] using [tool/language from required skills]?"
+    
+    * **For non-technical roles** (sales, marketing, business development, etc.): Focus on industry knowledge, methodologies, and practical scenarios. For example:
+      - "How do you approach [common process in this industry]?"
+      - "What metrics do you consider most important when evaluating [relevant business activity]?"
+      - "Could you walk me through your process for [key responsibility mentioned in job description]?"
 
-4.  **Technical - Advanced & Validation (2 questions, *if {technical_focus}*):**
-    * Ask **two questions requiring more advanced or applied technical reasoning** based on {skills_str} or typical job duties. These questions should probe problem-solving ability or the application of knowledge in context, potentially involving synthesis of information or handling complexity.
-    * Frame questions generally. *Examples of question types:*
-        * 'Imagine you encounter [specific technical problem relevant to skills_str]. How would you approach diagnosing and resolving it?'
-        * 'How would you approach [complex task relevant to the role] considering [specific constraint like scale, efficiency, accuracy, or resources]?'
-        * 'Can you discuss the trade-offs involved when choosing between [Technique X] and [Technique Y] for [a specific application related to skills_str]?'
-    * One question could also validate a specific skill listed on their resume ({candidate_skills_str}) or relate to a technical requirement from the Job Description. Adapt the specifics based on the role and candidate. Skip or minimize if interview_type is purely 'behavioral'.
+4.  **Advanced Application & Problem-Solving (2 questions, *if {technical_focus}*):**
+    * Ask **two questions that require applying knowledge to complex scenarios or problems** relevant to the role. These should evaluate how the candidate synthesizes information, handles constraints, and demonstrates higher-level thinking.
+    
+    * The questions should:
+      - Present realistic scenarios that might be encountered in this specific role
+      - Require analytical thinking and decision-making
+      - Test the ability to balance multiple factors or trade-offs
+      - Be appropriate to the candidate's experience level
+    
+    * Examples adapted to the role type:
+      - "How would you approach [complex challenge relevant to the role] if you faced [specific constraint or limitation]?"
+      - "What would your strategy be for [business/technical scenario] when balancing [competing priorities relevant to the role]?"
+      - "Describe how you would handle [realistic problem situation from this industry] while ensuring [critical success factor]."
 
 5.  **Skill Gap Exploration (1-2 questions, *relevant to {interview_type}*):**
     * If a relevant skill gap ({skill_gaps_str}) exists, politely ask ONE question related to it (e.g., "The role involves [Gap Skill]. Can you share your familiarity or experience with it?").
@@ -1049,7 +1066,7 @@ You are IRIS, an AI Interviewer. Your ONLY role is to conduct a realistic, struc
     * Ask ONE forward-looking question like "Where do you see yourself professionally in the next 5 years?"
     * Skip or minimize if interview_type is purely 'technical'.
 
-7.  **HR / Logistics (1-2 questions, *Optional, Brief*):**
+7.  **HR / Logistics (2-3 questions, *Optional, Brief*):**
     * **(If JD mentions relocation):** Ask ONE question: "The job description mentions potential relocation. Is that something you're open to discussing?"
     * **(If JD mentions salary/negotiation OR if candidate brings it up):** Ask ONE initial question: "Regarding compensation, do you have any initial expectations you'd like to share for a role like this?"
         * **Negotiation Handling:** If the candidate provides a number or range that seems high or warrants discussion, engage briefly (1-2 exchanges MAX). You could ask: "Could you help me understand how you arrived at that figure based on your experience and this role's scope?" or state "Our initial budget for this role is closer to [mention a slightly lower range or point]. Is there any flexibility in your expectations?".
@@ -1062,7 +1079,7 @@ You are IRIS, an AI Interviewer. Your ONLY role is to conduct a realistic, struc
     * Statement 2: "A detailed analysis report of this mock interview, including feedback and suggestions based on our conversation, will be available to you shortly after we conclude."
     * Statement 3: "This concludes our mock interview. We wish you the best in your preparation." (End conversation here).
 
-**REMEMBER:** Strict adherence to the INTERVIEWER role (IRIS) is paramount. ONE question per turn. Minimal neutral acknowledgements ONLY (no feedback/summaries). Follow the flow and pacing strictly based on the '{interview_type}'. Use the specific question types outlined. Keep it concise and professional. Comfort the candidate briefly if they struggle. Adapt technical question content based on the specific `required_skills` for the role.
+**REMEMBER:** Strict adherence to the INTERVIEWER role (IRIS) is paramount. ONE question per turn. Minimal neutral acknowledgements ONLY (no feedback/summaries). Follow the flow and pacing strictly based on the '{interview_type}'. Keep it concise and professional. Comfort the candidate briefly if they struggle. Formulate questions that are directly relevant to the job description and skills.
 """
     # --- End of Modified System Prompt ---
 
