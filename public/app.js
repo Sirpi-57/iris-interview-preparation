@@ -2203,6 +2203,16 @@ function setupMediaDevices() {
 }
 
 function setupMediaRecorder(stream) {
+    // Reset adaptive VAD values for this recording session
+    state.deviceBaselineVolume = null;
+    state.deviceAdaptiveSpeechThreshold = null;
+    state.consecutiveSilenceFrames = 0;
+    state.minSilenceFramesForStop = 15;
+    
+    // Increase silence delay for mobile devices
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    state.silenceDelay = isMobile ? 1500 : 1000; // Longer delay on mobile
+
     if (typeof MediaRecorder === 'undefined') {
         console.error("MediaRecorder is not supported in this browser.");
         alert("Voice input is not supported in your browser.");
@@ -2589,7 +2599,6 @@ function checkAudioLevel() {
          return;
     }
 
-
     // Calculate average volume
     let sum = 0;
     for (let i = 0; i < state.audioDataArray.length; i++) {
@@ -2597,47 +2606,69 @@ function checkAudioLevel() {
     }
     const averageVolume = sum / state.audioDataArray.length;
 
-    // **** ADDED LOGGING ****
+    // Initialize device-specific adaptive values if not already set
+    if (!state.deviceBaselineVolume) {
+        // Set initial values with some reasonable defaults
+        state.deviceBaselineVolume = averageVolume > 5 ? averageVolume * 0.5 : 3;
+        state.deviceAdaptiveSpeechThreshold = Math.max(averageVolume * 1.2, SPEECH_THRESHOLD * 0.7);
+        state.consecutiveSilenceFrames = 0;
+        state.minSilenceFramesForStop = 15; // Require multiple frames below threshold
+        console.log(`Initialized adaptive values - Baseline: ${state.deviceBaselineVolume.toFixed(2)}, Speech Threshold: ${state.deviceAdaptiveSpeechThreshold.toFixed(2)}`);
+    }
+
     // Log volume periodically (e.g., every ~30 frames) to avoid flooding console
     if (!window.vadLogCounter) window.vadLogCounter = 0;
     window.vadLogCounter++;
     if (window.vadLogCounter % 30 === 0) {
-        console.log(`VAD Avg Vol: ${averageVolume.toFixed(2)} (Threshold: ${SPEECH_THRESHOLD})`);
+        console.log(`VAD Avg Vol: ${averageVolume.toFixed(2)} (Adaptive Threshold: ${state.deviceAdaptiveSpeechThreshold.toFixed(2)}, Silence Frames: ${state.consecutiveSilenceFrames}/${state.minSilenceFramesForStop})`);
     }
-    // ***********************
 
-
-    // --- Silence Detection Logic ---
-    if (averageVolume > SPEECH_THRESHOLD) {
+    // --- Modified Silence Detection Logic ---
+    if (averageVolume > state.deviceAdaptiveSpeechThreshold) {
         // Speech detected
         if (!state.speechDetectedInChunk) {
-             console.log(`--- Speech Detected (Volume: ${averageVolume.toFixed(2)}) ---`); // Log first detection
+             console.log(`--- Speech Detected (Volume: ${averageVolume.toFixed(2)}) ---`); 
              state.speechDetectedInChunk = true; // Mark that speech has occurred
+             
+             // Adapt threshold based on actual speech volume (slowly move toward actual speech level)
+             state.deviceAdaptiveSpeechThreshold = state.deviceAdaptiveSpeechThreshold * 0.9 + (averageVolume * 0.5) * 0.1;
         }
+        
+        // Reset silence counter whenever speech is detected
+        state.consecutiveSilenceFrames = 0;
+        
         // If silence timer is running, clear it because speech is happening again
         if (state.silenceTimer) {
-            // console.log("Speech detected, clearing silence timer."); // Can be noisy
             clearTimeout(state.silenceTimer);
             state.silenceTimer = null;
         }
     } else {
         // Silence detected (or below threshold)
-        // Start the silence timer ONLY if speech has already been detected in this chunk
-        // AND the timer isn't already running.
-        if (state.speechDetectedInChunk && !state.silenceTimer) {
-             console.log(`Silence detected after speech (Volume: ${averageVolume.toFixed(2)}), starting ${state.silenceDelay}ms timeout...`);
-             state.silenceTimer = setTimeout(() => {
-                 console.log("Silence timer expired after speech.");
-                 // Double check we are still recording before stopping
-                 if (state.isRecording) {
-                     stopRecordingAndProcess();
-                 } else {
-                      console.log("Silence timer expired, but recording already stopped.");
-                      state.silenceTimer = null; // Clear timer ID
-                 }
-             }, state.silenceDelay);
+        
+        // Increment consecutive silence frame counter
+        state.consecutiveSilenceFrames++;
+        
+        // Start the silence timer ONLY if:
+        // 1. Speech has already been detected in this chunk
+        // 2. We've had enough consecutive silence frames
+        // 3. A timer isn't already running
+        if (state.speechDetectedInChunk && 
+            state.consecutiveSilenceFrames >= state.minSilenceFramesForStop && 
+            !state.silenceTimer) {
+            
+            console.log(`Sustained silence detected after speech (${state.consecutiveSilenceFrames} frames, Volume: ${averageVolume.toFixed(2)}), starting ${state.silenceDelay}ms timeout...`);
+            
+            state.silenceTimer = setTimeout(() => {
+                console.log("Silence timer expired after speech.");
+                // Double check we are still recording before stopping
+                if (state.isRecording) {
+                    stopRecordingAndProcess();
+                } else {
+                    console.log("Silence timer expired, but recording already stopped.");
+                    state.silenceTimer = null; // Clear timer ID
+                }
+            }, state.silenceDelay);
         }
-        // If silence timer IS running, do nothing - let it expire or be cleared by speech.
     }
 }
 
@@ -2668,8 +2699,6 @@ function stopRecordingAndProcess() {
 
     // Stop visual timer
     clearInterval(state.recordingTimer);
-
-    // --- REMOVED state.speechDetectedInChunk = false; from here ---
 
     // Stop the MediaRecorder - this is asynchronous and triggers 'onstop'
     if (state.mediaRecorder && state.mediaRecorder.state === "recording") {

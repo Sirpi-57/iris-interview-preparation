@@ -1173,33 +1173,48 @@ def generate_suggested_answers(transcript, resume_data, job_data):
     }
     job_req_str = json.dumps(job_req_summary, indent=2)
 
-    # Extract actual questions from interviewer lines
-    lines = transcript.split('\n')
+    # Extract actual questions from the transcript by analyzing blocks of text
     interviewer_questions = []
+    lines = transcript.split('\n')
     
     print(f"Extracting questions from transcript with {len(lines)} lines")
     
-    for i, line in enumerate(lines):
+    # Process the transcript to extract full interviewer questions with question marks
+    current_speaker = None
+    current_text = ""
+    
+    for line in lines:
         if line.startswith('Interviewer'):
-            # Skip lines that are not questions (like thank you, apologies, etc.)
-            if any(skip in line.lower() for skip in ["i apologize", "concluded", "this mock interview"]):
-                continue
-                
-            # Extract the question text (might be on the same line or next line)
-            question_text = line.replace('Interviewer', '').strip()
+            current_speaker = 'Interviewer'
+            current_text = line.replace('Interviewer', '').strip()
+            if current_text.startswith(':'):
+                current_text = current_text[1:].strip()
+        elif line.startswith('Candidate'):
+            # If we were collecting interviewer text and it ended with a question mark, save it
+            if current_speaker == 'Interviewer' and '?' in current_text:
+                # Extract the part that ends with a question mark
+                question_parts = current_text.split('?')
+                if len(question_parts) > 1:
+                    # Take everything up to and including the first question mark
+                    question = question_parts[0] + '?'
+                    if len(question) >= 20:  # Only keep substantive questions
+                        interviewer_questions.append(question)
+                        print(f"Extracted question: {question[:50]}...")
             
-            # If question is too short, check next line for the actual question
-            if len(question_text) < 15 and i+1 < len(lines) and not lines[i+1].startswith(('Interviewer', 'Candidate')):
-                question_text = lines[i+1].strip()
-                
-            # Clean leading colon if present (addressing format variations)
-            if question_text and question_text.startswith(':'):
-                question_text = question_text[1:].strip()
-                
-            # CHANGED: Removed '?' requirement - consider all substantive interviewer text
-            if question_text:  # Any non-empty text is considered
-                interviewer_questions.append(question_text)
-                print(f"Extracted question: {question_text[:50]}...")
+            current_speaker = 'Candidate'
+            current_text = ""
+        elif current_speaker == 'Interviewer' and line.strip():
+            # Continue building the interviewer text
+            current_text += " " + line.strip()
+    
+    # Check for any final question that might be at the end of the transcript
+    if current_speaker == 'Interviewer' and '?' in current_text:
+        question_parts = current_text.split('?')
+        if len(question_parts) > 1:
+            question = question_parts[0] + '?'
+            if len(question) >= 20:  # Only keep substantive questions
+                interviewer_questions.append(question)
+                print(f"Extracted question: {question[:50]}...")
     
     # Log extracted questions count
     print(f"Extracted {len(interviewer_questions)} questions from transcript")
@@ -1209,7 +1224,7 @@ def generate_suggested_answers(transcript, resume_data, job_data):
     
     # Process questions in batches to avoid hitting token limits
     all_suggested_answers = []
-    BATCH_SIZE = 3  # CHANGED: Reduced from 4 to 3 for better token management
+    BATCH_SIZE = 3  # Changed from 4 to 3 for better token management
     
     for i in range(0, len(interviewer_questions), BATCH_SIZE):
         batch_questions = interviewer_questions[i:i+BATCH_SIZE]
