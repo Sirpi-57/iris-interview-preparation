@@ -1573,21 +1573,22 @@
                 </section>
     
                 <!-- Interview Preparation Plan -->
+                <!-- Interview Preparation Plan with compatibility notice -->
                 <section id="prep-plan" class="content-section">
                     <div class="container-fluid">
                         <h2>Your Interview Preparation Plan</h2>
                         <p class="section-description">Based on your resume analysis, here's a personalized plan to help you prepare</p>
-    
+
                         <div class="card mb-4">
                             <div class="card-header"><h3>Focus Areas</h3></div>
                             <div class="card-body"><ul id="focusAreasList" class="focus-areas-list"><li>Loading...</li></ul></div>
                         </div>
-    
+
                         <div class="card mb-4">
                             <div class="card-header"><h3>Likely Interview Questions</h3></div>
                             <div class="card-body"><div id="likelyQuestions" class="accordion"><p class="text-center">Loading...</p></div></div>
                         </div>
-    
+
                         <div class="row">
                             <div class="col-md-6">
                                 <div class="card mb-4">
@@ -1605,7 +1606,7 @@
                                 </div>
                             </div>
                         </div>
-    
+
                         <div class="card mb-4">
                             <div class="card-header">
                                 <h3><i class="fas fa-calendar-alt me-2"></i> Dynamic Preparation Timeline</h3>
@@ -1628,7 +1629,14 @@
                             </div>
                         </div>
                         <div class="text-center mt-4">
-                            <button class="btn btn-primary btn-lg" id="startInterviewBtn">Start Mock Interview Now</button>
+                            <!-- Device compatibility notice -->
+                            <div class="alert alert-info mb-3" role="alert">
+                                <i class="fas fa-info-circle me-2"></i> <strong>Device Compatibility:</strong> Mock interviews work best on Windows PCs and Android devices. iOS support coming soon. For optimal experience, use a desktop or laptop computer.
+                            </div>
+                            <button class="btn btn-primary btn-lg" id="startInterviewBtn">
+                                <i class="fas fa-video me-2"></i> Start Mock Interview Now
+                                <span class="badge bg-warning text-dark ms-2" title="Supported on Windows and Android"><i class="fas fa-laptop me-1"></i><i class="fas fa-mobile-alt"></i></span>
+                            </button>
                         </div>
                     </div>
                 </section>
@@ -2118,6 +2126,13 @@
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
+                    <!-- Device compatibility notice at the top -->
+                    <div class="alert alert-warning mb-3" role="alert">
+                        <i class="fas fa-exclamation-triangle me-2"></i> <strong>Device Compatibility:</strong> 
+                        Currently supported on Windows PCs and Android devices. iOS support coming soon. 
+                        For best interview experience, use a desktop or laptop.
+                    </div>
+
                     <p>IRIS needs access to your camera and microphone to provide a realistic interview experience.</p>
                     <p>We use your camera to:</p>
                     <ul>
@@ -2136,7 +2151,10 @@
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="button" class="btn btn-primary" id="grantPermissionsBtn">Grant Access</button>
+                    <button type="button" class="btn btn-primary" id="grantPermissionsBtn">
+                        Grant Access
+                        <span class="badge bg-light text-dark ms-1" title="Windows & Android"><i class="fas fa-laptop"></i> / <i class="fas fa-android"></i></span>
+                    </button>
                 </div>
             </div>
         </div>
