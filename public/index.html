@@ -110,7 +110,7 @@
                             <a class="nav-link tab-button" data-tab="pricing-tab" href="#">Pricing</a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link tab-button" href="about-us.html">About Us</a>
+                            <a class="nav-link" href="about-us.html">About Us</a>
                         </li>
                     </ul>
                     <div class="d-flex">
@@ -2477,6 +2477,27 @@
                     openPDFInModal(privacyPolicyPDF, "Privacy Policy");
                 });
             }
+        });
+
+        document.addEventListener('DOMContentLoaded', function() {
+            // Find current page and set active class to corresponding nav link
+            const currentPage = window.location.pathname;
+            const navLinks = document.querySelectorAll('.navbar .nav-link');
+            
+            navLinks.forEach(link => {
+                const href = link.getAttribute('href');
+                
+                // For home page
+                if (currentPage.endsWith('/index.html') || currentPage.endsWith('/') || currentPage === '') {
+                    if (link.textContent.trim() === 'Home' || href === 'index.html' || href === './index.html' || href === '/index.html' || href === '#') {
+                        link.classList.add('active');
+                    }
+                } 
+                // For all other pages, match the href
+                else if (href && currentPage.includes(href)) {
+                    link.classList.add('active');
+                }
+            });
         });
 
         function openPDFInModal(pdfPath, title) {
