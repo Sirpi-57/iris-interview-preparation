@@ -2722,3 +2722,224 @@ overflow: hidden; /* Ensures iframe respects rounded corners */
     transform: translateY(-5px);
     box-shadow: 0 10px 20px rgba(0,0,0,0.1);
 }
+
+
+
+
+/* Resume Preview Styles - Add to your styles.css */
+
+.resume-preview-area {
+    min-height: 600px;
+    max-height: 800px;
+    overflow-y: auto;
+    font-family: 'Roboto', sans-serif;
+    line-height: 1.4;
+    font-size: 14px;
+    padding: 20px !important;
+    background: white;
+    border: 1px solid #ddd;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+/* Header Styles */
+.preview-header {
+    text-align: center;
+    margin-bottom: calc(20px * var(--section-spacing, 1));
+    padding-bottom: calc(10px * var(--spacing-factor, 1));
+    border-bottom: 1px solid #eee;
+}
+
+.preview-header .name {
+    font-size: 24px;
+    font-weight: bold;
+    margin-bottom: calc(8px * var(--spacing-factor, 1));
+    color: #333;
+}
+
+.preview-header .contact-info {
+    font-size: 12px;
+    color: #666;
+    margin-bottom: calc(8px * var(--spacing-factor, 1));
+}
+
+/* Objective Styles */
+.preview-objective {
+    margin-bottom: calc(16px * var(--section-spacing, 1));
+    font-style: italic;
+    color: #555;
+    line-height: 1.5;
+}
+
+/* Section Styles */
+.preview-section {
+    margin-bottom: calc(20px * var(--section-spacing, 1));
+}
+
+.preview-section h2 {
+    font-size: 16px;
+    font-weight: bold;
+    text-transform: uppercase;
+    color: #333;
+    margin-bottom: calc(12px * var(--spacing-factor, 1));
+    padding-bottom: calc(4px * var(--spacing-factor, 1));
+    border-bottom: 1px solid #333;
+}
+
+/* Item Styles */
+.preview-item {
+    margin-bottom: calc(12px * var(--item-spacing, 1));
+}
+
+.preview-item.mt-item {
+    margin-top: calc(8px * var(--item-spacing, 1));
+}
+
+.item-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: calc(4px * var(--spacing-factor, 1));
+}
+
+.item-title {
+    font-weight: bold;
+    font-size: 14px;
+    color: #333;
+}
+
+.item-date {
+    font-size: 12px;
+    color: #666;
+    font-style: italic;
+}
+
+.item-subtitle {
+    font-size: 12px;
+    color: #666;
+    font-style: italic;
+    margin-bottom: calc(6px * var(--spacing-factor, 1));
+}
+
+.item-subtitle a {
+    color: #0066cc;
+    text-decoration: none;
+}
+
+.item-subtitle a:hover {
+    text-decoration: underline;
+}
+
+/* List Styles */
+.preview-section ul {
+    margin: calc(6px * var(--spacing-factor, 1)) 0;
+    padding-left: 20px;
+}
+
+.preview-section li {
+    margin-bottom: calc(3px * var(--spacing-factor, 1));
+    font-size: 13px;
+    line-height: 1.4;
+}
+
+/* Skills Section */
+.preview-skills p {
+    margin: 0;
+    line-height: 1.5;
+}
+
+
+/* Languages Section */
+.preview-languages .preview-item {
+    display: inline-block;
+    margin-right: calc(15px * var(--spacing-factor, 1));
+    margin-bottom: calc(5px * var(--spacing-factor, 1));
+}
+
+.preview-languages .item-header {
+    display: inline;
+}
+
+.preview-languages .item-title {
+    display: inline;
+}
+
+/* Font Size Classes */
+.resume-preview-area.font-compact {
+    font-size: 12px;
+}
+
+.resume-preview-area.font-compact .preview-header .name {
+    font-size: 20px;
+}
+
+.resume-preview-area.font-compact .preview-section h2 {
+    font-size: 14px;
+}
+
+.resume-preview-area.font-compact .item-title {
+    font-size: 12px;
+}
+
+.resume-preview-area.font-standard {
+    font-size: 14px;
+}
+
+.resume-preview-area.font-standard .preview-header .name {
+    font-size: 24px;
+}
+
+.resume-preview-area.font-standard .preview-section h2 {
+    font-size: 16px;
+}
+
+.resume-preview-area.font-standard .item-title {
+    font-size: 14px;
+}
+
+.resume-preview-area.font-large {
+    font-size: 16px;
+}
+
+.resume-preview-area.font-large .preview-header .name {
+    font-size: 28px;
+}
+
+.resume-preview-area.font-large .preview-section h2 {
+    font-size: 18px;
+}
+
+.resume-preview-area.font-large .item-title {
+    font-size: 16px;
+}
+
+/* Document Size Classes */
+.resume-preview-area[data-doc-size="letter"] {
+    max-width: 100%;
+    aspect-ratio: 8.5/11;
+}
+
+.resume-preview-area[data-doc-size="a4"] {
+    max-width: 100%;
+    aspect-ratio: 1/1.414;
+}
+
+/* Hidden sections */
+.preview-section.hidden {
+    display: none;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .resume-preview-area {
+        padding: 15px !important;
+        font-size: 13px;
+    }
+    
+    .preview-header .name {
+        font-size: 20px;
+    }
+    
+    .preview-section h2 {
+        font-size: 14px;
+    }
+}

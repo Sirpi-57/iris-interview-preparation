@@ -4323,16 +4323,21 @@ function updateFullscreenButtonState() {
     }
 }
 
-// Keep track of unique IDs for dynamic items
+// Keep track of unique IDs for dynamic items (UPDATED)
 let experienceCounter = 0;
 let educationCounter = 0;
 let projectCounter = 0;
+let internshipCounter = 0;
+let publicationCounter = 0;
+let languageCounter = 0;
+let customSectionCounter = 0;
+let customItemCounter = 0;
 
 // Function to initialize resume builder listeners (call when navigating to it)
 function initResumeBuilder() {
     console.log("Initializing Resume Builder Listeners (with Live Preview)...");
     const resumeBuilderSection = document.getElementById('resume-builder');
-    const editorPane = resumeBuilderSection?.querySelector('.resume-editor-pane'); // Target editor pane
+    const editorPane = resumeBuilderSection?.querySelector('.resume-editor-pane');
 
     if (!resumeBuilderSection || !editorPane) {
         console.error("Resume builder section or editor pane not found.");
@@ -4340,11 +4345,9 @@ function initResumeBuilder() {
     }
 
     // --- Event Listener Setup ---
-    // Use event delegation on the editor pane for input changes
     if (!editorPane.dataset.inputListenerAttached) {
-        const debouncedUpdate = debounce(updateResumePreview, 300); // Update preview 300ms after last input
+        const debouncedUpdate = debounce(updateResumePreview, 300);
         editorPane.addEventListener('input', (event) => {
-            // Listen for changes in inputs, textareas, selects
             if (event.target.matches('input, textarea, select')) {
                 debouncedUpdate();
             }
@@ -4353,61 +4356,87 @@ function initResumeBuilder() {
         console.log("Input listener attached to editor pane.");
     }
 
-    // Add/Remove Item Buttons (using delegation, now also triggers preview update)
+    // Add/Remove Item Buttons (using delegation)
     if (!editorPane.dataset.addItemListenerAttached) {
          editorPane.addEventListener('click', function(event){
              const addButton = event.target.closest('.add-item-btn');
              const removeButton = event.target.closest('.remove-item-btn');
              if (addButton) {
                  handleAddItem(event);
-                 updateResumePreview(); // Update preview immediately after adding
+                 updateResumePreview();
              } else if (removeButton) {
-                 handleRemoveItem(removeButton); // Pass the button to handleRemoveItem
-                 updateResumePreview(); // Update preview immediately after removing
+                 handleRemoveItem(removeButton);
+                 updateResumePreview();
              }
          });
          editorPane.dataset.addItemListenerAttached = 'true';
          console.log("Add/Remove item listeners attached.");
     }
 
-    // AI Generate Buttons (already delegated, no preview update needed here)
+    // AI Generate Buttons (already delegated)
     if (!editorPane.dataset.aiListenerAttached) {
-         setupAIGenerateListener(editorPane); // Pass editorPane instead of whole section
+         setupAIGenerateListener(editorPane);
          console.log("AI listener attached.");
     }
 
-
-    // Section Hide/Show Buttons (now also triggers preview update)
+    // Section Hide/Show Buttons
      if (!editorPane.dataset.toggleListenerAttached) {
         editorPane.addEventListener('click', function(event) {
             const button = event.target.closest('.hide-section-btn, .show-section-btn');
             if (button) {
                 handleToggleSection(button);
-                updateResumePreview(); // Update preview after toggling
+                updateResumePreview();
             }
         });
         editorPane.dataset.toggleListenerAttached = 'true';
         console.log("Section toggle listener attached.");
      }
 
-    // Settings Controls (Listen for changes)
+    // Custom Section Management
+    if (!editorPane.dataset.customSectionListenerAttached) {
+        // Add Custom Section Button
+        const addCustomSectionBtn = document.getElementById('addCustomSectionBtn');
+        if (addCustomSectionBtn) {
+            addCustomSectionBtn.addEventListener('click', addCustomSection);
+        }
+
+        // Remove Custom Section Buttons (using delegation)
+        editorPane.addEventListener('click', function(event) {
+            const removeCustomSectionBtn = event.target.closest('.remove-custom-section-btn');
+            if (removeCustomSectionBtn) {
+                removeCustomSection(removeCustomSectionBtn);
+                updateResumePreview();
+            }
+        });
+
+        // Custom section title changes
+        editorPane.addEventListener('input', function(event) {
+            if (event.target.matches('.custom-section-title')) {
+                updateCustomSectionHeading(event.target);
+                updateResumePreview();
+            }
+        });
+
+        editorPane.dataset.customSectionListenerAttached = 'true';
+        console.log("Custom section listeners attached.");
+    }
+
+    // Settings Controls
     const settingsContainer = editorPane.querySelector('.resume-settings-container');
     if (settingsContainer) {
          settingsContainer.querySelectorAll('select, input[type="radio"]').forEach(control => {
               if (!control.dataset.listenerAttached) {
-                 // *** CHANGE HERE ***
                  control.addEventListener('change', () => {
-                     applyResumeStyles();   // Apply the style to the container
-                     updateResumePreview(); // Re-render the content
+                     applyResumeStyles();
+                     updateResumePreview();
                  });
-                 // *** END CHANGE ***
                  control.dataset.listenerAttached = 'true';
               }
          });
           console.log("Settings listeners attached.");
     }
 
-    // --- Spacing controls ---
+    // Spacing controls
     const spacingFactorSlider = document.getElementById('resumeSpacingFactor');
     const sectionSpacingSlider = document.getElementById('sectionSpacing');
     const itemSpacingSlider = document.getElementById('itemSpacing');
@@ -4416,54 +4445,127 @@ function initResumeBuilder() {
     const sectionSpacingValue = document.getElementById('sectionSpacingValue');
     const itemSpacingValue = document.getElementById('itemSpacingValue');
 
-    // Initialize spacing sliders if they exist
     if (spacingFactorSlider && spacingFactorValue) {
         spacingFactorSlider.addEventListener('input', function() {
             spacingFactorValue.textContent = `${this.value}×`;
-            updateResumePreview(); // Update preview when spacing changes
+            updateResumePreview();
         });
     }
 
     if (sectionSpacingSlider && sectionSpacingValue) {
         sectionSpacingSlider.addEventListener('input', function() {
             sectionSpacingValue.textContent = `${this.value}×`;
-            updateResumePreview(); // Update preview when spacing changes
+            updateResumePreview();
         });
     }
 
     if (itemSpacingSlider && itemSpacingValue) {
         itemSpacingSlider.addEventListener('input', function() {
             itemSpacingValue.textContent = `${this.value}×`;
-            updateResumePreview(); // Update preview when spacing changes
+            updateResumePreview();
         });
     }
 
-    // Download Button - Modified to use the original click handler
+    // Download Button
     const downloadBtn = document.getElementById('downloadResumeBtn');
     if (downloadBtn) {
-        // Remove any existing click handler
         const newDownloadBtn = downloadBtn.cloneNode(true);
         downloadBtn.parentNode.replaceChild(newDownloadBtn, downloadBtn);
-        
-        // Add the new handler with usage tracking
         newDownloadBtn.addEventListener('click', downloadResumePDF);
     }
 
     // Apply initial styles and render preview
     applyResumeStyles();
     updateResumePreview();
-    
-    // NEW: Update usage UI to display remaining usage
     updateResumeBuilderUsageUI();
     
     console.log("Resume builder initialized with usage tracking.");
 }
 
-// --- Ensure handleRemoveItem uses the passed button ---
-function handleRemoveItem(button) { // Modify signature
-    const itemToRemove = button.closest('.resume-item');
-    if (itemToRemove) {
-        itemToRemove.remove();
+// UPDATED handleAddItem function
+function handleAddItem(event) {
+    const targetContainerId = event.target.dataset.target;
+    const templateId = event.target.dataset.template;
+    const targetContainer = document.getElementById(targetContainerId) || 
+                          event.target.closest('.resume-section, .custom-section').querySelector('.customItems');
+    const template = document.getElementById(templateId);
+
+    if (!targetContainer || !template) {
+        console.error("Target container or template not found for add item.");
+        return;
+    }
+
+    const newItem = template.cloneNode(true);
+    newItem.id = '';
+    newItem.classList.remove('d-none');
+
+    // Assign unique IDs
+    let counter;
+    if (templateId === 'experienceTemplate') counter = ++experienceCounter;
+    else if (templateId === 'educationTemplate') counter = ++educationCounter;
+    else if (templateId === 'projectTemplate') counter = ++projectCounter;
+    else if (templateId === 'internshipTemplate') counter = ++internshipCounter;
+    else if (templateId === 'publicationTemplate') counter = ++publicationCounter;
+    else if (templateId === 'languageTemplate') counter = ++languageCounter;
+    else if (templateId === 'certificationTemplate') counter = Date.now();
+    else if (templateId === 'customItemTemplate') counter = ++customItemCounter;
+    else counter = Date.now();
+
+    newItem.querySelectorAll('input, textarea, select').forEach(el => {
+         if(el.id) el.id = `${el.id}-${counter}`;
+         const label = newItem.querySelector(`label[for="${el.id.replace(`-${counter}`, '')}"]`);
+         if(label) label.setAttribute('for', el.id);
+    });
+
+    targetContainer.appendChild(newItem);
+}
+
+// NEW: Add Custom Section function
+function addCustomSection() {
+    const customSectionsContainer = document.getElementById('customSectionsContainer');
+    const template = document.getElementById('customSectionTemplate');
+    
+    if (!customSectionsContainer || !template) {
+        console.error("Custom sections container or template not found.");
+        return;
+    }
+
+    const newSection = template.cloneNode(true);
+    const sectionId = `customSection-${++customSectionCounter}`;
+    newSection.id = sectionId;
+    newSection.classList.remove('d-none');
+    
+    // Update data-section attribute to be unique
+    newSection.setAttribute('data-section', `custom-${customSectionCounter}`);
+    
+    // Update the container class for items
+    const itemsContainer = newSection.querySelector('.customItems');
+    const addButton = newSection.querySelector('.add-item-btn');
+    
+    if (itemsContainer && addButton) {
+        const uniqueContainerClass = `customItems-${customSectionCounter}`;
+        itemsContainer.className = uniqueContainerClass;
+        addButton.setAttribute('data-target', uniqueContainerClass);
+    }
+
+    customSectionsContainer.appendChild(newSection);
+    updateResumePreview();
+}
+
+// NEW: Remove Custom Section function
+function removeCustomSection(button) {
+    const sectionToRemove = button.closest('.custom-section');
+    if (sectionToRemove) {
+        sectionToRemove.remove();
+    }
+}
+
+// NEW: Update Custom Section Heading function
+function updateCustomSectionHeading(titleInput) {
+    const section = titleInput.closest('.custom-section');
+    const heading = section.querySelector('.custom-section-heading');
+    if (heading) {
+        heading.textContent = titleInput.value || 'Custom Items';
     }
 }
 
@@ -4614,6 +4716,7 @@ function applyResumeStyles() {
 }
 
 // AI Content Enhancement
+// COMPLETE UPDATED enhanceResumeContent function
 async function enhanceResumeContent(sectionType, contentElement, button) {
     // First, check if user can use AI enhance
     if (!trackAiEnhance()) {
@@ -4631,7 +4734,26 @@ async function enhanceResumeContent(sectionType, contentElement, button) {
     button.disabled = true;
     const originalButtonText = button.innerHTML;
     button.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Enhancing...';
-    showToast('✨ Enhancing your content with AI...');
+    
+    // Show different loading messages based on section type
+    let loadingMessage = '✨ Enhancing your content with AI...';
+    if (sectionType === 'accomplishments' || sectionType === 'cocurriculars' || sectionType === 'extracurriculars') {
+        loadingMessage = '✨ Converting to professional bullet points...';
+    } else if (sectionType === 'skills') {
+        loadingMessage = '✨ Formatting your skills list...';
+    } else if (sectionType === 'objective') {
+        loadingMessage = '✨ Enhancing your professional summary...';
+    } else if (sectionType === 'experience' || sectionType === 'internship') {
+        loadingMessage = '✨ Enhancing work experience description...';
+    } else if (sectionType === 'project') {
+        loadingMessage = '✨ Enhancing project description...';
+    } else if (sectionType === 'publication') {
+        loadingMessage = '✨ Formatting publication details...';
+    } else if (sectionType === 'custom') {
+        loadingMessage = '✨ Enhancing custom content...';
+    }
+    
+    showToast(loadingMessage);
 
     try {
         const response = await fetch(`${API_BASE_URL}/enhance-resume-content`, {
@@ -4656,9 +4778,22 @@ async function enhanceResumeContent(sectionType, contentElement, button) {
 
         if (data.enhancedContent) {
             contentElement.value = data.enhancedContent; // Update the input/textarea
-            showToast('✅ Content enhanced successfully!', 'success');
+            
+            // Show success message based on section type
+            let successMessage = '✅ Content enhanced successfully!';
+            if (sectionType === 'accomplishments' || sectionType === 'cocurriculars' || sectionType === 'extracurriculars') {
+                successMessage = '✅ Successfully converted to bullet points!';
+            } else if (sectionType === 'skills') {
+                successMessage = '✅ Skills list formatted successfully!';
+            }
+            
+            showToast(successMessage, 'success');
+            
             // Trigger input event for potential frameworks that listen to changes
             contentElement.dispatchEvent(new Event('input', { bubbles: true }));
+            
+            // Update the preview immediately
+            updateResumePreview();
         } else {
             throw new Error(data.error || "Enhancement failed: No content returned.");
         }
@@ -4722,12 +4857,17 @@ function getResumeData() {
         },
         objective: document.getElementById('resumeObjective')?.value || '',
         experience: [],
-        education: [],
         projects: [],
+        internships: [],
+        publications: [],
         skills: document.getElementById('resumeSkills')?.value || '',
-        // --- ADDED THIS LINE ---
+        education: [],
         certifications: [],
-        // --- END ADDED LINE ---
+        accomplishments: document.getElementById('resumeAccomplishments')?.value || '',
+        cocurriculars: document.getElementById('resumeCocurriculars')?.value || '',
+        extracurriculars: document.getElementById('resumeExtracurriculars')?.value || '',
+        languages: [],
+        customSections: [],
         settings: {
             fontFamily: document.getElementById('resumeFontFamily')?.value || "'Helvetica', 'Arial', sans-serif",
             fontSize: document.querySelector('input[name="resumeFontSize"]:checked')?.value || 'standard',
@@ -4741,22 +4881,20 @@ function getResumeData() {
     // Helper to extract data from item containers
     const extractItems = (containerId) => {
         const items = [];
-        const container = document.getElementById(containerId); // Get container first
+        const container = document.getElementById(containerId);
         if (!container) {
              console.warn(`Container element with ID '${containerId}' not found during data extraction.`);
-             return items; // Return empty if container missing
+             return items;
         }
         container.querySelectorAll('.resume-item').forEach(itemEl => {
             const itemData = {};
-            itemEl.querySelectorAll('input[data-field], textarea[data-field]').forEach(field => {
-                // Ensure data-field attribute exists before trying to access dataset
+            itemEl.querySelectorAll('input[data-field], textarea[data-field], select[data-field]').forEach(field => {
                  if (field.dataset && field.dataset.field) {
                      itemData[field.dataset.field] = field.value;
                  } else {
                      console.warn("Element missing data-field attribute:", field);
                  }
             });
-             // Check if itemData has any actual content before pushing
              if (Object.keys(itemData).some(key => itemData[key]?.trim() !== '')) {
                 items.push(itemData);
              }
@@ -4764,33 +4902,61 @@ function getResumeData() {
         return items;
     };
 
+    // Extract all section data
     data.experience = extractItems('experienceItems');
     data.education = extractItems('educationItems');
     data.projects = extractItems('projectItems');
-    // --- ADDED THIS LINE ---
+    data.internships = extractItems('internshipItems');
+    data.publications = extractItems('publicationItems');
     data.certifications = extractItems('certificationItems');
-    // --- END ADDED LINE ---
-    // Note: Skills are taken directly above, not using extractItems
+    data.languages = extractItems('languageItems');
+
+    // Extract custom sections
+    document.querySelectorAll('.custom-section').forEach(section => {
+        const titleInput = section.querySelector('.custom-section-title');
+        const sectionTitle = titleInput?.value || 'Custom Section';
+        const itemsContainer = section.querySelector('[class*="customItems"]');
+        
+        if (itemsContainer) {
+            const items = [];
+            itemsContainer.querySelectorAll('.resume-item').forEach(itemEl => {
+                const itemData = {};
+                itemEl.querySelectorAll('input[data-field], textarea[data-field], select[data-field]').forEach(field => {
+                    if (field.dataset && field.dataset.field) {
+                        itemData[field.dataset.field] = field.value;
+                    }
+                });
+                if (Object.keys(itemData).some(key => itemData[key]?.trim() !== '')) {
+                    items.push(itemData);
+                }
+            });
+            
+            if (items.length > 0 || sectionTitle.trim()) {
+                data.customSections.push({
+                    title: sectionTitle,
+                    items: items,
+                    hidden: section.classList.contains('hidden')
+                });
+            }
+        }
+    });
 
     // Filter out hidden sections
     document.querySelectorAll('#resume-builder .resume-section.hidden').forEach(hiddenSection => {
          const sectionKey = hiddenSection.dataset.section;
          if (data.hasOwnProperty(sectionKey)) {
-             // For simplicity, let's just remove the data for preview/PDF generation
-             // If you needed to know it was hidden later, you could use:
-             // data.settings[`hide_${sectionKey}`] = true;
              delete data[sectionKey];
          }
     });
 
-    console.log("Collected Resume Data:", data); // Add log to see collected data
+    console.log("Collected Resume Data:", data);
     return data;
 }
 
 function downloadResumePDF() {
     // First, check if user can download PDF
     if (!trackPdfDownload()) {
-        return; // Stop if limit is reached or user not logged in
+        return;
     }
 
     // Check if jsPDF library is loaded
@@ -4800,266 +4966,310 @@ function downloadResumePDF() {
         return;
     }
     
-    const { jsPDF } = jspdf; // Destructure jsPDF
-    const resumeData = getResumeData(); // Get data from the form
-    const docSize = resumeData.settings.docSize || 'letter'; // 'letter' or 'a4'
+    const { jsPDF } = jspdf;
+    const resumeData = getResumeData();
+    const docSize = resumeData.settings.docSize || 'letter';
 
-    // --- Document Setup ---
+    // Document Setup
     const pdf = new jsPDF({
         orientation: 'portrait',
-        unit: 'pt', // Use points for consistency with font sizes
+        unit: 'pt',
         format: docSize
     });
 
-    // --- Get Spacing Settings ---
-    const spacingFactor = resumeData.settings.spacingFactor || 1.0; // Default if not set
-    const sectionSpacing = resumeData.settings.sectionSpacing || 1.0; // Default if not set
-    const itemSpacing = resumeData.settings.itemSpacing || 1.0; // Default if not set
+    // Get Spacing Settings
+    const spacingFactor = resumeData.settings.spacingFactor || 1.0;
+    const sectionSpacing = resumeData.settings.sectionSpacing || 1.0;
+    const itemSpacing = resumeData.settings.itemSpacing || 1.0;
     
     console.log(`PDF Generation with spacing: Overall=${spacingFactor}, Sections=${sectionSpacing}, Items=${itemSpacing}`);
 
-    // --- Margins and Page Dimensions ---
+    // Margins and Page Dimensions
     const pageHeight = pdf.internal.pageSize.getHeight();
     const pageWidth = pdf.internal.pageSize.getWidth();
     
-    // Adjust margins based on page aspect ratio and spacing
-    const margin = 36; // Base margin
+    const margin = 36;
     const contentWidth = pageWidth - (2 * margin);
-    let currentY = margin; // Start drawing from top margin
+    let currentY = margin;
 
-    // --- Font Settings ---
-    // Determine font sizes based on user selection
+    // Font Settings
     const baseFontSize = resumeData.settings.fontSize === 'compact' ? 9 : 
                           (resumeData.settings.fontSize === 'large' ? 11 : 10);
-    const headingFontSize = baseFontSize + 4; // e.g., 14pt for standard
-    const subHeadingFontSize = baseFontSize + 1; // e.g., 11pt for standard
-    const bodyFontSize = baseFontSize; // e.g., 10pt for standard
+    const headingFontSize = baseFontSize + 4;
+    const subHeadingFontSize = baseFontSize + 1;
+    const bodyFontSize = baseFontSize;
 
-    // Use standard PDF fonts (Helvetica is generally available)
     const standardFont = 'Helvetica';
-    pdf.setFont(standardFont); // Set default font
+    pdf.setFont(standardFont);
 
-    // --- Helper Functions ---
-
-    // Helper to add text that wraps within the content width
+    // Helper Functions
     const addWrappedText = (text, x, y, maxWidth, options = {}) => {
         const { fontSize = bodyFontSize, style = 'normal', align = 'left', lineHeightFactor = 1.15 } = options;
         pdf.setFontSize(fontSize);
-        pdf.setFont(standardFont, style); // Set style (normal, bold, italic)
-        const lines = pdf.splitTextToSize(text || '', maxWidth); // Split text to fit width
+        pdf.setFont(standardFont, style);
+        const lines = pdf.splitTextToSize(text || '', maxWidth);
         pdf.text(lines, x, y, { align: align, lineHeightFactor: lineHeightFactor });
-        // Return adjusted Y position with spacing factor
         return y + (lines.length * fontSize * lineHeightFactor * spacingFactor);
     };
 
-    // Helper to check if a page break is needed before adding content
     const checkAddPage = (requiredHeight) => {
-        if (currentY + requiredHeight > pageHeight - margin) { // Check if content exceeds bottom margin
-            pdf.addPage(); // Add a new page
-            currentY = margin; // Reset Y position to top margin
-            return true; // Page was added
+        if (currentY + requiredHeight > pageHeight - margin) {
+            pdf.addPage();
+            currentY = margin;
+            return true;
         }
-        return false; // No page added
+        return false;
     };
 
-    // Helper to add a standard section heading with an underline
     const addSectionHeading = (text) => {
-        // Don't add heading if the corresponding section data was deleted (because it was hidden in the editor)
-        const sectionKey = text.toLowerCase().replace(/\s+/g, '');
-        if (!resumeData[sectionKey] && 
-            !['workexperience', 'education', 'projects', 'skills', 'certifications'].includes(sectionKey)) {
-            console.log(`Skipping hidden section heading: ${text}`);
-            return false; // Indicate that heading was skipped
-        }
-
-        // Add extra section spacing (multiplied by the section spacing factor)
         if (currentY > margin + 10) {
-            currentY += 12 * sectionSpacing; // Add section spacing before heading (if not the first section)
+            currentY += 12 * sectionSpacing;
         }
 
-        checkAddPage(headingFontSize + 15); // Check space for heading and line
+        checkAddPage(headingFontSize + 15);
         pdf.setFontSize(headingFontSize);
         pdf.setFont(standardFont, 'bold');
-        pdf.text(text.toUpperCase(), margin, currentY); // Add heading text in uppercase
-        currentY += headingFontSize * 0.6; // Move down slightly for underline
-        pdf.setLineWidth(0.5); // Set line thickness
-        pdf.line(margin, currentY, pageWidth - margin, currentY); // Draw the underline
-        currentY += 10 * spacingFactor; // Add space after the line with spacing factor
-        return true; // Indicate heading was added
+        pdf.text(text.toUpperCase(), margin, currentY);
+        currentY += headingFontSize * 0.6;
+        pdf.setLineWidth(0.5);
+        pdf.line(margin, currentY, pageWidth - margin, currentY);
+        currentY += 10 * spacingFactor;
+        return true;
     };
 
-    // Calculate page distribution based on content and spacing
-    const calculateDistribution = () => {
-        // Get total available space on page
-        const availableSpace = pageHeight - (2 * margin);
-        
-        // Estimate minimum needed space (can be refined for better distribution)
-        let estimatedContentHeight = 0;
-        
-        // Personal info section
-        if (resumeData.personal?.name) {
-            estimatedContentHeight += (headingFontSize + 4) * 1.2; // Name
-            estimatedContentHeight += bodyFontSize * 1.5; // Contact info
-        }
-        
-        // Objective section
-        if (resumeData.objective) {
-            const lines = pdf.splitTextToSize(resumeData.objective, contentWidth);
-            estimatedContentHeight += lines.length * bodyFontSize * 1.2;
-            estimatedContentHeight += 20 * sectionSpacing; // Section gap
-        }
-        
-        // Work Experience section
-        if (resumeData.experience?.length > 0) {
-            estimatedContentHeight += 30 * sectionSpacing; // Section heading + gap
-            resumeData.experience.forEach(exp => {
-                estimatedContentHeight += subHeadingFontSize * 2; // Title + company
-                const descLines = exp.description?.split('\n') || [];
-                estimatedContentHeight += descLines.length * bodyFontSize * 1.2;
-                estimatedContentHeight += 15 * itemSpacing; // Item spacing
-            });
-        }
-        
-        // Education section
-        if (resumeData.education?.length > 0) {
-            estimatedContentHeight += 30 * sectionSpacing; // Section heading + gap
-            resumeData.education.forEach(edu => {
-                estimatedContentHeight += subHeadingFontSize * 2; // Degree + school
-                estimatedContentHeight += 15 * itemSpacing; // Item spacing
-            });
-        }
-        
-        // Projects section
-        if (resumeData.projects?.length > 0) {
-            estimatedContentHeight += 30 * sectionSpacing; // Section heading + gap
-            resumeData.projects.forEach(proj => {
-                estimatedContentHeight += subHeadingFontSize * 1.5; // Project name
-                const descLines = proj.description?.split('\n') || [];
-                estimatedContentHeight += descLines.length * bodyFontSize * 1.2;
-                estimatedContentHeight += 15 * itemSpacing; // Item spacing
-            });
-        }
-        
-        // Skills section
-        if (resumeData.skills) {
-            estimatedContentHeight += 30 * sectionSpacing; // Section heading + gap
-            const skillsLines = pdf.splitTextToSize(resumeData.skills, contentWidth);
-            estimatedContentHeight += skillsLines.length * bodyFontSize * 1.2;
-        }
-        
-        // Certifications section
-        if (resumeData.certifications?.length > 0) {
-            estimatedContentHeight += 30 * sectionSpacing; // Section heading + gap
-            estimatedContentHeight += resumeData.certifications.length * bodyFontSize * 2;
-        }
-        
-        // Calculate distribution factor based on content and available space
-        const distributionFactor = Math.max(1.0, availableSpace / (estimatedContentHeight * spacingFactor));
-        
-        // Limit the factor to a reasonable range to prevent excessive spacing
-        return Math.min(distributionFactor, 1.5);
-    };
-    
-    // Calculate distribution factor once
-    const distributionFactor = calculateDistribution();
-    console.log(`Calculated distribution factor: ${distributionFactor}`);
-
-    // --- 1. Header Section ---
+    // Header Section
     if (resumeData.personal?.name) {
-        checkAddPage(headingFontSize + 4 + bodyFontSize * 1.5); // Estimate height needed
-        pdf.setFontSize(headingFontSize + 4); // Larger font for name
+        checkAddPage(headingFontSize + 4 + bodyFontSize * 1.5);
+        pdf.setFontSize(headingFontSize + 4);
         pdf.setFont(standardFont, 'bold');
-        pdf.text(resumeData.personal.name, pageWidth / 2, currentY, { align: 'center' }); // Center align name
-        currentY += (headingFontSize + 4) * 1.05 * spacingFactor; // Move Y down with spacing factor
+        pdf.text(resumeData.personal.name, pageWidth / 2, currentY, { align: 'center' });
+        currentY += (headingFontSize + 4) * 1.05 * spacingFactor;
     }
     
-    // Construct contact info string, filtering out empty values
     let contactInfo = [
         resumeData.personal?.location,
         resumeData.personal?.phone,
         resumeData.personal?.email,
         resumeData.personal?.website
-    ].filter(Boolean).join(' | '); // Join with separators
+    ].filter(Boolean).join(' | ');
 
     if (contactInfo) {
         pdf.setFontSize(bodyFontSize);
         pdf.setFont(standardFont, 'normal');
-        pdf.text(contactInfo, pageWidth / 2, currentY, { align: 'center' }); // Center align contact info
-        currentY += bodyFontSize * 1.4 * spacingFactor; // Add space after contact info with spacing factor
+        pdf.text(contactInfo, pageWidth / 2, currentY, { align: 'center' });
+        currentY += bodyFontSize * 1.4 * spacingFactor;
     }
 
-    // --- 2. Objective/Summary Section ---
+    // Objective/Summary Section
     if (resumeData.objective) {
-        checkAddPage(bodyFontSize * 3); // Estimate height
-        // No heading for summary, just add the text, potentially italicized
+        checkAddPage(bodyFontSize * 3);
         currentY = addWrappedText(resumeData.objective, margin, currentY, contentWidth, { style: 'italic' });
-        currentY += bodyFontSize * 0.7 * spacingFactor * sectionSpacing; // Add space after summary with section spacing
+        currentY += bodyFontSize * 0.7 * spacingFactor * sectionSpacing;
     }
 
-    // --- 3. Work Experience Section ---
+    // Work Experience Section
     if (resumeData.experience && resumeData.experience.length > 0) {
-        if (addSectionHeading('Work Experience')) { // Only proceed if heading was added (section not hidden)
+        if (addSectionHeading('Work Experience')) {
             resumeData.experience.forEach((exp, index) => {
-                // Add item spacing between experiences
                 if (index > 0) {
                     currentY += bodyFontSize * 0.4 * itemSpacing;
                 }
                 
-                checkAddPage(subHeadingFontSize * 2 + bodyFontSize * 3); // Estimate space needed
+                checkAddPage(subHeadingFontSize * 2 + bodyFontSize * 3);
                 pdf.setFontSize(subHeadingFontSize);
                 pdf.setFont(standardFont, 'bold');
-                // Add Job Title (left aligned)
                 pdf.text(exp.jobTitle || 'Job Title', margin, currentY);
                 
-                // Add Date Range (right aligned)
                 if (exp.date) {
                     pdf.setFont(standardFont, 'normal');
                     pdf.text(exp.date, pageWidth - margin, currentY, { align: 'right' });
                 }
-                currentY += subHeadingFontSize * 1.05 * spacingFactor; // Move Y down with spacing factor
+                currentY += subHeadingFontSize * 1.05 * spacingFactor;
 
-                // Add Company & Location (italicized)
                 pdf.setFontSize(bodyFontSize);
                 pdf.setFont(standardFont, 'italic');
                 pdf.text(`${exp.company || 'Company'} | ${exp.location || 'Location'}`, margin, currentY);
-                currentY += bodyFontSize * 1.1 * spacingFactor; // Move Y down with spacing factor
+                currentY += bodyFontSize * 1.1 * spacingFactor;
 
-                // Add Description (as bullet points)
                 if (exp.description) {
                     const descLines = exp.description.split('\n').map(line => line.trim()).filter(line => line);
                     descLines.forEach((line, i) => {
-                        const cleanLine = line.replace(/^[\*\-\•]\s*/, ''); // Remove leading bullet characters
+                        const cleanLine = line.replace(/^[\*\-\•]\s*/, '');
                         
-                        // Check for page break, but only if not the first line
                         if (i > 0) {
                             checkAddPage(bodyFontSize * 1.2);
                         }
                         
                         pdf.setFontSize(bodyFontSize);
                         pdf.setFont(standardFont, 'normal');
-                        pdf.text('•', margin + 3, currentY); // Draw bullet point
-                        
-                        // Add the wrapped text line, indented
+                        pdf.text('•', margin + 3, currentY);
                         currentY = addWrappedText(cleanLine, margin + 12, currentY, contentWidth - 12);
                     });
                 }
                 
-                // Add spacing after each experience item (except last) based on item spacing
                 if (index < resumeData.experience.length - 1) {
                     currentY += bodyFontSize * 0.5 * itemSpacing;
                 }
             });
             
-            // Add spacing after the section
             currentY += bodyFontSize * 0.5 * sectionSpacing;
         }
     }
 
-    // --- 4. Education Section ---
+    // Projects Section
+    if (resumeData.projects && resumeData.projects.length > 0) {
+        if (addSectionHeading('Projects')) {
+            resumeData.projects.forEach((proj, index) => {
+                if (index > 0) {
+                    currentY += bodyFontSize * 0.4 * itemSpacing;
+                }
+                
+                checkAddPage(subHeadingFontSize + bodyFontSize * 3);
+                pdf.setFontSize(subHeadingFontSize);
+                pdf.setFont(standardFont, 'bold');
+                pdf.text(proj.projectName || 'Project Name', margin, currentY);
+                
+                if(proj.date) {
+                    pdf.setFont(standardFont, 'normal');
+                    pdf.text(proj.date, pageWidth - margin, currentY, { align: 'right' });
+                }
+                currentY += subHeadingFontSize * 1.05 * spacingFactor;
+
+                if (proj.link) {
+                    checkAddPage(bodyFontSize * 1.2);
+                    pdf.setFontSize(bodyFontSize - 1);
+                    pdf.setFont(standardFont, 'italic');
+                    currentY = addWrappedText(proj.link, margin, currentY, contentWidth);
+                }
+
+                if (proj.description) {
+                    const descLines = proj.description.split('\n').map(line => line.trim()).filter(line => line);
+                    descLines.forEach((line, i) => {
+                        const cleanLine = line.replace(/^[\*\-\•]\s*/, '');
+                        
+                        if (i > 0) {
+                            checkAddPage(bodyFontSize * 1.2);
+                        }
+                        
+                        pdf.setFontSize(bodyFontSize);
+                        pdf.setFont(standardFont, 'normal');
+                        pdf.text('•', margin + 3, currentY);
+                        currentY = addWrappedText(cleanLine, margin + 12, currentY, contentWidth - 12);
+                    });
+                }
+                
+                if (index < resumeData.projects.length - 1) {
+                    currentY += bodyFontSize * 0.4 * itemSpacing;
+                }
+            });
+            
+            currentY += bodyFontSize * 0.5 * sectionSpacing;
+        }
+    }
+
+    // NEW: Internships Section
+    if (resumeData.internships && resumeData.internships.length > 0) {
+        if (addSectionHeading('Internships')) {
+            resumeData.internships.forEach((intern, index) => {
+                if (index > 0) {
+                    currentY += bodyFontSize * 0.4 * itemSpacing;
+                }
+                
+                checkAddPage(subHeadingFontSize * 2 + bodyFontSize * 3);
+                pdf.setFontSize(subHeadingFontSize);
+                pdf.setFont(standardFont, 'bold');
+                pdf.text(intern.role || 'Role', margin, currentY);
+                
+                if (intern.date) {
+                    pdf.setFont(standardFont, 'normal');
+                    pdf.text(intern.date, pageWidth - margin, currentY, { align: 'right' });
+                }
+                currentY += subHeadingFontSize * 1.05 * spacingFactor;
+
+                pdf.setFontSize(bodyFontSize);
+                pdf.setFont(standardFont, 'italic');
+                pdf.text(`${intern.company || 'Company'} | ${intern.location || 'Location'}`, margin, currentY);
+                currentY += bodyFontSize * 1.1 * spacingFactor;
+
+                if (intern.description) {
+                    const descLines = intern.description.split('\n').map(line => line.trim()).filter(line => line);
+                    descLines.forEach((line, i) => {
+                        const cleanLine = line.replace(/^[\*\-\•]\s*/, '');
+                        
+                        if (i > 0) {
+                            checkAddPage(bodyFontSize * 1.2);
+                        }
+                        
+                        pdf.setFontSize(bodyFontSize);
+                        pdf.setFont(standardFont, 'normal');
+                        pdf.text('•', margin + 3, currentY);
+                        currentY = addWrappedText(cleanLine, margin + 12, currentY, contentWidth - 12);
+                    });
+                }
+                
+                if (index < resumeData.internships.length - 1) {
+                    currentY += bodyFontSize * 0.4 * itemSpacing;
+                }
+            });
+            
+            currentY += bodyFontSize * 0.5 * sectionSpacing;
+        }
+    }
+
+    // NEW: Publications Section
+    if (resumeData.publications && resumeData.publications.length > 0) {
+        if (addSectionHeading('Publications')) {
+            resumeData.publications.forEach((pub, index) => {
+                if (index > 0) {
+                    currentY += bodyFontSize * 0.4 * itemSpacing;
+                }
+                
+                checkAddPage(subHeadingFontSize + bodyFontSize * 3);
+                pdf.setFontSize(subHeadingFontSize);
+                pdf.setFont(standardFont, 'bold');
+                pdf.text(pub.title || 'Publication Title', margin, currentY);
+                
+                if (pub.date) {
+                    pdf.setFont(standardFont, 'normal');
+                    pdf.text(pub.date, pageWidth - margin, currentY, { align: 'right' });
+                }
+                currentY += subHeadingFontSize * 1.05 * spacingFactor;
+
+                pdf.setFontSize(bodyFontSize);
+                pdf.setFont(standardFont, 'italic');
+                let pubLine = `${pub.authors || 'Authors'} | ${pub.publication || 'Publication'}`;
+                pdf.text(pubLine, margin, currentY);
+                currentY += bodyFontSize * 1.1 * spacingFactor;
+
+                if (pub.link) {
+                    pdf.setFontSize(bodyFontSize - 1);
+                    pdf.setFont(standardFont, 'italic');
+                    currentY = addWrappedText(pub.link, margin, currentY, contentWidth);
+                }
+                
+                if (index < resumeData.publications.length - 1) {
+                    currentY += bodyFontSize * 0.4 * itemSpacing;
+                }
+            });
+            
+            currentY += bodyFontSize * 0.5 * sectionSpacing;
+        }
+    }
+
+    // Skills Section
+    if (resumeData.skills) {
+        if (addSectionHeading('Skills')) {
+            checkAddPage(bodyFontSize * 3);
+            const skillsList = resumeData.skills.split(/[\n,]+/).map(s => s.trim()).filter(s => s);
+            currentY = addWrappedText(skillsList.join(', '), margin, currentY, contentWidth);
+            currentY += bodyFontSize * 0.7 * sectionSpacing;
+        }
+    }
+
+    // Education Section
     if (resumeData.education && resumeData.education.length > 0) {
         if (addSectionHeading('Education')) {
             resumeData.education.forEach((edu, index) => {
-                // Add item spacing between education items
                 if (index > 0) {
                     currentY += bodyFontSize * 0.4 * itemSpacing;
                 }
@@ -5067,17 +5277,14 @@ function downloadResumePDF() {
                 checkAddPage(subHeadingFontSize * 2 + bodyFontSize * 2);
                 pdf.setFontSize(subHeadingFontSize);
                 pdf.setFont(standardFont, 'bold');
-                // Add Degree/Major (left aligned)
                 pdf.text(edu.degreeMajor || 'Degree/Major', margin, currentY);
                 
-                // Add Graduation Date (right aligned)
                 if (edu.date) {
                     pdf.setFont(standardFont, 'normal');
                     pdf.text(edu.date, pageWidth - margin, currentY, { align: 'right' });
                 }
-                currentY += subHeadingFontSize * 1.05 * spacingFactor; // Move Y down with spacing factor
+                currentY += subHeadingFontSize * 1.05 * spacingFactor;
 
-                // Add School, Location, GPA (italicized)
                 pdf.setFontSize(bodyFontSize);
                 pdf.setFont(standardFont, 'italic');
                 let schoolLine = `${edu.school || 'School'} | ${edu.location || 'Location'}`;
@@ -5085,9 +5292,8 @@ function downloadResumePDF() {
                     schoolLine += ` | GPA: ${edu.gpa}`;
                 }
                 pdf.text(schoolLine, margin, currentY);
-                currentY += bodyFontSize * 1.1 * spacingFactor; // Move Y down with spacing factor
+                currentY += bodyFontSize * 1.1 * spacingFactor;
 
-                // Add Additional Info if present
                 if (edu.additionalInfo) {
                     currentY = addWrappedText(`Relevant Info: ${edu.additionalInfo}`, margin, currentY, contentWidth, { 
                         style: 'italic', 
@@ -5095,100 +5301,26 @@ function downloadResumePDF() {
                     });
                 }
                 
-                // Add spacing after each education item
                 if (index < resumeData.education.length - 1) {
                     currentY += bodyFontSize * 0.4 * itemSpacing;
                 }
             });
             
-            // Add spacing after the section
             currentY += bodyFontSize * 0.5 * sectionSpacing;
         }
     }
 
-    // --- 5. Projects Section ---
-    if (resumeData.projects && resumeData.projects.length > 0) {
-        if (addSectionHeading('Projects')) {
-            resumeData.projects.forEach((proj, index) => {
-                // Add item spacing between projects
-                if (index > 0) {
-                    currentY += bodyFontSize * 0.4 * itemSpacing;
-                }
-                
-                checkAddPage(subHeadingFontSize + bodyFontSize * 3); // Estimate space
-                pdf.setFontSize(subHeadingFontSize);
-                pdf.setFont(standardFont, 'bold');
-                // Add Project Name (left aligned)
-                pdf.text(proj.projectName || 'Project Name', margin, currentY);
-                
-                // Add Date (right aligned, if present)
-                if(proj.date) {
-                    pdf.setFont(standardFont, 'normal');
-                    pdf.text(proj.date, pageWidth - margin, currentY, { align: 'right' });
-                }
-                currentY += subHeadingFontSize * 1.05 * spacingFactor; // Move Y down with spacing factor
-
-                // Add Link (if present)
-                if (proj.link) {
-                    checkAddPage(bodyFontSize * 1.2);
-                    pdf.setFontSize(bodyFontSize - 1); // Smaller font for link
-                    pdf.setFont(standardFont, 'italic');
-                    currentY = addWrappedText(proj.link, margin, currentY, contentWidth);
-                }
-
-                // Add Description (as bullet points)
-                if (proj.description) {
-                    const descLines = proj.description.split('\n').map(line => line.trim()).filter(line => line);
-                    descLines.forEach((line, i) => {
-                        const cleanLine = line.replace(/^[\*\-\•]\s*/, '');
-                        
-                        // Check for page break, but only if not the first line
-                        if (i > 0) {
-                            checkAddPage(bodyFontSize * 1.2);
-                        }
-                        
-                        pdf.setFontSize(bodyFontSize);
-                        pdf.setFont(standardFont, 'normal');
-                        pdf.text('•', margin + 3, currentY); // Draw bullet closer
-                        currentY = addWrappedText(cleanLine, margin + 12, currentY, contentWidth - 12); // Indented text
-                    });
-                }
-                
-                // Add spacing after each project
-                if (index < resumeData.projects.length - 1) {
-                    currentY += bodyFontSize * 0.4 * itemSpacing;
-                }
-            });
-            
-            // Add spacing after the section
-            currentY += bodyFontSize * 0.5 * sectionSpacing;
-        }
-    }
-
-    // --- 6. Skills Section ---
-    if (resumeData.skills) {
-        if (addSectionHeading('Skills')) {
-            checkAddPage(bodyFontSize * 3); // Estimate space
-            // Format skills as a comma-separated list
-            const skillsList = resumeData.skills.split(/[\n,]+/).map(s => s.trim()).filter(s => s);
-            currentY = addWrappedText(skillsList.join(', '), margin, currentY, contentWidth);
-            currentY += bodyFontSize * 0.7 * sectionSpacing; // Add space after skills with section spacing
-        }
-    }
-
-    // --- 7. Certifications Section ---
+    // Certifications Section
     if (resumeData.certifications && resumeData.certifications.length > 0) {
         if (addSectionHeading('Certifications')) {
             resumeData.certifications.forEach((cert, index) => {
-                // Add item spacing between certifications
                 if (index > 0) {
                     currentY += bodyFontSize * 0.3 * itemSpacing;
                 }
                 
-                checkAddPage(bodyFontSize * 2); // Estimate space
+                checkAddPage(bodyFontSize * 2);
                 pdf.setFontSize(bodyFontSize);
                 
-                // Handle available width for certification text
                 let availableWidth = contentWidth;
                 const dateText = cert.date || '';
                 if (dateText) {
@@ -5198,17 +5330,14 @@ function downloadResumePDF() {
                     pdf.text(dateText, pageWidth - margin, currentY, { align: 'right' });
                 }
                 
-                // Combine certification name and issuing body
                 let certLine = cert.certificationName || 'Certification';
                 if (cert.issuingBody) {
                     certLine += ` - ${cert.issuingBody}`;
                 }
                 
-                // Add certification with bold style
                 pdf.setFont(standardFont, 'bold');
                 currentY = addWrappedText(certLine, margin, currentY, availableWidth);
                 
-                // Add space between certifications
                 if (index < resumeData.certifications.length - 1) {
                     currentY += bodyFontSize * 0.3 * itemSpacing;
                 }
@@ -5216,23 +5345,165 @@ function downloadResumePDF() {
         }
     }
 
-    // --- Optimize white space by checking if we can fit more on the page ---
-    // Get remaining space and distribute if there's still a gap
-    const remainingSpace = pageHeight - margin - currentY;
-    if (remainingSpace > 50) {
-        console.log(`PDF has ${remainingSpace}px of empty space at bottom - applying distribution factor: ${distributionFactor}`);
-        
-        // If we still have significant white space at the end,
-        // we could add a subtle footer or watermark
-        if (remainingSpace > 100) {
-            pdf.setFontSize(8);
-            pdf.setTextColor(180, 180, 180); // Light gray
-            pdf.text(`Generated on ${new Date().toLocaleDateString()}`, pageWidth/2, pageHeight - 20, {align: 'center'});
-            pdf.setTextColor(0, 0, 0); // Reset color
+    // NEW: Accomplishments Section
+    if (resumeData.accomplishments) {
+        if (addSectionHeading('Accomplishments')) {
+            checkAddPage(bodyFontSize * 3);
+            const accomplishmentLines = resumeData.accomplishments.split('\n').map(line => line.trim()).filter(line => line);
+            accomplishmentLines.forEach((line, i) => {
+                const cleanLine = line.replace(/^[\*\-\•]\s*/, '');
+                
+                if (i > 0) {
+                    checkAddPage(bodyFontSize * 1.2);
+                }
+                
+                pdf.setFontSize(bodyFontSize);
+                pdf.setFont(standardFont, 'normal');
+                pdf.text('•', margin + 3, currentY);
+                currentY = addWrappedText(cleanLine, margin + 12, currentY, contentWidth - 12);
+            });
+            currentY += bodyFontSize * 0.7 * sectionSpacing;
         }
     }
 
-    // --- Save PDF ---
+    // NEW: Co-curriculars Section
+    if (resumeData.cocurriculars) {
+        if (addSectionHeading('Co-curriculars')) {
+            checkAddPage(bodyFontSize * 3);
+            const cocurrLines = resumeData.cocurriculars.split('\n').map(line => line.trim()).filter(line => line);
+            cocurrLines.forEach((line, i) => {
+                const cleanLine = line.replace(/^[\*\-\•]\s*/, '');
+                
+                if (i > 0) {
+                    checkAddPage(bodyFontSize * 1.2);
+                }
+                
+                pdf.setFontSize(bodyFontSize);
+                pdf.setFont(standardFont, 'normal');
+                pdf.text('•', margin + 3, currentY);
+                currentY = addWrappedText(cleanLine, margin + 12, currentY, contentWidth - 12);
+            });
+            currentY += bodyFontSize * 0.7 * sectionSpacing;
+        }
+    }
+
+    // NEW: Extracurriculars Section
+    if (resumeData.extracurriculars) {
+        if (addSectionHeading('Extracurriculars')) {
+            checkAddPage(bodyFontSize * 3);
+            const extracurrLines = resumeData.extracurriculars.split('\n').map(line => line.trim()).filter(line => line);
+            extracurrLines.forEach((line, i) => {
+                const cleanLine = line.replace(/^[\*\-\•]\s*/, '');
+                
+                if (i > 0) {
+                    checkAddPage(bodyFontSize * 1.2);
+                }
+                
+                pdf.setFontSize(bodyFontSize);
+                pdf.setFont(standardFont, 'normal');
+                pdf.text('•', margin + 3, currentY);
+                currentY = addWrappedText(cleanLine, margin + 12, currentY, contentWidth - 12);
+            });
+            currentY += bodyFontSize * 0.7 * sectionSpacing;
+        }
+    }
+
+    // NEW: Languages Section
+    if (resumeData.languages && resumeData.languages.length > 0) {
+        if (addSectionHeading('Languages Known')) {
+            resumeData.languages.forEach((lang, index) => {
+                if (index > 0) {
+                    currentY += bodyFontSize * 0.3 * itemSpacing;
+                }
+                
+                checkAddPage(bodyFontSize * 1.5);
+                pdf.setFontSize(bodyFontSize);
+                pdf.setFont(standardFont, 'bold');
+                
+                let langText = lang.language || 'Language';
+                if (lang.proficiency) {
+                    langText += ` (${lang.proficiency})`;
+                }
+                
+                currentY = addWrappedText(langText, margin, currentY, contentWidth);
+                
+                if (index < resumeData.languages.length - 1) {
+                    currentY += bodyFontSize * 0.3 * itemSpacing;
+                }
+            });
+            currentY += bodyFontSize * 0.5 * sectionSpacing;
+        }
+    }
+
+    // NEW: Custom Sections
+    resumeData.customSections.forEach(customSection => {
+        if (!customSection.hidden && (customSection.title || customSection.items.length > 0)) {
+            if (addSectionHeading(customSection.title || 'Custom Section')) {
+                customSection.items.forEach((item, index) => {
+                    if (index > 0) {
+                        currentY += bodyFontSize * 0.4 * itemSpacing;
+                    }
+                    
+                    checkAddPage(subHeadingFontSize + bodyFontSize * 3);
+                    pdf.setFontSize(subHeadingFontSize);
+                    pdf.setFont(standardFont, 'bold');
+                    pdf.text(item.title || 'Item', margin, currentY);
+                    
+                    if (item.date) {
+                        pdf.setFont(standardFont, 'normal');
+                        pdf.text(item.date, pageWidth - margin, currentY, { align: 'right' });
+                    }
+                    currentY += subHeadingFontSize * 1.05 * spacingFactor;
+
+                    if (item.subtitle) {
+                        pdf.setFontSize(bodyFontSize);
+                        pdf.setFont(standardFont, 'italic');
+                        pdf.text(item.subtitle, margin, currentY);
+                        currentY += bodyFontSize * 1.1 * spacingFactor;
+                    }
+
+                    if (item.link && !item.subtitle) {
+                        pdf.setFontSize(bodyFontSize - 1);
+                        pdf.setFont(standardFont, 'italic');
+                        currentY = addWrappedText(item.link, margin, currentY, contentWidth);
+                    }
+
+                    if (item.description) {
+                        const descLines = item.description.split('\n').map(line => line.trim()).filter(line => line);
+                        descLines.forEach((line, i) => {
+                            const cleanLine = line.replace(/^[\*\-\•]\s*/, '');
+                            
+                            if (i > 0) {
+                                checkAddPage(bodyFontSize * 1.2);
+                            }
+                            
+                            pdf.setFontSize(bodyFontSize);
+                            pdf.setFont(standardFont, 'normal');
+                            pdf.text('•', margin + 3, currentY);
+                            currentY = addWrappedText(cleanLine, margin + 12, currentY, contentWidth - 12);
+                        });
+                    }
+                    
+                    if (index < customSection.items.length - 1) {
+                        currentY += bodyFontSize * 0.4 * itemSpacing;
+                    }
+                });
+                
+                currentY += bodyFontSize * 0.5 * sectionSpacing;
+            }
+        }
+    });
+
+    // Footer
+    const remainingSpace = pageHeight - margin - currentY;
+    if (remainingSpace > 100) {
+        pdf.setFontSize(8);
+        pdf.setTextColor(180, 180, 180);
+        pdf.text(`Generated on ${new Date().toLocaleDateString()}`, pageWidth/2, pageHeight - 20, {align: 'center'});
+        pdf.setTextColor(0, 0, 0);
+    }
+
+    // Save PDF
     const filename = `Resume_${(resumeData.personal.name || 'User').replace(/ /g, '_')}.pdf`;
     pdf.save(filename);
     showToast(`📄 Resume downloaded as ${filename}`, 'success');
@@ -5255,47 +5526,45 @@ function debounce(func, wait) {
 // --- Live Preview Update Function (Enhanced) ---
 function updateResumePreview() {
     console.log("Updating resume preview content...");
-    const resumeData = getResumeData(); // Calls the function you already have
+    const resumeData = getResumeData();
     const previewArea = document.getElementById('resumePreviewArea');
     if (!previewArea) return;
 
-    // Apply spacing variables to the preview area
+    // Apply spacing variables
     const spacingFactor = resumeData.settings.spacingFactor || 1.0;
     const sectionSpacing = resumeData.settings.sectionSpacing || 1.0;
     const itemSpacing = resumeData.settings.itemSpacing || 1.0;
     
-    // Set CSS variables for spacing
     previewArea.style.setProperty('--spacing-factor', spacingFactor);
     previewArea.style.setProperty('--section-spacing', sectionSpacing);
     previewArea.style.setProperty('--item-spacing', itemSpacing);
 
-    // Clear previous preview content
     previewArea.innerHTML = '';
-
-    // Update preview area data attributes for proper sizing
     previewArea.setAttribute('data-doc-size', resumeData.settings.docSize || 'letter');
 
     // Check if there's any data to render
-    if (Object.values(resumeData.personal).every(val => !val) && 
-        !resumeData.objective && 
-        !resumeData.experience.length && 
-        !resumeData.education.length && 
-        !resumeData.projects.length && 
-        !resumeData.skills && 
-        !resumeData.certifications.length) {
+    const hasPersonalData = Object.values(resumeData.personal).some(val => val);
+    const hasAnyContent = hasPersonalData || resumeData.objective || 
+                         resumeData.experience.length || resumeData.education.length || 
+                         resumeData.projects.length || resumeData.internships.length || 
+                         resumeData.publications.length || resumeData.skills || 
+                         resumeData.certifications.length || resumeData.accomplishments ||
+                         resumeData.cocurriculars || resumeData.extracurriculars ||
+                         resumeData.languages.length || resumeData.customSections.length;
+
+    if (!hasAnyContent) {
         previewArea.innerHTML = '<p class="text-center text-muted initial-preview-message">Resume preview will appear here as you enter details.</p>';
-        return; // Show placeholder if no data
+        return;
     }
 
-    // --- Helper function to safely create HTML ---
+    // Helper function to create HTML elements
     const createHtml = (tag, className = '', content = '', attributes = {}) => {
         const el = document.createElement(tag);
         if (className) el.className = className;
-        // Use textContent for safety unless HTML is intended (like lists)
         if (typeof content === 'string' && !content.startsWith('<')) {
              el.textContent = content;
         } else if (typeof content === 'string') {
-             el.innerHTML = content; // Use innerHTML carefully for list structures etc.
+             el.innerHTML = content;
         } else if (Array.isArray(content)) {
              content.forEach(child => el.appendChild(child));
         } else if (content instanceof Node) {
@@ -5307,11 +5576,10 @@ function updateResumePreview() {
         return el;
     };
 
-    // --- Build Preview HTML ---
     const fragment = document.createDocumentFragment();
 
     // Header
-    if (resumeData.personal && Object.values(resumeData.personal).some(val => val)) {
+    if (hasPersonalData) {
         const headerDiv = createHtml('div', 'preview-header');
         if (resumeData.personal.name) {
             headerDiv.appendChild(createHtml('div', 'name', resumeData.personal.name));
@@ -5335,22 +5603,20 @@ function updateResumePreview() {
         fragment.appendChild(objectiveDiv);
     }
 
-    // Function to render section items (enhanced)
+    // Function to render section items
     const renderSectionItems = (title, sectionKey, items) => {
-        // Check if section should be hidden
         const editorSection = document.querySelector(`.resume-section[data-section="${sectionKey}"]`);
         const isHidden = editorSection?.classList.contains('hidden');
 
-        if (!items || items.length === 0) return null;
+        if (!items || items.length === 0 || isHidden) return null;
 
-        const sectionDiv = createHtml('div', `preview-section preview-${sectionKey} ${isHidden ? 'hidden' : ''}`);
+        const sectionDiv = createHtml('div', `preview-section preview-${sectionKey}`);
         sectionDiv.appendChild(createHtml('h2', '', title));
 
         items.forEach((item, index) => {
             const itemDiv = createHtml('div', 'preview-item');
-            // Add spacing classes based on position
             if (index > 0) {
-                itemDiv.classList.add('mt-item'); // Add class for margin top when not first item
+                itemDiv.classList.add('mt-item');
             }
             
             const itemHeader = createHtml('div', 'item-header');
@@ -5371,23 +5637,33 @@ function updateResumePreview() {
                 titleText = item.projectName || 'Project Name';
                 dateText = item.date || '';
                 subtitleText = item.link ? `<a href="${item.link}" target="_blank">${item.link}</a>` : '';
+            } else if (sectionKey === 'internships') {
+                titleText = item.role || 'Role';
+                dateText = item.date || '';
+                subtitleText = `${item.company || 'Company'} | ${item.location || 'Location'}`;
+            } else if (sectionKey === 'publications') {
+                titleText = item.title || 'Publication Title';
+                dateText = item.date || '';
+                subtitleText = `${item.authors || 'Authors'} | ${item.publication || 'Publication'}`;
+                if (item.link) {
+                    subtitleText += ` | <a href="${item.link}" target="_blank">Link</a>`;
+                }
             } else if (sectionKey === 'certifications') {
-                // For certifications, we'll format like PDF - combined bold name and issuing body
                 titleText = item.certificationName || 'Certification';
                 if (item.issuingBody) {
                     titleText += ` - ${item.issuingBody}`;
                 }
                 dateText = item.date || '';
+            } else if (sectionKey === 'languages') {
+                titleText = item.language || 'Language';
+                if (item.proficiency) {
+                    titleText += ` (${item.proficiency})`;
+                }
             }
 
-            // Use .textContent or innerHTML appropriately
-            if (sectionKey === 'certifications') {
-                // For certifications, we might include HTML formatting
+            if (sectionKey === 'certifications' || sectionKey === 'languages') {
                 const titleSpan = createHtml('span', 'item-title');
-                titleSpan.innerHTML = `<strong>${item.certificationName || 'Certification'}</strong>`;
-                if (item.issuingBody) {
-                    titleSpan.innerHTML += ` - ${item.issuingBody}`;
-                }
+                titleSpan.innerHTML = `<strong>${titleText}</strong>`;
                 itemHeader.appendChild(titleSpan);
             } else {
                 itemHeader.appendChild(createHtml('span', 'item-title', titleText));
@@ -5398,8 +5674,10 @@ function updateResumePreview() {
             }
             itemDiv.appendChild(itemHeader);
 
-            if (subtitleText && sectionKey !== 'certifications') {
-                itemDiv.appendChild(createHtml('div', 'item-subtitle', subtitleText));
+            if (subtitleText && sectionKey !== 'certifications' && sectionKey !== 'languages') {
+                const subtitleDiv = createHtml('div', 'item-subtitle');
+                subtitleDiv.innerHTML = subtitleText;
+                itemDiv.appendChild(subtitleDiv);
             }
 
             // Handle descriptions
@@ -5425,15 +5703,43 @@ function updateResumePreview() {
         return sectionDiv;
     };
 
-    // Render sections
+    // Function to render textarea sections (accomplishments, co-curriculars, extracurriculars)
+    const renderTextAreaSection = (title, sectionKey, content) => {
+        const editorSection = document.querySelector(`.resume-section[data-section="${sectionKey}"]`);
+        const isHidden = editorSection?.classList.contains('hidden');
+
+        if (!content || isHidden) return null;
+
+        const sectionDiv = createHtml('div', `preview-section preview-${sectionKey}`);
+        sectionDiv.appendChild(createHtml('h2', '', title));
+        
+        const contentLines = content.split('\n').map(line => line.trim()).filter(line => line);
+        if (contentLines.length > 0) {
+            const ul = createHtml('ul');
+            contentLines.forEach(line => {
+                const cleanLine = line.replace(/^[\*\-\•]\s*/, '');
+                ul.appendChild(createHtml('li', '', cleanLine));
+            });
+            sectionDiv.appendChild(ul);
+        } else {
+            sectionDiv.appendChild(createHtml('p', '', content));
+        }
+        
+        return sectionDiv;
+    };
+
+    // Render sections in order
     const expSection = renderSectionItems('Work Experience', 'experience', resumeData.experience);
     if (expSection) fragment.appendChild(expSection);
 
-    const eduSection = renderSectionItems('Education', 'education', resumeData.education);
-    if (eduSection) fragment.appendChild(eduSection);
-
     const projSection = renderSectionItems('Projects', 'projects', resumeData.projects);
     if (projSection) fragment.appendChild(projSection);
+
+    const internSection = renderSectionItems('Internships', 'internships', resumeData.internships);
+    if (internSection) fragment.appendChild(internSection);
+
+    const pubSection = renderSectionItems('Publications', 'publications', resumeData.publications);
+    if (pubSection) fragment.appendChild(pubSection);
 
     // Skills
     const skillsSectionEditor = document.querySelector('.resume-section[data-section="skills"]');
@@ -5446,11 +5752,79 @@ function updateResumePreview() {
         fragment.appendChild(skillsSection);
     }
 
-    // Certifications
+    const eduSection = renderSectionItems('Education', 'education', resumeData.education);
+    if (eduSection) fragment.appendChild(eduSection);
+
     const certSection = renderSectionItems('Certifications', 'certifications', resumeData.certifications);
     if (certSection) fragment.appendChild(certSection);
 
-    // Append the built fragment to the preview area
+    const accomplishmentsSection = renderTextAreaSection('Accomplishments', 'accomplishments', resumeData.accomplishments);
+    if (accomplishmentsSection) fragment.appendChild(accomplishmentsSection);
+
+    const cocurrSection = renderTextAreaSection('Co-curriculars', 'cocurriculars', resumeData.cocurriculars);
+    if (cocurrSection) fragment.appendChild(cocurrSection);
+
+    const extracurrSection = renderTextAreaSection('Extracurriculars', 'extracurriculars', resumeData.extracurriculars);
+    if (extracurrSection) fragment.appendChild(extracurrSection);
+
+    const langSection = renderSectionItems('Languages Known', 'languages', resumeData.languages);
+    if (langSection) fragment.appendChild(langSection);
+
+    // Custom Sections
+    resumeData.customSections.forEach(customSection => {
+        if (!customSection.hidden && (customSection.title || customSection.items.length > 0)) {
+            const customSectionDiv = createHtml('div', 'preview-section preview-custom');
+            customSectionDiv.appendChild(createHtml('h2', '', customSection.title || 'Custom Section'));
+            
+            customSection.items.forEach((item, index) => {
+                const itemDiv = createHtml('div', 'preview-item');
+                if (index > 0) {
+                    itemDiv.classList.add('mt-item');
+                }
+                
+                const itemHeader = createHtml('div', 'item-header');
+                const titleText = item.title || 'Item';
+                const dateText = item.date || '';
+                
+                itemHeader.appendChild(createHtml('span', 'item-title', titleText));
+                if (dateText) {
+                    itemHeader.appendChild(createHtml('span', 'item-date', dateText));
+                }
+                itemDiv.appendChild(itemHeader);
+
+                if (item.subtitle) {
+                    let subtitleContent = item.subtitle;
+                    if (item.link) {
+                        subtitleContent += ` | <a href="${item.link}" target="_blank">Link</a>`;
+                    }
+                    const subtitleDiv = createHtml('div', 'item-subtitle');
+                    subtitleDiv.innerHTML = subtitleContent;
+                    itemDiv.appendChild(subtitleDiv);
+                } else if (item.link) {
+                    const linkDiv = createHtml('div', 'item-subtitle');
+                    linkDiv.innerHTML = `<a href="${item.link}" target="_blank">${item.link}</a>`;
+                    itemDiv.appendChild(linkDiv);
+                }
+
+                if (item.description) {
+                    const descLines = item.description.split('\n').map(line => line.trim()).filter(line => line);
+                    if (descLines.length > 0) {
+                        const ul = createHtml('ul');
+                        descLines.forEach(line => {
+                            const cleanLine = line.replace(/^[\*\-\•]\s*/, '');
+                            ul.appendChild(createHtml('li', '', cleanLine));
+                        });
+                        itemDiv.appendChild(ul);
+                    }
+                }
+
+                customSectionDiv.appendChild(itemDiv);
+            });
+            
+            fragment.appendChild(customSectionDiv);
+        }
+    });
+
     previewArea.appendChild(fragment);
     console.log("Preview content updated.");
 }
