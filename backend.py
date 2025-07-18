@@ -1627,11 +1627,6 @@ def call_haiku_for_enhancement(section_type, original_content):
         user_content = f"Original Experience Description:\n{original_content}"
         max_tokens = 400
         temperature = 0.5
-    elif section_type == 'internship':
-        system_prompt = "You are an expert resume writer specializing in internship experiences. Rewrite the following internship description using strong action verbs at the start of each point. Focus on skills learned, projects completed, and contributions made. Use bullet points (use '*' or '-' for bullets) and highlight achievements where possible. Respond with ONLY the rewritten bullet points."
-        user_content = f"Original Internship Description:\n{original_content}"
-        max_tokens = 400
-        temperature = 0.5
     elif section_type == 'project':
         system_prompt = "You are an expert resume writer. Rewrite the following project description to clearly state the project goal, technologies used, the candidate's contribution, and key outcomes or features. Use bullet points (use '*' or '-'). Respond with ONLY the rewritten bullet points."
         user_content = f"Original Project Description:\n{original_content}"
@@ -1642,31 +1637,6 @@ def call_haiku_for_enhancement(section_type, original_content):
         user_content = f"Original Skills List:\n{original_content}"
         max_tokens = 250
         temperature = 0.3
-    elif section_type == 'accomplishments':
-        system_prompt = "You are an expert resume writer. Transform the following accomplishments into professional bullet points that quantify achievements and demonstrate impact. Use strong action verbs and focus on measurable results. Format each accomplishment as a separate bullet point using '*' or '-'. Respond with ONLY the formatted bullet points."
-        user_content = f"Original Accomplishments:\n{original_content}"
-        max_tokens = 350
-        temperature = 0.5
-    elif section_type == 'cocurriculars':
-        system_prompt = "You are an expert resume writer. Transform the following co-curricular activities into professional bullet points that highlight leadership, skills developed, and contributions made. Use strong action verbs and focus on transferable skills and achievements. Format each activity as a separate bullet point using '*' or '-'. Respond with ONLY the formatted bullet points."
-        user_content = f"Original Co-curricular Activities:\n{original_content}"
-        max_tokens = 350
-        temperature = 0.5
-    elif section_type == 'extracurriculars':
-        system_prompt = "You are an expert resume writer. Transform the following extracurricular activities into professional bullet points that demonstrate transferable skills, leadership, and personal development. Use strong action verbs and focus on achievements and impact. Format each activity as a separate bullet point using '*' or '-'. Respond with ONLY the formatted bullet points."
-        user_content = f"Original Extracurricular Activities:\n{original_content}"
-        max_tokens = 350
-        temperature = 0.5
-    elif section_type == 'publication':
-        system_prompt = "You are an expert academic/research resume writer. Format and enhance this publication information to follow professional standards. Ensure proper citation style and highlight the significance of the work. If multiple publications are listed, format each as a separate line. Respond with ONLY the enhanced publication details."
-        user_content = f"Original Publication Information:\n{original_content}"
-        max_tokens = 300
-        temperature = 0.4
-    elif section_type == 'custom':
-        system_prompt = "You are an expert resume writer. Enhance this content to be more professional and impactful. If the content contains multiple items, format them as clear bullet points using '*' or '-'. Use strong action verbs and focus on achievements and impact where applicable. Respond with ONLY the enhanced content."
-        user_content = f"Original Content:\n{original_content}"
-        max_tokens = 350
-        temperature = 0.6
     else:
         # Fallback for unknown types
         system_prompt = "You are a helpful assistant. Briefly rewrite the following text for clarity and conciseness. Respond with ONLY the rewritten text."
