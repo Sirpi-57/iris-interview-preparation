@@ -1627,11 +1627,46 @@ def call_haiku_for_enhancement(section_type, original_content):
         user_content = f"Original Experience Description:\n{original_content}"
         max_tokens = 400
         temperature = 0.5
+    elif section_type == 'internship':
+        system_prompt = "You are an expert resume writer specializing in internship experiences. Rewrite the following internship description using strong action verbs and highlighting learning outcomes, contributions, and achievements. Use bullet points (use '*' or '-' for bullets) and focus on skills gained and value added. Respond with ONLY the rewritten bullet points."
+        user_content = f"Original Internship Description:\n{original_content}"
+        max_tokens = 350
+        temperature = 0.5
     elif section_type == 'project':
         system_prompt = "You are an expert resume writer. Rewrite the following project description to clearly state the project goal, technologies used, the candidate's contribution, and key outcomes or features. Use bullet points (use '*' or '-'). Respond with ONLY the rewritten bullet points."
         user_content = f"Original Project Description:\n{original_content}"
         max_tokens = 350
         temperature = 0.5
+    elif section_type == 'publication':
+        system_prompt = "You are an expert academic resume writer. Rewrite the following publication description to be clear, concise, and highlight the research contribution, methodology, and impact. Focus on technical accuracy and academic standards. Respond with ONLY the rewritten description."
+        user_content = f"Original Publication Description:\n{original_content}"
+        max_tokens = 300
+        temperature = 0.4
+    elif section_type == 'accomplishment':
+        system_prompt = "You are an expert resume writer. Rewrite the following accomplishment to be impactful and quantifiable. Focus on the achievement, its significance, and measurable outcomes. Use strong action words and be specific about results. Respond with ONLY the rewritten accomplishment description."
+        user_content = f"Original Accomplishment:\n{original_content}"
+        max_tokens = 250
+        temperature = 0.5
+    elif section_type == 'award':
+        system_prompt = "You are an expert resume writer. Rewrite the following award description to clearly explain why it was received, its significance, and what it demonstrates about the candidate's abilities or achievements. Be concise and impactful. Respond with ONLY the rewritten description."
+        user_content = f"Original Award Description:\n{original_content}"
+        max_tokens = 200
+        temperature = 0.5
+    elif section_type == 'extracurricular':
+        system_prompt = "You are an expert resume writer. Rewrite the following extracurricular activity description to highlight leadership skills, teamwork, achievements, and transferable skills relevant to professional contexts. Use bullet points (use '*' or '-') where appropriate. Respond with ONLY the rewritten description."
+        user_content = f"Original Extracurricular Description:\n{original_content}"
+        max_tokens = 300
+        temperature = 0.5
+    elif section_type == 'customSection':
+        # For custom sections, we need to extract the section title for context
+        lines = original_content.split('\n')
+        section_title = lines[0] if lines else "Custom Section"
+        content = '\n'.join(lines[1:]) if len(lines) > 1 else original_content
+        
+        system_prompt = f"You are an expert resume writer. Based on the section title '{section_title}', understand the context and rewrite the following content to be professional, clear, and appropriately formatted for a resume section. Use bullet points (use '*' or '-') where appropriate. Focus on relevance to career goals and professional development. Respond with ONLY the rewritten content."
+        user_content = f"Section Title: {section_title}\nOriginal Content:\n{content}"
+        max_tokens = 350
+        temperature = 0.6
     elif section_type == 'skills':
         system_prompt = "You are an expert resume formatter. Take the following list of skills (which might be comma-separated, newline-separated, or mixed) and format it into a clean, comma-separated list. Remove duplicates and categorize briefly if obvious categories emerge (e.g., Languages, Frameworks, Tools), but prioritize a simple comma-separated list if categorization isn't clear. Respond with ONLY the formatted comma-separated list."
         user_content = f"Original Skills List:\n{original_content}"

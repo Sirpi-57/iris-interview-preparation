@@ -2725,4 +2725,315 @@ overflow: hidden; /* Ensures iframe respects rounded corners */
 
 
 
+/* CSS for new resume sections - Add these to your styles.css */
 
+/* Custom section title styling in preview */
+.preview-custom-sections .custom-section-title {
+    font-size: 11pt;
+    font-weight: bold;
+    color: #000;
+    margin-bottom: 8pt;
+    margin-top: 0;
+}
+
+/* Language items styling */
+.preview-languages .preview-item .item-title {
+    font-size: 10pt;
+    font-weight: normal;
+    color: #000;
+}
+
+/* Award and accomplishment styling */
+.preview-awards .preview-item .item-title,
+.preview-accomplishments .preview-item .item-title {
+    font-size: 10pt;
+    font-weight: bold;
+    color: #000;
+}
+
+/* Publications specific styling */
+.preview-publications .preview-item .item-subtitle {
+    font-size: 9pt;
+    font-style: italic;
+    margin-bottom: 4pt;
+    color: #000;
+}
+
+.preview-publications .preview-item .small {
+    font-size: 9pt;
+    color: #666;
+    margin-bottom: 4pt;
+}
+
+/* Extra curricular activities */
+.preview-extracurriculars .preview-item .item-title {
+    font-size: 11pt;
+    font-weight: bold;
+    color: #000;
+}
+
+.preview-extracurriculars .preview-item .item-subtitle {
+    font-size: 10pt;
+    font-style: italic;
+    margin-bottom: 4pt;
+    color: #000;
+}
+
+/* Internships styling - similar to experience */
+.preview-internships .preview-item .item-title {
+    font-size: 11pt;
+    font-weight: bold;
+    color: #000;
+}
+
+.preview-internships .preview-item .item-subtitle {
+    font-size: 10pt;
+    font-style: italic;
+    margin-bottom: 4pt;
+    color: #000;
+}
+
+/* Custom sections general styling */
+.preview-custom-sections .preview-item p {
+    font-size: 10pt;
+    line-height: 1.15;
+    color: #000;
+    margin-bottom: 5pt;
+}
+
+.preview-custom-sections .preview-item ul {
+    list-style: none;
+    margin-left: 12pt;
+    padding-left: 0;
+    margin-top: 2pt;
+    margin-bottom: 2pt;
+}
+
+.preview-custom-sections .preview-item ul li::before {
+    content: '•';
+    display: inline-block;
+    width: 8pt;
+    margin-left: -8pt;
+}
+
+.preview-custom-sections .preview-item ul li {
+    margin-bottom: 2pt;
+    color: #000;
+    line-height: 1.15;
+    padding-left: 8pt;
+}
+
+/* Ensure all new sections follow the same spacing rules */
+.preview-internships,
+.preview-publications,
+.preview-accomplishments,
+.preview-awards,
+.preview-extracurriculars,
+.preview-languages,
+.preview-custom-sections {
+    margin-bottom: calc(8pt * var(--section-spacing));
+}
+
+.preview-internships h2,
+.preview-publications h2,
+.preview-accomplishments h2,
+.preview-awards h2,
+.preview-extracurriculars h2,
+.preview-languages h2,
+.preview-custom-sections h2 {
+    margin-top: calc(10pt * var(--section-spacing));
+    margin-bottom: calc(8pt * var(--spacing-factor));
+}
+
+.preview-internships .preview-item,
+.preview-publications .preview-item,
+.preview-accomplishments .preview-item,
+.preview-awards .preview-item,
+.preview-extracurriculars .preview-item,
+.preview-languages .preview-item,
+.preview-custom-sections .preview-item {
+    margin-bottom: calc(5pt * var(--item-spacing));
+}
+
+/* Special styling for language proficiency display */
+.preview-languages .preview-item {
+    display: inline-block;
+    margin-right: 15pt;
+    margin-bottom: calc(3pt * var(--item-spacing));
+}
+
+.preview-languages .preview-item .item-header {
+    display: inline;
+    margin-bottom: 0;
+}
+
+/* Make languages flow horizontally if there are multiple */
+.preview-languages {
+    line-height: 1.4;
+}
+
+/* Awards and accomplishments date styling */
+.preview-awards .preview-item .item-date,
+.preview-accomplishments .preview-item .item-date {
+    font-size: 10pt;
+    font-style: normal;
+    color: #000;
+}
+
+/* Publication link styling */
+.preview-publications .preview-item a {
+    color: #0066cc;
+    text-decoration: underline;
+}
+
+.preview-publications .preview-item a:hover {
+    color: #004499;
+}
+
+/* Form styling for new sections */
+.resume-section[data-section="internships"],
+.resume-section[data-section="publications"],
+.resume-section[data-section="accomplishments"],
+.resume-section[data-section="awards"],
+.resume-section[data-section="extracurriculars"],
+.resume-section[data-section="languages"],
+.resume-section[data-section="customSections"] {
+    border-bottom: 1px solid #eee;
+    padding-bottom: 1.5rem;
+    margin-bottom: 1.5rem;
+}
+
+/* Language dropdown styling */
+#languageTemplate .form-select {
+    background-color: #fff;
+    border: 1px solid #ced4da;
+    border-radius: 0.375rem;
+    padding: 0.375rem 0.75rem;
+    font-size: 1rem;
+    line-height: 1.5;
+    color: #495057;
+}
+
+#languageTemplate .form-select:focus {
+    border-color: var(--primary-color);
+    outline: 0;
+    box-shadow: 0 0 0 0.2rem rgba(var(--primary-color-rgb), 0.25);
+}
+
+/* Custom section title input styling */
+#customSectionTemplate input[data-field="sectionTitle"] {
+    font-weight: 600;
+    background-color: #f8f9fa;
+    border: 2px solid #e9ecef;
+}
+
+#customSectionTemplate input[data-field="sectionTitle"]:focus {
+    background-color: #fff;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 0.2rem rgba(var(--primary-color-rgb), 0.25);
+}
+
+/* AI enhance button styling for new sections */
+.resume-section[data-section="internships"] .ai-generate-btn,
+.resume-section[data-section="publications"] .ai-generate-btn,
+.resume-section[data-section="accomplishments"] .ai-generate-btn,
+.resume-section[data-section="awards"] .ai-generate-btn,
+.resume-section[data-section="extracurriculars"] .ai-generate-btn,
+.resume-section[data-section="customSections"] .ai-generate-btn {
+    transition: all 0.3s ease;
+}
+
+.resume-section[data-section="internships"] .ai-generate-btn:hover:not(:disabled),
+.resume-section[data-section="publications"] .ai-generate-btn:hover:not(:disabled),
+.resume-section[data-section="accomplishments"] .ai-generate-btn:hover:not(:disabled),
+.resume-section[data-section="awards"] .ai-generate-btn:hover:not(:disabled),
+.resume-section[data-section="extracurriculars"] .ai-generate-btn:hover:not(:disabled),
+.resume-section[data-section="customSections"] .ai-generate-btn:hover:not(:disabled) {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* Publication template specific styling */
+#publicationTemplate .row .col-md-8 input,
+#publicationTemplate .row .col-md-6 input {
+    font-size: 0.95rem;
+}
+
+#publicationTemplate textarea[data-field="description"] {
+    font-size: 0.9rem;
+    min-height: 80px;
+}
+
+/* Award template category field styling */
+#awardTemplate input[data-field="category"] {
+    font-style: italic;
+    color: #6c757d;
+}
+
+/* Responsive adjustments for new sections */
+@media (max-width: 768px) {
+    .preview-languages .preview-item {
+        display: block;
+        margin-right: 0;
+        margin-bottom: calc(5pt * var(--item-spacing));
+    }
+    
+    /* Stack language items vertically on mobile */
+    .preview-languages .preview-item .item-header {
+        display: block;
+    }
+    
+    /* Adjust custom section titles on mobile */
+    .preview-custom-sections .custom-section-title {
+        font-size: 10pt;
+        margin-bottom: 6pt;
+    }
+}
+
+/* Print-specific styles for new sections */
+@media print {
+    .preview-internships,
+    .preview-publications,
+    .preview-accomplishments,
+    .preview-awards,
+    .preview-extracurriculars,
+    .preview-languages,
+    .preview-custom-sections {
+        page-break-inside: avoid;
+        break-inside: avoid;
+    }
+    
+    .preview-internships .preview-item,
+    .preview-publications .preview-item,
+    .preview-accomplishments .preview-item,
+    .preview-awards .preview-item,
+    .preview-extracurriculars .preview-item,
+    .preview-custom-sections .preview-item {
+        page-break-inside: avoid;
+        break-inside: avoid;
+    }
+}
+
+/* Animation for adding new items */
+.resume-item {
+    animation: slideInFromRight 0.3s ease-out;
+}
+
+@keyframes slideInFromRight {
+    from {
+        opacity: 0;
+        transform: translateX(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+/* Focus states for accessibility */
+.resume-section[data-section="languages"] .form-select:focus,
+.resume-section[data-section="customSections"] input:focus,
+.resume-section[data-section="customSections"] textarea:focus {
+    outline: 2px solid var(--primary-color);
+    outline-offset: 2px;
+}

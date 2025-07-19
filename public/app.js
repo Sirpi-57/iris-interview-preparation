@@ -4323,10 +4323,17 @@ function updateFullscreenButtonState() {
     }
 }
 
-// Keep track of unique IDs for dynamic items
+// Replace your existing counter declarations with these
 let experienceCounter = 0;
 let educationCounter = 0;
 let projectCounter = 0;
+let internshipCounter = 0;
+let publicationCounter = 0;
+let accomplishmentCounter = 0;
+let awardCounter = 0;
+let extracurricularCounter = 0;
+let languageCounter = 0;
+let customSectionCounter = 0;
 
 // Function to initialize resume builder listeners (call when navigating to it)
 function initResumeBuilder() {
@@ -4542,25 +4549,26 @@ function handleAddItem(event) {
     newItem.id = ''; // Remove template ID from clone
     newItem.classList.remove('d-none'); // Make it visible
 
-     // Assign unique IDs to inputs/textareas within the cloned item if needed
+    // Assign unique IDs to inputs/textareas within the cloned item if needed
     let counter;
     if (templateId === 'experienceTemplate') counter = ++experienceCounter;
     else if (templateId === 'educationTemplate') counter = ++educationCounter;
     else if (templateId === 'projectTemplate') counter = ++projectCounter;
+    else if (templateId === 'internshipTemplate') counter = ++internshipCounter;
+    else if (templateId === 'publicationTemplate') counter = ++publicationCounter;
+    else if (templateId === 'accomplishmentTemplate') counter = ++accomplishmentCounter;
+    else if (templateId === 'awardTemplate') counter = ++awardCounter;
+    else if (templateId === 'extracurricularTemplate') counter = ++extracurricularCounter;
+    else if (templateId === 'languageTemplate') counter = ++languageCounter;
+    else if (templateId === 'customSectionTemplate') counter = ++customSectionCounter;
+    else if (templateId === 'certificationTemplate') counter = ++certificationCounter;
     else counter = Date.now(); // Fallback
 
-    newItem.querySelectorAll('input, textarea').forEach(el => {
-         if(el.id) el.id = `<span class="math-inline">\{el\.id\}\-</span>{counter}`;
-         const label = newItem.querySelector(`label[for="${el.id.replace(`-${counter}`, '')}"]`);
-         if(label) label.setAttribute('for', el.id);
-         // Find the AI button targeting this element
-         const aiButton = newItem.querySelector(`.ai-generate-btn[data-target="${el.dataset.field}"]`);
-         if(aiButton) {
-             // Set a more specific target reference, perhaps using the counter
-             // For now, the relative search in setupAIGenerateListener should work
-         }
+    newItem.querySelectorAll('input, textarea, select').forEach(el => {
+        if(el.id) el.id = `${el.id}-${counter}`;
+        const label = newItem.querySelector(`label[for="${el.id.replace(`-${counter}`, '')}"]`);
+        if(label) label.setAttribute('for', el.id);
     });
-
 
     targetContainer.appendChild(newItem);
 }
@@ -4721,13 +4729,18 @@ function getResumeData() {
             website: document.getElementById('resumeWebsite')?.value || ''
         },
         objective: document.getElementById('resumeObjective')?.value || '',
-        experience: [],
         education: [],
+        experience: [],
         projects: [],
+        internships: [],
         skills: document.getElementById('resumeSkills')?.value || '',
-        // --- ADDED THIS LINE ---
+        publications: [],
         certifications: [],
-        // --- END ADDED LINE ---
+        accomplishments: [],
+        awards: [],
+        extracurriculars: [],
+        languages: [],
+        customSections: [],
         settings: {
             fontFamily: document.getElementById('resumeFontFamily')?.value || "'Helvetica', 'Arial', sans-serif",
             fontSize: document.querySelector('input[name="resumeFontSize"]:checked')?.value || 'standard',
@@ -4741,49 +4754,49 @@ function getResumeData() {
     // Helper to extract data from item containers
     const extractItems = (containerId) => {
         const items = [];
-        const container = document.getElementById(containerId); // Get container first
+        const container = document.getElementById(containerId);
         if (!container) {
-             console.warn(`Container element with ID '${containerId}' not found during data extraction.`);
-             return items; // Return empty if container missing
+            console.warn(`Container element with ID '${containerId}' not found during data extraction.`);
+            return items;
         }
         container.querySelectorAll('.resume-item').forEach(itemEl => {
             const itemData = {};
-            itemEl.querySelectorAll('input[data-field], textarea[data-field]').forEach(field => {
-                // Ensure data-field attribute exists before trying to access dataset
-                 if (field.dataset && field.dataset.field) {
-                     itemData[field.dataset.field] = field.value;
-                 } else {
-                     console.warn("Element missing data-field attribute:", field);
-                 }
+            itemEl.querySelectorAll('input[data-field], textarea[data-field], select[data-field]').forEach(field => {
+                if (field.dataset && field.dataset.field) {
+                    itemData[field.dataset.field] = field.value;
+                } else {
+                    console.warn("Element missing data-field attribute:", field);
+                }
             });
-             // Check if itemData has any actual content before pushing
-             if (Object.keys(itemData).some(key => itemData[key]?.trim() !== '')) {
+            if (Object.keys(itemData).some(key => itemData[key]?.trim() !== '')) {
                 items.push(itemData);
-             }
+            }
         });
         return items;
     };
 
-    data.experience = extractItems('experienceItems');
+    // Extract all section data
     data.education = extractItems('educationItems');
+    data.experience = extractItems('experienceItems');
     data.projects = extractItems('projectItems');
-    // --- ADDED THIS LINE ---
+    data.internships = extractItems('internshipItems');
+    data.publications = extractItems('publicationItems');
     data.certifications = extractItems('certificationItems');
-    // --- END ADDED LINE ---
-    // Note: Skills are taken directly above, not using extractItems
+    data.accomplishments = extractItems('accomplishmentItems');
+    data.awards = extractItems('awardItems');
+    data.extracurriculars = extractItems('extracurricularItems');
+    data.languages = extractItems('languageItems');
+    data.customSections = extractItems('customSectionItems');
 
     // Filter out hidden sections
     document.querySelectorAll('#resume-builder .resume-section.hidden').forEach(hiddenSection => {
-         const sectionKey = hiddenSection.dataset.section;
-         if (data.hasOwnProperty(sectionKey)) {
-             // For simplicity, let's just remove the data for preview/PDF generation
-             // If you needed to know it was hidden later, you could use:
-             // data.settings[`hide_${sectionKey}`] = true;
-             delete data[sectionKey];
-         }
+        const sectionKey = hiddenSection.dataset.section;
+        if (data.hasOwnProperty(sectionKey)) {
+            delete data[sectionKey];
+        }
     });
 
-    console.log("Collected Resume Data:", data); // Add log to see collected data
+    console.log("Collected Resume Data:", data);
     return data;
 }
 
@@ -4867,7 +4880,7 @@ function downloadResumePDF() {
         // Don't add heading if the corresponding section data was deleted (because it was hidden in the editor)
         const sectionKey = text.toLowerCase().replace(/\s+/g, '');
         if (!resumeData[sectionKey] && 
-            !['workexperience', 'education', 'projects', 'skills', 'certifications'].includes(sectionKey)) {
+            !['workeexperience', 'education', 'projects', 'internships', 'skills', 'publications', 'certifications', 'accomplishments', 'awards', 'extracurricularactivities', 'languages', 'customsections'].includes(sectionKey)) {
             console.log(`Skipping hidden section heading: ${text}`);
             return false; // Indicate that heading was skipped
         }
@@ -4909,48 +4922,40 @@ function downloadResumePDF() {
             estimatedContentHeight += 20 * sectionSpacing; // Section gap
         }
         
-        // Work Experience section
-        if (resumeData.experience?.length > 0) {
-            estimatedContentHeight += 30 * sectionSpacing; // Section heading + gap
-            resumeData.experience.forEach(exp => {
-                estimatedContentHeight += subHeadingFontSize * 2; // Title + company
-                const descLines = exp.description?.split('\n') || [];
-                estimatedContentHeight += descLines.length * bodyFontSize * 1.2;
-                estimatedContentHeight += 15 * itemSpacing; // Item spacing
-            });
-        }
-        
-        // Education section
-        if (resumeData.education?.length > 0) {
-            estimatedContentHeight += 30 * sectionSpacing; // Section heading + gap
-            resumeData.education.forEach(edu => {
-                estimatedContentHeight += subHeadingFontSize * 2; // Degree + school
-                estimatedContentHeight += 15 * itemSpacing; // Item spacing
-            });
-        }
-        
-        // Projects section
-        if (resumeData.projects?.length > 0) {
-            estimatedContentHeight += 30 * sectionSpacing; // Section heading + gap
-            resumeData.projects.forEach(proj => {
-                estimatedContentHeight += subHeadingFontSize * 1.5; // Project name
-                const descLines = proj.description?.split('\n') || [];
-                estimatedContentHeight += descLines.length * bodyFontSize * 1.2;
-                estimatedContentHeight += 15 * itemSpacing; // Item spacing
-            });
-        }
+        // All sections estimation
+        const sections = [
+            { key: 'education', items: resumeData.education },
+            { key: 'experience', items: resumeData.experience },
+            { key: 'projects', items: resumeData.projects },
+            { key: 'internships', items: resumeData.internships },
+            { key: 'publications', items: resumeData.publications },
+            { key: 'certifications', items: resumeData.certifications },
+            { key: 'accomplishments', items: resumeData.accomplishments },
+            { key: 'awards', items: resumeData.awards },
+            { key: 'extracurriculars', items: resumeData.extracurriculars },
+            { key: 'languages', items: resumeData.languages },
+            { key: 'customSections', items: resumeData.customSections }
+        ];
+
+        sections.forEach(section => {
+            if (section.items?.length > 0) {
+                estimatedContentHeight += 30 * sectionSpacing; // Section heading + gap
+                section.items.forEach(item => {
+                    estimatedContentHeight += subHeadingFontSize * 2; // Title + subtitle
+                    if (item.description) {
+                        const descLines = item.description?.split('\n') || [];
+                        estimatedContentHeight += descLines.length * bodyFontSize * 1.2;
+                    }
+                    estimatedContentHeight += 15 * itemSpacing; // Item spacing
+                });
+            }
+        });
         
         // Skills section
         if (resumeData.skills) {
-            estimatedContentHeight += 30 * sectionSpacing; // Section heading + gap
+            estimatedContentHeight += 30 * sectionSpacing;
             const skillsLines = pdf.splitTextToSize(resumeData.skills, contentWidth);
             estimatedContentHeight += skillsLines.length * bodyFontSize * 1.2;
-        }
-        
-        // Certifications section
-        if (resumeData.certifications?.length > 0) {
-            estimatedContentHeight += 30 * sectionSpacing; // Section heading + gap
-            estimatedContentHeight += resumeData.certifications.length * bodyFontSize * 2;
         }
         
         // Calculate distribution factor based on content and available space
@@ -4996,7 +5001,58 @@ function downloadResumePDF() {
         currentY += bodyFontSize * 0.7 * spacingFactor * sectionSpacing; // Add space after summary with section spacing
     }
 
-    // --- 3. Work Experience Section ---
+    // --- 3. Education Section ---
+    if (resumeData.education && resumeData.education.length > 0) {
+        if (addSectionHeading('Education')) {
+            resumeData.education.forEach((edu, index) => {
+                // Add item spacing between education items
+                if (index > 0) {
+                    currentY += bodyFontSize * 0.4 * itemSpacing;
+                }
+                
+                checkAddPage(subHeadingFontSize * 2 + bodyFontSize * 2);
+                pdf.setFontSize(subHeadingFontSize);
+                pdf.setFont(standardFont, 'bold');
+                // Add Degree/Major (left aligned)
+                pdf.text(edu.degreeMajor || 'Degree/Major', margin, currentY);
+                
+                // Add Graduation Date (right aligned)
+                if (edu.date) {
+                    pdf.setFont(standardFont, 'normal');
+                    pdf.text(edu.date, pageWidth - margin, currentY, { align: 'right' });
+                }
+                currentY += subHeadingFontSize * 1.05 * spacingFactor; // Move Y down with spacing factor
+
+                // Add School, Location, GPA (italicized)
+                pdf.setFontSize(bodyFontSize);
+                pdf.setFont(standardFont, 'italic');
+                let schoolLine = `${edu.school || 'School'} | ${edu.location || 'Location'}`;
+                if (edu.gpa) {
+                    schoolLine += ` | GPA: ${edu.gpa}`;
+                }
+                pdf.text(schoolLine, margin, currentY);
+                currentY += bodyFontSize * 1.1 * spacingFactor; // Move Y down with spacing factor
+
+                // Add Additional Info if present
+                if (edu.additionalInfo) {
+                    currentY = addWrappedText(`Relevant Info: ${edu.additionalInfo}`, margin, currentY, contentWidth, { 
+                        style: 'italic', 
+                        fontSize: bodyFontSize - 1 
+                    });
+                }
+                
+                // Add spacing after each education item
+                if (index < resumeData.education.length - 1) {
+                    currentY += bodyFontSize * 0.4 * itemSpacing;
+                }
+            });
+            
+            // Add spacing after the section
+            currentY += bodyFontSize * 0.5 * sectionSpacing;
+        }
+    }
+
+    // --- 4. Work Experience Section ---
     if (resumeData.experience && resumeData.experience.length > 0) {
         if (addSectionHeading('Work Experience')) { // Only proceed if heading was added (section not hidden)
             resumeData.experience.forEach((exp, index) => {
@@ -5047,57 +5103,6 @@ function downloadResumePDF() {
                 // Add spacing after each experience item (except last) based on item spacing
                 if (index < resumeData.experience.length - 1) {
                     currentY += bodyFontSize * 0.5 * itemSpacing;
-                }
-            });
-            
-            // Add spacing after the section
-            currentY += bodyFontSize * 0.5 * sectionSpacing;
-        }
-    }
-
-    // --- 4. Education Section ---
-    if (resumeData.education && resumeData.education.length > 0) {
-        if (addSectionHeading('Education')) {
-            resumeData.education.forEach((edu, index) => {
-                // Add item spacing between education items
-                if (index > 0) {
-                    currentY += bodyFontSize * 0.4 * itemSpacing;
-                }
-                
-                checkAddPage(subHeadingFontSize * 2 + bodyFontSize * 2);
-                pdf.setFontSize(subHeadingFontSize);
-                pdf.setFont(standardFont, 'bold');
-                // Add Degree/Major (left aligned)
-                pdf.text(edu.degreeMajor || 'Degree/Major', margin, currentY);
-                
-                // Add Graduation Date (right aligned)
-                if (edu.date) {
-                    pdf.setFont(standardFont, 'normal');
-                    pdf.text(edu.date, pageWidth - margin, currentY, { align: 'right' });
-                }
-                currentY += subHeadingFontSize * 1.05 * spacingFactor; // Move Y down with spacing factor
-
-                // Add School, Location, GPA (italicized)
-                pdf.setFontSize(bodyFontSize);
-                pdf.setFont(standardFont, 'italic');
-                let schoolLine = `${edu.school || 'School'} | ${edu.location || 'Location'}`;
-                if (edu.gpa) {
-                    schoolLine += ` | GPA: ${edu.gpa}`;
-                }
-                pdf.text(schoolLine, margin, currentY);
-                currentY += bodyFontSize * 1.1 * spacingFactor; // Move Y down with spacing factor
-
-                // Add Additional Info if present
-                if (edu.additionalInfo) {
-                    currentY = addWrappedText(`Relevant Info: ${edu.additionalInfo}`, margin, currentY, contentWidth, { 
-                        style: 'italic', 
-                        fontSize: bodyFontSize - 1 
-                    });
-                }
-                
-                // Add spacing after each education item
-                if (index < resumeData.education.length - 1) {
-                    currentY += bodyFontSize * 0.4 * itemSpacing;
                 }
             });
             
@@ -5165,7 +5170,53 @@ function downloadResumePDF() {
         }
     }
 
-    // --- 6. Skills Section ---
+    // --- 6. Internships Section ---
+    if (resumeData.internships && resumeData.internships.length > 0) {
+        if (addSectionHeading('Internships')) {
+            resumeData.internships.forEach((intern, index) => {
+                if (index > 0) {
+                    currentY += bodyFontSize * 0.4 * itemSpacing;
+                }
+                
+                checkAddPage(subHeadingFontSize * 2 + bodyFontSize * 3);
+                pdf.setFontSize(subHeadingFontSize);
+                pdf.setFont(standardFont, 'bold');
+                pdf.text(intern.role || 'Internship Role', margin, currentY);
+                
+                if (intern.date) {
+                    pdf.setFont(standardFont, 'normal');
+                    pdf.text(intern.date, pageWidth - margin, currentY, { align: 'right' });
+                }
+                currentY += subHeadingFontSize * 1.05 * spacingFactor;
+
+                pdf.setFontSize(bodyFontSize);
+                pdf.setFont(standardFont, 'italic');
+                pdf.text(`${intern.company || 'Company'} | ${intern.location || 'Location'}`, margin, currentY);
+                currentY += bodyFontSize * 1.1 * spacingFactor;
+
+                if (intern.description) {
+                    const descLines = intern.description.split('\n').map(line => line.trim()).filter(line => line);
+                    descLines.forEach((line, i) => {
+                        const cleanLine = line.replace(/^[\*\-\•]\s*/, '');
+                        if (i > 0) {
+                            checkAddPage(bodyFontSize * 1.2);
+                        }
+                        pdf.setFontSize(bodyFontSize);
+                        pdf.setFont(standardFont, 'normal');
+                        pdf.text('•', margin + 3, currentY);
+                        currentY = addWrappedText(cleanLine, margin + 12, currentY, contentWidth - 12);
+                    });
+                }
+                
+                if (index < resumeData.internships.length - 1) {
+                    currentY += bodyFontSize * 0.5 * itemSpacing;
+                }
+            });
+            currentY += bodyFontSize * 0.5 * sectionSpacing;
+        }
+    }
+
+    // --- 7. Skills Section ---
     if (resumeData.skills) {
         if (addSectionHeading('Skills')) {
             checkAddPage(bodyFontSize * 3); // Estimate space
@@ -5176,7 +5227,54 @@ function downloadResumePDF() {
         }
     }
 
-    // --- 7. Certifications Section ---
+    // --- 8. Publications Section ---
+    if (resumeData.publications && resumeData.publications.length > 0) {
+        if (addSectionHeading('Publications')) {
+            resumeData.publications.forEach((pub, index) => {
+                if (index > 0) {
+                    currentY += bodyFontSize * 0.4 * itemSpacing;
+                }
+                
+                checkAddPage(subHeadingFontSize + bodyFontSize * 3);
+                pdf.setFontSize(subHeadingFontSize);
+                pdf.setFont(standardFont, 'bold');
+                pdf.text(pub.title || 'Publication Title', margin, currentY);
+                
+                if (pub.date) {
+                    pdf.setFont(standardFont, 'normal');
+                    pdf.text(pub.date, pageWidth - margin, currentY, { align: 'right' });
+                }
+                currentY += subHeadingFontSize * 1.05 * spacingFactor;
+
+                pdf.setFontSize(bodyFontSize);
+                pdf.setFont(standardFont, 'italic');
+                let pubLine = pub.venue || 'Publication Venue';
+                if (pub.coAuthors) {
+                    pubLine += ` | Co-Authors: ${pub.coAuthors}`;
+                }
+                pdf.text(pubLine, margin, currentY);
+                currentY += bodyFontSize * 1.1 * spacingFactor;
+
+                if (pub.link) {
+                    checkAddPage(bodyFontSize * 1.2);
+                    pdf.setFontSize(bodyFontSize - 1);
+                    pdf.setFont(standardFont, 'italic');
+                    currentY = addWrappedText(pub.link, margin, currentY, contentWidth);
+                }
+
+                if (pub.description) {
+                    currentY = addWrappedText(pub.description, margin, currentY, contentWidth);
+                }
+                
+                if (index < resumeData.publications.length - 1) {
+                    currentY += bodyFontSize * 0.4 * itemSpacing;
+                }
+            });
+            currentY += bodyFontSize * 0.5 * sectionSpacing;
+        }
+    }
+
+    // --- 9. Certifications Section ---
     if (resumeData.certifications && resumeData.certifications.length > 0) {
         if (addSectionHeading('Certifications')) {
             resumeData.certifications.forEach((cert, index) => {
@@ -5213,7 +5311,194 @@ function downloadResumePDF() {
                     currentY += bodyFontSize * 0.3 * itemSpacing;
                 }
             });
+            currentY += bodyFontSize * 0.5 * sectionSpacing;
         }
+    }
+
+    // --- 10. Accomplishments Section ---
+    if (resumeData.accomplishments && resumeData.accomplishments.length > 0) {
+        if (addSectionHeading('Accomplishments')) {
+            resumeData.accomplishments.forEach((acc, index) => {
+                if (index > 0) {
+                    currentY += bodyFontSize * 0.3 * itemSpacing;
+                }
+                
+                checkAddPage(bodyFontSize * 2);
+                pdf.setFontSize(bodyFontSize);
+                pdf.setFont(standardFont, 'bold');
+                
+                let availableWidth = contentWidth;
+                const dateText = acc.date || '';
+                if (dateText) {
+                    pdf.setFont(standardFont, 'normal');
+                    let dateWidth = pdf.getTextWidth(dateText) + 5;
+                    availableWidth = contentWidth - dateWidth;
+                    pdf.text(dateText, pageWidth - margin, currentY, { align: 'right' });
+                }
+                
+                pdf.setFont(standardFont, 'bold');
+                currentY = addWrappedText(acc.title || 'Accomplishment', margin, currentY, availableWidth);
+                
+                if (acc.description) {
+                    pdf.setFont(standardFont, 'normal');
+                    currentY = addWrappedText(acc.description, margin, currentY, contentWidth);
+                }
+                
+                if (index < resumeData.accomplishments.length - 1) {
+                    currentY += bodyFontSize * 0.3 * itemSpacing;
+                }
+            });
+            currentY += bodyFontSize * 0.5 * sectionSpacing;
+        }
+    }
+
+    // --- 11. Awards Section ---
+    if (resumeData.awards && resumeData.awards.length > 0) {
+        if (addSectionHeading('Awards')) {
+            resumeData.awards.forEach((award, index) => {
+                if (index > 0) {
+                    currentY += bodyFontSize * 0.3 * itemSpacing;
+                }
+                
+                checkAddPage(bodyFontSize * 2);
+                pdf.setFontSize(bodyFontSize);
+                
+                let availableWidth = contentWidth;
+                const dateText = award.date || '';
+                if (dateText) {
+                    pdf.setFont(standardFont, 'normal');
+                    let dateWidth = pdf.getTextWidth(dateText) + 5;
+                    availableWidth = contentWidth - dateWidth;
+                    pdf.text(dateText, pageWidth - margin, currentY, { align: 'right' });
+                }
+                
+                let awardLine = award.awardName || 'Award';
+                if (award.issuingOrganization) {
+                    awardLine += ` - ${award.issuingOrganization}`;
+                }
+                
+                pdf.setFont(standardFont, 'bold');
+                currentY = addWrappedText(awardLine, margin, currentY, availableWidth);
+                
+                if (award.category) {
+                    pdf.setFont(standardFont, 'italic');
+                    currentY = addWrappedText(`Category: ${award.category}`, margin, currentY, contentWidth);
+                }
+                
+                if (award.description) {
+                    pdf.setFont(standardFont, 'normal');
+                    currentY = addWrappedText(award.description, margin, currentY, contentWidth);
+                }
+                
+                if (index < resumeData.awards.length - 1) {
+                    currentY += bodyFontSize * 0.3 * itemSpacing;
+                }
+            });
+            currentY += bodyFontSize * 0.5 * sectionSpacing;
+        }
+    }
+
+    // --- 12. Extra Curricular Activities Section ---
+    if (resumeData.extracurriculars && resumeData.extracurriculars.length > 0) {
+        if (addSectionHeading('Extra Curricular Activities')) {
+            resumeData.extracurriculars.forEach((extra, index) => {
+                if (index > 0) {
+                    currentY += bodyFontSize * 0.4 * itemSpacing;
+                }
+                
+                checkAddPage(subHeadingFontSize + bodyFontSize * 3);
+                pdf.setFontSize(subHeadingFontSize);
+                pdf.setFont(standardFont, 'bold');
+                
+                let titleText = extra.activityName || 'Activity';
+                if (extra.role) {
+                    titleText += ` - ${extra.role}`;
+                }
+                pdf.text(titleText, margin, currentY);
+                
+                if (extra.date) {
+                    pdf.setFont(standardFont, 'normal');
+                    pdf.text(extra.date, pageWidth - margin, currentY, { align: 'right' });
+                }
+                currentY += subHeadingFontSize * 1.05 * spacingFactor;
+
+                if (extra.organization) {
+                    pdf.setFontSize(bodyFontSize);
+                    pdf.setFont(standardFont, 'italic');
+                    pdf.text(extra.organization, margin, currentY);
+                    currentY += bodyFontSize * 1.1 * spacingFactor;
+                }
+
+                if (extra.description) {
+                    const descLines = extra.description.split('\n').map(line => line.trim()).filter(line => line);
+                    descLines.forEach((line, i) => {
+                        const cleanLine = line.replace(/^[\*\-\•]\s*/, '');
+                        if (i > 0) {
+                            checkAddPage(bodyFontSize * 1.2);
+                        }
+                        pdf.setFontSize(bodyFontSize);
+                        pdf.setFont(standardFont, 'normal');
+                        pdf.text('•', margin + 3, currentY);
+                        currentY = addWrappedText(cleanLine, margin + 12, currentY, contentWidth - 12);
+                    });
+                }
+                
+                if (index < resumeData.extracurriculars.length - 1) {
+                    currentY += bodyFontSize * 0.4 * itemSpacing;
+                }
+            });
+            currentY += bodyFontSize * 0.5 * sectionSpacing;
+        }
+    }
+
+    // --- 13. Languages Section ---
+    if (resumeData.languages && resumeData.languages.length > 0) {
+        if (addSectionHeading('Languages')) {
+            checkAddPage(bodyFontSize * 3);
+            const langList = resumeData.languages.map(lang => {
+                let langText = lang.language || 'Language';
+                if (lang.proficiency) {
+                    langText += ` (${lang.proficiency})`;
+                }
+                return langText;
+            }).join(', ');
+            
+            currentY = addWrappedText(langList, margin, currentY, contentWidth);
+            currentY += bodyFontSize * 0.7 * sectionSpacing;
+        }
+    }
+
+    // --- 14. Custom Sections - handle each individually ---
+    if (resumeData.customSections && resumeData.customSections.length > 0) {
+        resumeData.customSections.forEach((customItem, index) => {
+            if (customItem.sectionTitle && customItem.content) {
+                if (addSectionHeading(customItem.sectionTitle)) {
+                    checkAddPage(bodyFontSize * 3);
+                    
+                    const contentLines = customItem.content.split('\n').map(line => line.trim()).filter(line => line);
+                    if (contentLines.length > 1) {
+                        // Multiple lines - treat as bullet points
+                        contentLines.forEach((line, i) => {
+                            const cleanLine = line.replace(/^[\*\-\•]\s*/, '');
+                            if (i > 0) {
+                                checkAddPage(bodyFontSize * 1.2);
+                            }
+                            pdf.setFontSize(bodyFontSize);
+                            pdf.setFont(standardFont, 'normal');
+                            pdf.text('•', margin + 3, currentY);
+                            currentY = addWrappedText(cleanLine, margin + 12, currentY, contentWidth - 12);
+                        });
+                    } else {
+                        // Single paragraph
+                        currentY = addWrappedText(customItem.content, margin, currentY, contentWidth);
+                    }
+                    
+                    if (index < resumeData.customSections.length - 1) {
+                        currentY += bodyFontSize * 0.5 * sectionSpacing;
+                    }
+                }
+            }
+        });
     }
 
     // --- Optimize white space by checking if we can fit more on the page ---
@@ -5275,14 +5560,21 @@ function updateResumePreview() {
     // Update preview area data attributes for proper sizing
     previewArea.setAttribute('data-doc-size', resumeData.settings.docSize || 'letter');
 
-    // Check if there's any data to render
+    // Check if there's any data to render - updated to include new sections
     if (Object.values(resumeData.personal).every(val => !val) && 
         !resumeData.objective && 
-        !resumeData.experience.length && 
         !resumeData.education.length && 
+        !resumeData.experience.length && 
         !resumeData.projects.length && 
+        !resumeData.internships.length &&
         !resumeData.skills && 
-        !resumeData.certifications.length) {
+        !resumeData.publications.length &&
+        !resumeData.certifications.length &&
+        !resumeData.accomplishments.length &&
+        !resumeData.awards.length &&
+        !resumeData.extracurriculars.length &&
+        !resumeData.languages.length &&
+        !resumeData.customSections.length) {
         previewArea.innerHTML = '<p class="text-center text-muted initial-preview-message">Resume preview will appear here as you enter details.</p>';
         return; // Show placeholder if no data
     }
@@ -5335,7 +5627,7 @@ function updateResumePreview() {
         fragment.appendChild(objectiveDiv);
     }
 
-    // Function to render section items (enhanced)
+    // Function to render section items (enhanced for all new sections)
     const renderSectionItems = (title, sectionKey, items) => {
         // Check if section should be hidden
         const editorSection = document.querySelector(`.resume-section[data-section="${sectionKey}"]`);
@@ -5353,71 +5645,25 @@ function updateResumePreview() {
                 itemDiv.classList.add('mt-item'); // Add class for margin top when not first item
             }
             
-            const itemHeader = createHtml('div', 'item-header');
-            let titleText = '';
-            let dateText = '';
-            let subtitleText = '';
-
-            // Customize based on section
-            if (sectionKey === 'experience') {
-                titleText = item.jobTitle || 'Job Title';
-                dateText = item.date || '';
-                subtitleText = `${item.company || 'Company'} | ${item.location || 'Location'}`;
+            // Handle different section types
+            if (sectionKey === 'experience' || sectionKey === 'internships') {
+                renderExperienceItem(itemDiv, item, sectionKey);
             } else if (sectionKey === 'education') {
-                titleText = item.degreeMajor || 'Degree/Major';
-                dateText = item.date || '';
-                subtitleText = `${item.school || 'School'} | ${item.location || 'Location'} ${item.gpa ? `| GPA: ${item.gpa}` : ''}`;
+                renderEducationItem(itemDiv, item);
             } else if (sectionKey === 'projects') {
-                titleText = item.projectName || 'Project Name';
-                dateText = item.date || '';
-                subtitleText = item.link ? `<a href="${item.link}" target="_blank">${item.link}</a>` : '';
+                renderProjectItem(itemDiv, item);
+            } else if (sectionKey === 'publications') {
+                renderPublicationItem(itemDiv, item);
+            } else if (sectionKey === 'accomplishments') {
+                renderAccomplishmentItem(itemDiv, item);
+            } else if (sectionKey === 'awards') {
+                renderAwardItem(itemDiv, item);
+            } else if (sectionKey === 'extracurriculars') {
+                renderExtracurricularItem(itemDiv, item);
+            } else if (sectionKey === 'languages') {
+                renderLanguageItem(itemDiv, item);
             } else if (sectionKey === 'certifications') {
-                // For certifications, we'll format like PDF - combined bold name and issuing body
-                titleText = item.certificationName || 'Certification';
-                if (item.issuingBody) {
-                    titleText += ` - ${item.issuingBody}`;
-                }
-                dateText = item.date || '';
-            }
-
-            // Use .textContent or innerHTML appropriately
-            if (sectionKey === 'certifications') {
-                // For certifications, we might include HTML formatting
-                const titleSpan = createHtml('span', 'item-title');
-                titleSpan.innerHTML = `<strong>${item.certificationName || 'Certification'}</strong>`;
-                if (item.issuingBody) {
-                    titleSpan.innerHTML += ` - ${item.issuingBody}`;
-                }
-                itemHeader.appendChild(titleSpan);
-            } else {
-                itemHeader.appendChild(createHtml('span', 'item-title', titleText));
-            }
-            
-            if (dateText) {
-                itemHeader.appendChild(createHtml('span', 'item-date', dateText));
-            }
-            itemDiv.appendChild(itemHeader);
-
-            if (subtitleText && sectionKey !== 'certifications') {
-                itemDiv.appendChild(createHtml('div', 'item-subtitle', subtitleText));
-            }
-
-            // Handle descriptions
-            if (item.description) {
-                const descLines = item.description.split('\n').map(line => line.trim()).filter(line => line);
-                if (descLines.length > 0) {
-                    const ul = createHtml('ul');
-                    descLines.forEach(line => {
-                        const cleanLine = line.replace(/^[\*\-\•]\s*/, '');
-                        ul.appendChild(createHtml('li', '', cleanLine));
-                    });
-                    itemDiv.appendChild(ul);
-                }
-            }
-            
-            // Handle education additional info
-            if (sectionKey === 'education' && item.additionalInfo) {
-                itemDiv.appendChild(createHtml('p', 'small text-muted', `Relevant Info: ${item.additionalInfo}`));
+                renderCertificationItem(itemDiv, item);
             }
 
             sectionDiv.appendChild(itemDiv);
@@ -5425,17 +5671,232 @@ function updateResumePreview() {
         return sectionDiv;
     };
 
-    // Render sections
-    const expSection = renderSectionItems('Work Experience', 'experience', resumeData.experience);
-    if (expSection) fragment.appendChild(expSection);
+    // Individual item renderers
+    function renderExperienceItem(itemDiv, item, sectionKey) {
+        const itemHeader = createHtml('div', 'item-header');
+        const titleText = sectionKey === 'internships' ? (item.role || 'Internship Role') : (item.jobTitle || 'Job Title');
+        const dateText = item.date || '';
+        
+        itemHeader.appendChild(createHtml('span', 'item-title', titleText));
+        if (dateText) {
+            itemHeader.appendChild(createHtml('span', 'item-date', dateText));
+        }
+        itemDiv.appendChild(itemHeader);
 
+        const subtitleText = `${item.company || 'Company'} | ${item.location || 'Location'}`;
+        itemDiv.appendChild(createHtml('div', 'item-subtitle', subtitleText));
+
+        if (item.description) {
+            const descLines = item.description.split('\n').map(line => line.trim()).filter(line => line);
+            if (descLines.length > 0) {
+                const ul = createHtml('ul');
+                descLines.forEach(line => {
+                    const cleanLine = line.replace(/^[\*\-\•]\s*/, '');
+                    ul.appendChild(createHtml('li', '', cleanLine));
+                });
+                itemDiv.appendChild(ul);
+            }
+        }
+    }
+
+    function renderEducationItem(itemDiv, item) {
+        const itemHeader = createHtml('div', 'item-header');
+        itemHeader.appendChild(createHtml('span', 'item-title', item.degreeMajor || 'Degree/Major'));
+        if (item.date) {
+            itemHeader.appendChild(createHtml('span', 'item-date', item.date));
+        }
+        itemDiv.appendChild(itemHeader);
+
+        let subtitleText = `${item.school || 'School'} | ${item.location || 'Location'}`;
+        if (item.gpa) {
+            subtitleText += ` | GPA: ${item.gpa}`;
+        }
+        itemDiv.appendChild(createHtml('div', 'item-subtitle', subtitleText));
+
+        if (item.additionalInfo) {
+            itemDiv.appendChild(createHtml('p', 'small text-muted', `Relevant Info: ${item.additionalInfo}`));
+        }
+    }
+
+    function renderProjectItem(itemDiv, item) {
+        const itemHeader = createHtml('div', 'item-header');
+        itemHeader.appendChild(createHtml('span', 'item-title', item.projectName || 'Project Name'));
+        if (item.date) {
+            itemHeader.appendChild(createHtml('span', 'item-date', item.date));
+        }
+        itemDiv.appendChild(itemHeader);
+
+        if (item.link) {
+            const linkDiv = createHtml('div', 'item-subtitle');
+            linkDiv.innerHTML = `<a href="${item.link}" target="_blank">${item.link}</a>`;
+            itemDiv.appendChild(linkDiv);
+        }
+
+        if (item.description) {
+            const descLines = item.description.split('\n').map(line => line.trim()).filter(line => line);
+            if (descLines.length > 0) {
+                const ul = createHtml('ul');
+                descLines.forEach(line => {
+                    const cleanLine = line.replace(/^[\*\-\•]\s*/, '');
+                    ul.appendChild(createHtml('li', '', cleanLine));
+                });
+                itemDiv.appendChild(ul);
+            }
+        }
+    }
+
+    function renderPublicationItem(itemDiv, item) {
+        const itemHeader = createHtml('div', 'item-header');
+        itemHeader.appendChild(createHtml('span', 'item-title', item.title || 'Publication Title'));
+        if (item.date) {
+            itemHeader.appendChild(createHtml('span', 'item-date', item.date));
+        }
+        itemDiv.appendChild(itemHeader);
+
+        let subtitleText = item.venue || 'Publication Venue';
+        if (item.coAuthors) {
+            subtitleText += ` | Co-Authors: ${item.coAuthors}`;
+        }
+        itemDiv.appendChild(createHtml('div', 'item-subtitle', subtitleText));
+
+        if (item.link) {
+            const linkDiv = createHtml('div', 'small');
+            linkDiv.innerHTML = `<a href="${item.link}" target="_blank">${item.link}</a>`;
+            itemDiv.appendChild(linkDiv);
+        }
+
+        if (item.description) {
+            itemDiv.appendChild(createHtml('p', '', item.description));
+        }
+    }
+
+    function renderAccomplishmentItem(itemDiv, item) {
+        const itemHeader = createHtml('div', 'item-header');
+        itemHeader.appendChild(createHtml('span', 'item-title', item.title || 'Accomplishment'));
+        if (item.date) {
+            itemHeader.appendChild(createHtml('span', 'item-date', item.date));
+        }
+        itemDiv.appendChild(itemHeader);
+
+        if (item.description) {
+            itemDiv.appendChild(createHtml('p', '', item.description));
+        }
+    }
+
+    function renderAwardItem(itemDiv, item) {
+        const itemHeader = createHtml('div', 'item-header');
+        let titleText = item.awardName || 'Award Name';
+        if (item.issuingOrganization) {
+            titleText += ` - ${item.issuingOrganization}`;
+        }
+        itemHeader.appendChild(createHtml('span', 'item-title', titleText));
+        if (item.date) {
+            itemHeader.appendChild(createHtml('span', 'item-date', item.date));
+        }
+        itemDiv.appendChild(itemHeader);
+
+        if (item.category) {
+            itemDiv.appendChild(createHtml('div', 'item-subtitle', `Category: ${item.category}`));
+        }
+
+        if (item.description) {
+            itemDiv.appendChild(createHtml('p', '', item.description));
+        }
+    }
+
+    function renderExtracurricularItem(itemDiv, item) {
+        const itemHeader = createHtml('div', 'item-header');
+        let titleText = item.activityName || 'Activity';
+        if (item.role) {
+            titleText += ` - ${item.role}`;
+        }
+        itemHeader.appendChild(createHtml('span', 'item-title', titleText));
+        if (item.date) {
+            itemHeader.appendChild(createHtml('span', 'item-date', item.date));
+        }
+        itemDiv.appendChild(itemHeader);
+
+        if (item.organization) {
+            itemDiv.appendChild(createHtml('div', 'item-subtitle', item.organization));
+        }
+
+        if (item.description) {
+            const descLines = item.description.split('\n').map(line => line.trim()).filter(line => line);
+            if (descLines.length > 0) {
+                const ul = createHtml('ul');
+                descLines.forEach(line => {
+                    const cleanLine = line.replace(/^[\*\-\•]\s*/, '');
+                    ul.appendChild(createHtml('li', '', cleanLine));
+                });
+                itemDiv.appendChild(ul);
+            }
+        }
+    }
+
+    function renderLanguageItem(itemDiv, item) {
+        const itemHeader = createHtml('div', 'item-header');
+        let titleText = item.language || 'Language';
+        if (item.proficiency) {
+            titleText += ` - ${item.proficiency}`;
+        }
+        itemHeader.appendChild(createHtml('span', 'item-title', titleText));
+        itemDiv.appendChild(itemHeader);
+    }
+
+    function renderCertificationItem(itemDiv, item) {
+        const itemHeader = createHtml('div', 'item-header');
+        const titleSpan = createHtml('span', 'item-title');
+        titleSpan.innerHTML = `<strong>${item.certificationName || 'Certification'}</strong>`;
+        if (item.issuingBody) {
+            titleSpan.innerHTML += ` - ${item.issuingBody}`;
+        }
+        itemHeader.appendChild(titleSpan);
+        if (item.date) {
+            itemHeader.appendChild(createHtml('span', 'item-date', item.date));
+        }
+        itemDiv.appendChild(itemHeader);
+    }
+
+    function renderCustomSectionItem(itemDiv, item) {
+        if (item.sectionTitle) {
+            itemDiv.appendChild(createHtml('h3', 'custom-section-title', item.sectionTitle));
+        }
+        
+        if (item.content) {
+            const contentLines = item.content.split('\n').map(line => line.trim()).filter(line => line);
+            if (contentLines.length > 1) {
+                // Multiple lines - treat as bullet points
+                const ul = createHtml('ul');
+                contentLines.forEach(line => {
+                    const cleanLine = line.replace(/^[\*\-\•]\s*/, '');
+                    ul.appendChild(createHtml('li', '', cleanLine));
+                });
+                itemDiv.appendChild(ul);
+            } else {
+                // Single line or paragraph
+                itemDiv.appendChild(createHtml('p', '', item.content));
+            }
+        }
+    }
+
+    // Render sections in the correct order
+    // 1. Education
     const eduSection = renderSectionItems('Education', 'education', resumeData.education);
     if (eduSection) fragment.appendChild(eduSection);
 
+    // 2. Experience
+    const expSection = renderSectionItems('Work Experience', 'experience', resumeData.experience);
+    if (expSection) fragment.appendChild(expSection);
+
+    // 3. Projects
     const projSection = renderSectionItems('Projects', 'projects', resumeData.projects);
     if (projSection) fragment.appendChild(projSection);
 
-    // Skills
+    // 4. Internships
+    const internSection = renderSectionItems('Internships', 'internships', resumeData.internships);
+    if (internSection) fragment.appendChild(internSection);
+
+    // 5. Skills
     const skillsSectionEditor = document.querySelector('.resume-section[data-section="skills"]');
     const skillsHidden = skillsSectionEditor?.classList.contains('hidden');
     if (resumeData.skills && !skillsHidden) {
@@ -5446,13 +5907,57 @@ function updateResumePreview() {
         fragment.appendChild(skillsSection);
     }
 
-    // Certifications
+    // 6. Publications
+    const pubSection = renderSectionItems('Publications', 'publications', resumeData.publications);
+    if (pubSection) fragment.appendChild(pubSection);
+
+    // 7. Certifications
     const certSection = renderSectionItems('Certifications', 'certifications', resumeData.certifications);
     if (certSection) fragment.appendChild(certSection);
 
+    // 8. Accomplishments
+    const accompSection = renderSectionItems('Accomplishments', 'accomplishments', resumeData.accomplishments);
+    if (accompSection) fragment.appendChild(accompSection);
+
+    // 9. Awards
+    const awardSection = renderSectionItems('Awards', 'awards', resumeData.awards);
+    if (awardSection) fragment.appendChild(awardSection);
+
+    // 10. Extra Curricular Activities
+    const extraSection = renderSectionItems('Extra Curricular Activities', 'extracurriculars', resumeData.extracurriculars);
+    if (extraSection) fragment.appendChild(extraSection);
+
+    // 11. Languages
+    const langSection = renderSectionItems('Languages', 'languages', resumeData.languages);
+    if (langSection) fragment.appendChild(langSection);
+
+    // 12. Custom sections - handle each one individually since they have dynamic titles
+    if (resumeData.customSections && resumeData.customSections.length > 0) {
+        const customSectionEditor = document.querySelector('.resume-section[data-section="customSections"]');
+        const customHidden = customSectionEditor?.classList.contains('hidden');
+        
+        if (!customHidden) {
+            resumeData.customSections.forEach((customItem, index) => {
+                if (customItem.sectionTitle && customItem.content) {
+                    const customSectionDiv = createHtml('div', 'preview-section preview-custom-sections');
+                    customSectionDiv.appendChild(createHtml('h2', '', customItem.sectionTitle));
+                    
+                    const itemDiv = createHtml('div', 'preview-item');
+                    if (index > 0) {
+                        itemDiv.classList.add('mt-item');
+                    }
+                    
+                    renderCustomSectionItem(itemDiv, customItem);
+                    customSectionDiv.appendChild(itemDiv);
+                    fragment.appendChild(customSectionDiv);
+                }
+            });
+        }
+    }
+
     // Append the built fragment to the preview area
     previewArea.appendChild(fragment);
-    console.log("Preview content updated.");
+    console.log("Preview content updated with all new sections.");
 }
 
 // Function to apply document size settings to preview
