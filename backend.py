@@ -1618,44 +1618,44 @@ def call_haiku_for_enhancement(section_type, original_content):
 
     # --- Define specific prompts based on section type ---
     if section_type == 'objective':
-        system_prompt = "You are an expert resume writer. Rewrite this professional summary/objective to be concise, impactful, and tailored for showcasing skills and career goals. Focus on clarity and professionalism. Respond with ONLY the rewritten text."
+        system_prompt = "You are an expert resume writer. Rewrite this professional summary/objective to be concise, impactful, and ATS-friendly. Keep it 2-3 sentences maximum. Do not include any headers, labels, or introductory text. Return ONLY the enhanced objective text."
         user_content = f"Original Objective/Summary:\n{original_content}"
-        max_tokens = 200
+        max_tokens = 150
         temperature = 0.6
     elif section_type == 'experience':
-        system_prompt = "You are an expert resume writer specializing in action verbs and quantifying achievements. Rewrite the following work experience description using strong action verbs at the start of each point. Ensure it uses bullet points (use '*' or '-' for bullets) and highlights responsibilities and measurable accomplishments where possible. Respond with ONLY the rewritten bullet points."
+        system_prompt = "You are an expert resume writer. Rewrite the following work experience description using strong action verbs and quantified achievements. Format as clean bullet points using '*' or '-'. Keep each bullet concise (1-2 lines max). Do not include headers or labels. Return ONLY the bullet points."
         user_content = f"Original Experience Description:\n{original_content}"
-        max_tokens = 400
+        max_tokens = 300
         temperature = 0.5
     elif section_type == 'internship':
-        system_prompt = "You are an expert resume writer specializing in internship experiences. Rewrite the following internship description using strong action verbs and highlighting learning outcomes, contributions, and achievements. Use bullet points (use '*' or '-' for bullets) and focus on skills gained and value added. Respond with ONLY the rewritten bullet points."
+        system_prompt = "You are an expert resume writer. Rewrite the following internship description using strong action verbs and highlighting key contributions. Format as clean bullet points using '*' or '-'. Keep each bullet concise and ATS-friendly. Do not include headers or labels. Return ONLY the bullet points."
         user_content = f"Original Internship Description:\n{original_content}"
-        max_tokens = 350
-        temperature = 0.5
-    elif section_type == 'project':
-        system_prompt = "You are an expert resume writer. Rewrite the following project description to clearly state the project goal, technologies used, the candidate's contribution, and key outcomes or features. Use bullet points (use '*' or '-'). Respond with ONLY the rewritten bullet points."
-        user_content = f"Original Project Description:\n{original_content}"
-        max_tokens = 350
-        temperature = 0.5
-    elif section_type == 'publication':
-        system_prompt = "You are an expert academic resume writer. Rewrite the following publication description to be clear, concise, and highlight the research contribution, methodology, and impact. Focus on technical accuracy and academic standards. Respond with ONLY the rewritten description."
-        user_content = f"Original Publication Description:\n{original_content}"
-        max_tokens = 300
-        temperature = 0.4
-    elif section_type == 'accomplishment':
-        system_prompt = "You are an expert resume writer. Rewrite the following accomplishment to be impactful and quantifiable. Focus on the achievement, its significance, and measurable outcomes. Use strong action words and be specific about results. Respond with ONLY the rewritten accomplishment description."
-        user_content = f"Original Accomplishment:\n{original_content}"
         max_tokens = 250
         temperature = 0.5
-    elif section_type == 'award':
-        system_prompt = "You are an expert resume writer. Rewrite the following award description to clearly explain why it was received, its significance, and what it demonstrates about the candidate's abilities or achievements. Be concise and impactful. Respond with ONLY the rewritten description."
-        user_content = f"Original Award Description:\n{original_content}"
+    elif section_type == 'project':
+        system_prompt = "You are an expert resume writer. Rewrite the following project description to be concise and technical. Format as clean bullet points using '*' or '-'. Focus on technologies used and key outcomes. Keep each bullet 1-2 lines maximum. Do not include headers or labels. Return ONLY the bullet points."
+        user_content = f"Original Project Description:\n{original_content}"
+        max_tokens = 250
+        temperature = 0.5
+    elif section_type == 'publication':
+        system_prompt = "You are an expert academic resume writer. Rewrite the following publication description to be professional and concise. Focus on research contribution and methodology. Keep it brief and academic. Do not include headers or labels. Return ONLY the enhanced description."
+        user_content = f"Original Publication Description:\n{original_content}"
         max_tokens = 200
+        temperature = 0.4
+    elif section_type == 'accomplishment':
+        system_prompt = "You are an expert resume writer. Rewrite the following accomplishment to be impactful and quantified. Use strong action verbs and include specific results where possible. Keep it concise (1-2 sentences). Do not include headers or labels. Return ONLY the enhanced accomplishment text."
+        user_content = f"Original Accomplishment:\n{original_content}"
+        max_tokens = 150
+        temperature = 0.5
+    elif section_type == 'award':
+        system_prompt = "You are an expert resume writer. Rewrite the following award description to be professional and concise. Explain the significance briefly. Keep it short (1-2 sentences maximum). Do not include headers or labels. Return ONLY the enhanced description."
+        user_content = f"Original Award Description:\n{original_content}"
+        max_tokens = 100
         temperature = 0.5
     elif section_type == 'extracurricular':
-        system_prompt = "You are an expert resume writer. Rewrite the following extracurricular activity description to highlight leadership skills, teamwork, achievements, and transferable skills relevant to professional contexts. Use bullet points (use '*' or '-') where appropriate. Respond with ONLY the rewritten description."
+        system_prompt = "You are an expert resume writer. Rewrite the following extracurricular activity description to highlight transferable skills and leadership. Format as clean bullet points using '*' or '-'. Keep each bullet concise and professional. Do not include headers, labels, or introductory text. Return ONLY the bullet points."
         user_content = f"Original Extracurricular Description:\n{original_content}"
-        max_tokens = 300
+        max_tokens = 200
         temperature = 0.5
     elif section_type == 'customSection':
         # For custom sections, we need to extract the section title for context
@@ -1663,20 +1663,20 @@ def call_haiku_for_enhancement(section_type, original_content):
         section_title = lines[0] if lines else "Custom Section"
         content = '\n'.join(lines[1:]) if len(lines) > 1 else original_content
         
-        system_prompt = f"You are an expert resume writer. Based on the section title '{section_title}', understand the context and rewrite the following content to be professional, clear, and appropriately formatted for a resume section. Use bullet points (use '*' or '-') where appropriate. Focus on relevance to career goals and professional development. Respond with ONLY the rewritten content."
+        system_prompt = f"You are an expert resume writer. Based on the section title '{section_title}', rewrite the following content to be professional and ATS-friendly. Use bullet points with '*' or '-' if multiple items, otherwise write as concise paragraph. Keep it brief and relevant to career goals. Do not include headers or labels. Return ONLY the enhanced content."
         user_content = f"Section Title: {section_title}\nOriginal Content:\n{content}"
-        max_tokens = 350
+        max_tokens = 250
         temperature = 0.6
     elif section_type == 'skills':
-        system_prompt = "You are an expert resume formatter. Take the following list of skills (which might be comma-separated, newline-separated, or mixed) and format it into a clean, comma-separated list. Remove duplicates and categorize briefly if obvious categories emerge (e.g., Languages, Frameworks, Tools), but prioritize a simple comma-separated list if categorization isn't clear. Respond with ONLY the formatted comma-separated list."
+        system_prompt = "You are an expert resume formatter. Clean up and organize the following skills list. Format as a simple comma-separated list. Remove duplicates and fix capitalization. Group similar technologies together naturally. Do not categorize with headers. Do not include any labels or introductory text. Return ONLY the clean comma-separated skills list."
         user_content = f"Original Skills List:\n{original_content}"
-        max_tokens = 250
+        max_tokens = 200
         temperature = 0.3
     else:
         # Fallback for unknown types
-        system_prompt = "You are a helpful assistant. Briefly rewrite the following text for clarity and conciseness. Respond with ONLY the rewritten text."
+        system_prompt = "You are a resume writing expert. Rewrite the following text to be more professional and concise. Do not include headers or labels. Return ONLY the improved text."
         user_content = f"Original Text:\n{original_content}"
-        max_tokens = 300
+        max_tokens = 200
         temperature = 0.7
 
     messages = [{"role": "user", "content": user_content}]
@@ -1690,6 +1690,29 @@ def call_haiku_for_enhancement(section_type, original_content):
         temperature=temperature,
         max_tokens=max_tokens
     )
+    
+    # Clean up any potential unwanted prefixes that might slip through
+    enhanced_content = enhanced_content.strip()
+    
+    # Remove common unwanted prefixes if they appear
+    unwanted_prefixes = [
+        "Rewritten", "Enhanced", "Improved", "Updated", "Here is", "Here's",
+        "Professional", "Summary:", "Description:", "Objective:", "Skills:",
+        "Experience:", "Project:", "Award:", "Accomplishment:"
+    ]
+    
+    for prefix in unwanted_prefixes:
+        if enhanced_content.startswith(prefix):
+            # Find the first colon or newline after the prefix
+            colon_pos = enhanced_content.find(':')
+            newline_pos = enhanced_content.find('\n')
+            
+            if colon_pos != -1:
+                enhanced_content = enhanced_content[colon_pos + 1:].strip()
+            elif newline_pos != -1:
+                enhanced_content = enhanced_content[newline_pos + 1:].strip()
+            break
+    
     return enhanced_content
 
 def get_package_limit(package_name, feature_type):
