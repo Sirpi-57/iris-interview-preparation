@@ -487,96 +487,79 @@ function downloadUserData() {
     // Show loading message
     showMessage('Preparing your comprehensive learning report...', 'info');
     
-    // Collect user data from Firestore
+    // Collect educational user data from Firestore (no payments/webhooks)
     const userData = {
         profile: null,
         sessions: [],
         interviews: [],
-        addonPurchases: [],
-        payments: [],
-        jobPostings: []
+        addonPurchases: []
     };
     
-    // Get user profile
-    firebase.firestore().collection('users').doc(user.uid).get()
-        .then(doc => {
-            if (doc.exists) {
-                userData.profile = doc.data();
-                // Remove sensitive information if needed
-                if (userData.profile.hasOwnProperty('password')) {
-                    delete userData.profile.password;
+    // Helper function to safely execute queries
+    async function safeQuery(queryPromise, dataArray, collectionName) {
+        try {
+            const snapshot = await queryPromise;
+            snapshot.forEach(doc => {
+                dataArray.push({
+                    id: doc.id,
+                    ...doc.data()
+                });
+            });
+            console.log(`Successfully loaded ${dataArray.length} items from ${collectionName}`);
+        } catch (error) {
+            console.warn(`Could not load ${collectionName}:`, error.message);
+            // Continue without this data
+        }
+    }
+    
+    // Execute all queries with error handling
+    Promise.resolve()
+        .then(async () => {
+            // Get user profile
+            try {
+                const doc = await firebase.firestore().collection('users').doc(user.uid).get();
+                if (doc.exists) {
+                    userData.profile = doc.data();
+                    // Remove sensitive information if needed
+                    if (userData.profile.hasOwnProperty('password')) {
+                        delete userData.profile.password;
+                    }
                 }
+            } catch (error) {
+                console.warn('Could not load user profile:', error.message);
             }
             
             // Get user sessions
-            return firebase.firestore().collection('sessions')
-                .where('userId', '==', user.uid)
-                .orderBy('start_time', 'desc')
-                .get();
-        })
-        .then(snapshot => {
-            snapshot.forEach(doc => {
-                userData.sessions.push({
-                    id: doc.id,
-                    ...doc.data()
-                });
-            });
+            await safeQuery(
+                firebase.firestore().collection('sessions')
+                    .where('userId', '==', user.uid)
+                    .orderBy('start_time', 'desc')
+                    .get(),
+                userData.sessions,
+                'sessions'
+            );
             
             // Get user interviews
-            return firebase.firestore().collection('interviews')
-                .where('userId', '==', user.uid)
-                .orderBy('start_time', 'desc')
-                .get();
-        })
-        .then(snapshot => {
-            snapshot.forEach(doc => {
-                userData.interviews.push({
-                    id: doc.id,
-                    ...doc.data()
-                });
-            });
+            await safeQuery(
+                firebase.firestore().collection('interviews')
+                    .where('userId', '==', user.uid)
+                    .orderBy('start_time', 'desc')
+                    .get(),
+                userData.interviews,
+                'interviews'
+            );
             
-            // Get addon purchases
-            return firebase.firestore().collection('addonPurchases')
-                .where('userId', '==', user.uid)
-                .get();
-        })
-        .then(snapshot => {
-            snapshot.forEach(doc => {
-                userData.addonPurchases.push({
-                    id: doc.id,
-                    ...doc.data()
-                });
-            });
+            // Get addon purchases (educational add-ons only)
+            await safeQuery(
+                firebase.firestore().collection('addonPurchases')
+                    .where('userId', '==', user.uid)
+                    .get(),
+                userData.addonPurchases,
+                'addonPurchases'
+            );
             
-            // Get payments
-            return firebase.firestore().collection('payments')
-                .where('userId', '==', user.uid)
-                .get();
-        })
-        .then(snapshot => {
-            snapshot.forEach(doc => {
-                userData.payments.push({
-                    id: doc.id,
-                    ...doc.data()
-                });
-            });
-            
-            // Get relevant job postings (if any are saved/applied)
-            return firebase.firestore().collection('jobPostings')
-                .limit(5) // Get recent job postings for reference
-                .get();
-        })
-        .then(snapshot => {
-            snapshot.forEach(doc => {
-                userData.jobPostings.push({
-                    id: doc.id,
-                    ...doc.data()
-                });
-            });
-            
-            // Generate comprehensive PDF
-            generateComprehensivePDFReport(userData);
+            // Generate comprehensive educational PDF
+            generateEducationalPDFReport(userData);
         })
         .catch(error => {
             console.error('Error downloading user data:', error);
@@ -584,7 +567,97 @@ function downloadUserData() {
         });
 }
 
-function generateComprehensivePDFReport(userData) {
+function downloadUserData() {
+    const user = firebase.auth().currentUser;
+    if (!user || !firebase.firestore) {
+        showMessage('Unable to download data at this time', 'danger');
+        return;
+    }
+    
+    // Show loading message
+    showMessage('Preparing your comprehensive learning report...', 'info');
+    
+    // Collect educational user data from Firestore (no payments/webhooks)
+    const userData = {
+        profile: null,
+        sessions: [],
+        interviews: [],
+        addonPurchases: []
+    };
+    
+    // Helper function to safely execute queries
+    async function safeQuery(queryPromise, dataArray, collectionName) {
+        try {
+            const snapshot = await queryPromise;
+            snapshot.forEach(doc => {
+                dataArray.push({
+                    id: doc.id,
+                    ...doc.data()
+                });
+            });
+            console.log(`Successfully loaded ${dataArray.length} items from ${collectionName}`);
+        } catch (error) {
+            console.warn(`Could not load ${collectionName}:`, error.message);
+            // Continue without this data
+        }
+    }
+    
+    // Execute all queries with error handling
+    Promise.resolve()
+        .then(async () => {
+            // Get user profile
+            try {
+                const doc = await firebase.firestore().collection('users').doc(user.uid).get();
+                if (doc.exists) {
+                    userData.profile = doc.data();
+                    // Remove sensitive information if needed
+                    if (userData.profile.hasOwnProperty('password')) {
+                        delete userData.profile.password;
+                    }
+                }
+            } catch (error) {
+                console.warn('Could not load user profile:', error.message);
+            }
+            
+            // Get user sessions
+            await safeQuery(
+                firebase.firestore().collection('sessions')
+                    .where('userId', '==', user.uid)
+                    .orderBy('start_time', 'desc')
+                    .get(),
+                userData.sessions,
+                'sessions'
+            );
+            
+            // Get user interviews
+            await safeQuery(
+                firebase.firestore().collection('interviews')
+                    .where('userId', '==', user.uid)
+                    .orderBy('start_time', 'desc')
+                    .get(),
+                userData.interviews,
+                'interviews'
+            );
+            
+            // Get addon purchases (educational add-ons only)
+            await safeQuery(
+                firebase.firestore().collection('addonPurchases')
+                    .where('userId', '==', user.uid)
+                    .get(),
+                userData.addonPurchases,
+                'addonPurchases'
+            );
+            
+            // Generate comprehensive educational PDF
+            generateEducationalPDFReport(userData);
+        })
+        .catch(error => {
+            console.error('Error downloading user data:', error);
+            showMessage(`Error downloading data: ${error.message}`, 'danger');
+        });
+}
+
+function generateEducationalPDFReport(userData) {
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF();
     
@@ -614,11 +687,13 @@ function generateComprehensivePDFReport(userData) {
         checkPageBreak(25);
         doc.setFontSize(fontSize);
         doc.setFont(undefined, 'bold');
+        doc.setTextColor(41, 128, 185); // Professional blue
         doc.text(title, margin, yPosition);
         yPosition += 12;
         
         // Add a line under the header
         doc.setLineWidth(0.5);
+        doc.setTextColor(0, 0, 0);
         doc.line(margin, yPosition - 5, margin + maxWidth, yPosition - 5);
         yPosition += 5;
     }
@@ -627,6 +702,7 @@ function generateComprehensivePDFReport(userData) {
         checkPageBreak(15);
         doc.setFontSize(fontSize);
         doc.setFont(undefined, 'bold');
+        doc.setTextColor(0, 0, 0);
         doc.text(title, margin, yPosition);
         yPosition += 8;
     }
@@ -634,6 +710,7 @@ function generateComprehensivePDFReport(userData) {
     function addNormalText(text, indent = 0) {
         doc.setFontSize(11);
         doc.setFont(undefined, 'normal');
+        doc.setTextColor(0, 0, 0);
         if (text) {
             const height = addWrappedText(text, margin + indent, yPosition, maxWidth - indent);
             yPosition += height + 2;
@@ -644,15 +721,56 @@ function generateComprehensivePDFReport(userData) {
         checkPageBreak(10);
         doc.setFontSize(11);
         doc.setFont(undefined, 'normal');
+        doc.setTextColor(0, 0, 0);
         doc.text('•', margin + indent, yPosition);
         const height = addWrappedText(text, margin + indent + 8, yPosition, maxWidth - indent - 8);
         yPosition += Math.max(height, lineHeight) + 1;
     }
     
+    // NEW: Improved function to display job description without box
+    function addJobDescriptionSection(jobDescription) {
+        if (!jobDescription) return;
+        
+        checkPageBreak(30);
+        
+        // Add section header for job description
+        doc.setFontSize(12);
+        doc.setFont(undefined, 'bold');
+        doc.setTextColor(41, 128, 185); // Same blue as other headers
+        doc.text('Complete Job Description:', margin, yPosition);
+        yPosition += 10;
+        
+        // Add job description text with better formatting
+        doc.setFontSize(10);
+        doc.setFont(undefined, 'normal');
+        doc.setTextColor(0, 0, 0);
+        
+        // Split job description into paragraphs for better readability
+        const paragraphs = jobDescription.split('\n\n').filter(p => p.trim());
+        
+        paragraphs.forEach((paragraph, index) => {
+            // Check for page break before each paragraph
+            const estimatedHeight = Math.ceil(paragraph.length / 80) * lineHeight + 5;
+            checkPageBreak(estimatedHeight);
+            
+            // Add paragraph with proper spacing
+            const height = addWrappedText(paragraph.trim(), margin, yPosition, maxWidth);
+            yPosition += height + 3; // Add some spacing between paragraphs
+            
+            // Add extra spacing between major sections if the paragraph looks like a header
+            if (paragraph.toUpperCase() === paragraph || paragraph.includes(':')) {
+                yPosition += 2;
+            }
+        });
+        
+        // Add spacing after the job description section
+        yPosition += 8;
+    }
+    
     // Title Page
     doc.setFontSize(28);
     doc.setFont(undefined, 'bold');
-    doc.setTextColor(41, 128, 185); // Professional blue
+    doc.setTextColor(41, 128, 185);
     doc.text('IRIS Learning Report', margin, yPosition);
     yPosition += 20;
     
@@ -674,22 +792,11 @@ function generateComprehensivePDFReport(userData) {
     doc.text(`Plan: ${userData.profile?.plan?.toUpperCase() || 'FREE'}`, margin, yPosition);
     yPosition += 20;
     
-    // Table of Contents
-    addSectionHeader('Table of Contents');
-    addNormalText('1. Student Profile & Overview');
-    addNormalText('2. Learning Progress Summary');
-    addNormalText('3. Resume Analysis Results');
-    addNormalText('4. Mock Interview Performance');
-    addNormalText('5. Skill Development Recommendations');
-    addNormalText('6. Career Preparation Insights');
-    addNormalText('7. Study Plan & Focus Areas');
-    addNormalText('8. Progress Tracking & Analytics');
-    
+    // Student Profile Section
     doc.addPage();
     yPosition = 20;
     
-    // 1. Student Profile & Overview
-    addSectionHeader('1. Student Profile & Overview');
+    addSectionHeader('Student Profile Overview');
     
     if (userData.profile) {
         addSubHeader('Personal Information');
@@ -702,375 +809,354 @@ function generateComprehensivePDFReport(userData) {
         addNormalText(`Account Created: ${userData.profile.createdAt ? new Date(userData.profile.createdAt).toLocaleDateString() : 'Unknown'}`);
         yPosition += 5;
         
-        addSubHeader('Subscription & Usage');
-        addNormalText(`Current Plan: ${userData.profile.plan?.toUpperCase() || 'FREE'}`);
-        if (userData.profile.planPurchasedAt) {
-            addNormalText(`Plan Purchased: ${new Date(userData.profile.planPurchasedAt).toLocaleDateString()}`);
-        }
-        if (userData.profile.planExpiresAt) {
-            addNormalText(`Plan Expires: ${new Date(userData.profile.planExpiresAt).toLocaleDateString()}`);
+        addSubHeader('Learning Progress Summary');
+        const totalSessions = userData.sessions.length;
+        const completedSessions = userData.sessions.filter(s => s.status === 'completed').length;
+        const totalInterviews = userData.interviews.length;
+        const completedInterviews = userData.interviews.filter(i => i.status === 'completed').length;
+        
+        addNormalText(`Total Job Analyses: ${totalSessions}`);
+        addNormalText(`Completed Analyses: ${completedSessions}`);
+        addNormalText(`Success Rate: ${totalSessions > 0 ? Math.round((completedSessions / totalSessions) * 100) : 0}%`);
+        addNormalText(`Total Mock Interviews: ${totalInterviews}`);
+        addNormalText(`Completed Interviews: ${completedInterviews}`);
+        yPosition += 5;
+    }
+
+    // Process each job analysis session
+    userData.sessions.forEach((session, sessionIndex) => {
+        if (!session.results) return; // Skip sessions without results
+        
+        doc.addPage();
+        yPosition = 20;
+        
+        addSectionHeader(`Job Analysis #${sessionIndex + 1}`, 18);
+        addNormalText(`Analysis Date: ${session.start_time ? new Date(session.start_time).toLocaleDateString() : 'Unknown'}`);
+        addNormalText(`Status: ${session.status || 'Unknown'}`);
+        yPosition += 5;
+        
+        // 1. Job Description Section (Updated - no box)
+        if (session.job_description) {
+            addJobDescriptionSection(session.job_description);
         }
         
-        if (userData.profile.usage) {
-            yPosition += 5;
-            addSubHeader('Current Usage Statistics');
-            const usage = userData.profile.usage;
+        // 2. Resume Analysis Results
+        if (session.results.match_results) {
+            const matchResults = session.results.match_results;
             
-            if (usage.resumeAnalyses) {
-                addBulletPoint(`Resume Analyses: ${usage.resumeAnalyses.used}/${usage.resumeAnalyses.limit} used`);
-            }
-            if (usage.mockInterviews) {
-                addBulletPoint(`Mock Interviews: ${usage.mockInterviews.used}/${usage.mockInterviews.limit} conducted`);
-            }
-            if (usage.aiEnhance) {
-                addBulletPoint(`AI Enhancement: ${usage.aiEnhance.used}/${usage.aiEnhance.limit} uses`);
-            }
-            if (usage.pdfDownloads) {
-                addBulletPoint(`PDF Downloads: ${usage.pdfDownloads.used}/${usage.pdfDownloads.limit} downloads`);
-            }
-        }
-    }
-    
-    // 2. Learning Progress Summary
-    addSectionHeader('2. Learning Progress Summary');
-    
-    const totalSessions = userData.sessions.length;
-    const completedSessions = userData.sessions.filter(s => s.status === 'completed').length;
-    const totalInterviews = userData.interviews.length;
-    const completedInterviews = userData.interviews.filter(i => i.status === 'completed').length;
-    
-    addNormalText(`Total Resume Analysis Sessions: ${totalSessions}`);
-    addNormalText(`Completed Sessions: ${completedSessions}`);
-    addNormalText(`Total Mock Interviews: ${totalInterviews}`);
-    addNormalText(`Completed Interviews: ${completedInterviews}`);
-    
-    if (userData.sessions.length > 0) {
-        const latestSession = userData.sessions[0];
-        addNormalText(`Latest Activity: ${latestSession.start_time ? new Date(latestSession.start_time).toLocaleDateString() : 'Unknown'}`);
-    }
-    
-    // Calculate improvement trends
-    if (userData.interviews.length > 1) {
-        const sortedInterviews = userData.interviews
-            .filter(i => i.analysis && i.analysis.overallScore)
-            .sort((a, b) => new Date(a.start_time) - new Date(b.start_time));
-        
-        if (sortedInterviews.length >= 2) {
-            const firstScore = sortedInterviews[0].analysis.overallScore;
-            const lastScore = sortedInterviews[sortedInterviews.length - 1].analysis.overallScore;
-            const improvement = lastScore - firstScore;
+            addSubHeader('Resume Analysis Results');
+            addNormalText(`Match Score: ${matchResults.matchScore || 'N/A'}%`);
+            yPosition += 3;
             
-            yPosition += 5;
-            addSubHeader('Performance Improvement');
-            addNormalText(`Overall Score Improvement: ${improvement > 0 ? '+' : ''}${improvement} points`);
-            addNormalText(`First Interview Score: ${firstScore}/100`);
-            addNormalText(`Latest Interview Score: ${lastScore}/100`);
-        }
-    }
-    
-    // 3. Resume Analysis Results
-    if (userData.sessions.length > 0) {
-        addSectionHeader('3. Resume Analysis Results');
-        
-        userData.sessions.slice(0, 3).forEach((session, index) => {
-            addSubHeader(`Analysis ${index + 1} - ${session.start_time ? new Date(session.start_time).toLocaleDateString() : 'Unknown Date'}`);
-            
-            addNormalText(`Status: ${session.status || 'Unknown'}`);
-            addNormalText(`Progress: ${session.progress || 0}%`);
-            
-            if (session.job_description) {
+            if (matchResults.matchAnalysis) {
+                addBulletPoint('Match Analysis:');
+                addNormalText(matchResults.matchAnalysis, 15);
                 yPosition += 3;
-                addBulletPoint('Job Description Analysis:');
-                const jobDesc = session.job_description.length > 200 
-                    ? session.job_description.substring(0, 200) + '...' 
-                    : session.job_description;
-                addNormalText(jobDesc, 15);
             }
             
-            if (session.results && session.results.match_results) {
-                const match = session.results.match_results;
-                
-                yPosition += 3;
-                addBulletPoint(`Match Score: ${match.matchScore || 'N/A'}%`);
-                
-                if (match.keyStrengths && match.keyStrengths.length > 0) {
-                    addBulletPoint('Key Strengths Identified:');
-                    match.keyStrengths.slice(0, 3).forEach(strength => {
+            if (matchResults.keyStrengths && Array.isArray(matchResults.keyStrengths) && matchResults.keyStrengths.length > 0) {
+                addBulletPoint('Key Strengths:');
+                matchResults.keyStrengths.forEach(strength => {
+                    if (strength && strength.strength) {
                         addNormalText(`• ${strength.strength}`, 20);
-                    });
-                }
-                
-                if (match.skillGaps && match.skillGaps.length > 0) {
-                    addBulletPoint('Areas for Improvement:');
-                    match.skillGaps.slice(0, 3).forEach(gap => {
-                        addNormalText(`• ${gap.missingSkill} (${gap.importance} priority)`, 20);
-                    });
-                }
-                
-                if (match.resumeImprovements && match.resumeImprovements.length > 0) {
-                    addBulletPoint('Resume Enhancement Suggestions:');
-                    match.resumeImprovements.slice(0, 2).forEach(improvement => {
-                        addNormalText(`• ${improvement.section}: ${improvement.recommendation}`, 20);
-                    });
-                }
-            }
-            
-            if (session.results && session.results.parsed_resume) {
-                const resume = session.results.parsed_resume;
+                        if (strength.relevance) {
+                            addNormalText(`  Relevance: ${strength.relevance}`, 25);
+                        }
+                    }
+                });
                 yPosition += 3;
-                addBulletPoint('Resume Summary:');
-                if (resume.name) addNormalText(`Name: ${resume.name}`, 15);
-                if (resume.currentPosition) addNormalText(`Position: ${resume.currentPosition}`, 15);
-                if (resume.yearsOfExperience) addNormalText(`Experience: ${resume.yearsOfExperience} years`, 15);
-                if (resume.education && resume.education.length > 0) {
-                    addNormalText(`Education: ${resume.education[0]}`, 15);
-                }
             }
             
-            yPosition += 10;
-        });
-    }
-    
-    // 4. Mock Interview Performance
-    if (userData.interviews.length > 0) {
-        addSectionHeader('4. Mock Interview Performance');
+            if (matchResults.skillGaps && Array.isArray(matchResults.skillGaps) && matchResults.skillGaps.length > 0) {
+                addBulletPoint('Skill Gaps to Address:');
+                matchResults.skillGaps.forEach(gap => {
+                    if (gap && gap.missingSkill) {
+                        addNormalText(`• ${gap.missingSkill} (${gap.importance || 'medium'} priority)`, 20);
+                        if (gap.suggestion) {
+                            addNormalText(`  Suggestion: ${gap.suggestion}`, 25);
+                        }
+                    }
+                });
+                yPosition += 3;
+            }
+        }
         
-        userData.interviews.slice(0, 5).forEach((interview, index) => {
-            addSubHeader(`Interview ${index + 1} - ${interview.start_time ? new Date(interview.start_time).toLocaleDateString() : 'Unknown Date'}`);
+        // 3. Interview Preparation Plan
+        if (session.results.prep_plan) {
+            const prepPlan = session.results.prep_plan;
             
-            addNormalText(`Type: ${interview.interviewType || 'General'}`);
-            addNormalText(`Status: ${interview.status || 'Unknown'}`);
-            addNormalText(`Duration: ${interview.start_time && interview.end_time ? 
-                Math.round((new Date(interview.end_time) - new Date(interview.start_time)) / 60000) + ' minutes' : 'Unknown'}`);
+            addSubHeader('Interview Preparation Plan');
             
-            if (interview.analysis) {
-                const analysis = interview.analysis;
-                
+            // Focus Areas
+            if (prepPlan.focusAreas && Array.isArray(prepPlan.focusAreas) && prepPlan.focusAreas.length > 0) {
+                addBulletPoint('Focus Areas for Study:');
+                prepPlan.focusAreas.forEach(focus => {
+                    if (typeof focus === 'object' && focus.area) {
+                        addNormalText(`• ${focus.area} (${focus.priority || 'medium'} priority)`, 20);
+                        if (focus.relevance) {
+                            addNormalText(`  Why important: ${focus.relevance}`, 25);
+                        }
+                    } else if (typeof focus === 'string') {
+                        addNormalText(`• ${focus}`, 20);
+                    }
+                });
                 yPosition += 3;
-                addBulletPoint('Performance Scores:');
-                if (analysis.overallScore) addNormalText(`Overall: ${analysis.overallScore}/100`, 15);
-                if (analysis.technicalAssessment?.score) addNormalText(`Technical: ${analysis.technicalAssessment.score}/100`, 15);
-                if (analysis.communicationAssessment?.score) addNormalText(`Communication: ${analysis.communicationAssessment.score}/100`, 15);
-                if (analysis.behavioralAssessment?.score) addNormalText(`Behavioral: ${analysis.behavioralAssessment.score}/100`, 15);
-                
-                if (analysis.keyImprovementAreas && analysis.keyImprovementAreas.length > 0) {
-                    yPosition += 3;
-                    addBulletPoint('Key Improvement Areas:');
-                    analysis.keyImprovementAreas.slice(0, 3).forEach(area => {
-                        addNormalText(`• ${area.area}: ${area.recommendation}`, 20);
-                    });
-                }
-                
-                if (analysis.specificFeedback && analysis.specificFeedback.length > 0) {
-                    yPosition += 3;
-                    addBulletPoint('Specific Feedback Highlights:');
-                    analysis.specificFeedback.slice(0, 2).forEach(feedback => {
-                        addNormalText(`• Q: ${feedback.question.substring(0, 80)}...`, 20);
-                        addNormalText(`  Improvement: ${feedback.improvement}`, 20);
-                    });
-                }
             }
             
-            // Add conversation highlights if available
-            if (interview.conversation && interview.conversation.length > 0) {
-                const userResponses = interview.conversation.filter(msg => msg.role === 'user').length;
-                addBulletPoint(`Total Questions Answered: ${userResponses}`);
+            // Likely Interview Questions - ENHANCED
+            if (prepPlan.likelyQuestions && Array.isArray(prepPlan.likelyQuestions) && prepPlan.likelyQuestions.length > 0) {
+                checkPageBreak(30);
+                addBulletPoint('Likely Interview Questions & Guidance:');
+                prepPlan.likelyQuestions.forEach((q, qIndex) => {
+                    checkPageBreak(20);
+                    addNormalText(`Q${qIndex + 1}: ${q.question || 'Question not available'}`, 20);
+                    if (q.category) {
+                        addNormalText(`Category: ${q.category}`, 25);
+                    }
+                    if (q.guidance) {
+                        addNormalText(`How to Answer: ${q.guidance}`, 25);
+                    }
+                    if (q.sampleAnswerOutline) {
+                        addNormalText(`Sample Structure: ${q.sampleAnswerOutline}`, 25);
+                    }
+                    yPosition += 2;
+                });
+                yPosition += 3;
             }
             
-            yPosition += 8;
-        });
-    }
-    
-    // 5. Skill Development Recommendations
-    addSectionHeader('5. Skill Development Recommendations');
-    
-    // Aggregate recommendations from all sessions
-    const allRecommendations = new Set();
-    const allSkillGaps = new Set();
-    const allFocusAreas = new Set();
-    
-    userData.sessions.forEach(session => {
-        if (session.results?.prep_plan?.focusAreas) {
-            session.results.prep_plan.focusAreas.forEach(area => allFocusAreas.add(area));
-        }
-        if (session.results?.prep_plan?.conceptsToStudy) {
-            session.results.prep_plan.conceptsToStudy.forEach(concept => allRecommendations.add(concept));
-        }
-        if (session.results?.match_results?.skillGaps) {
-            session.results.match_results.skillGaps.forEach(gap => allSkillGaps.add(gap.missingSkill));
-        }
-    });
-    
-    if (allFocusAreas.size > 0) {
-        addSubHeader('Primary Focus Areas');
-        Array.from(allFocusAreas).slice(0, 8).forEach(area => {
-            addBulletPoint(area);
-        });
-    }
-    
-    if (allRecommendations.size > 0) {
-        addSubHeader('Recommended Study Topics');
-        Array.from(allRecommendations).slice(0, 10).forEach(concept => {
-            addBulletPoint(concept);
-        });
-    }
-    
-    if (allSkillGaps.size > 0) {
-        addSubHeader('Skills to Develop');
-        Array.from(allSkillGaps).slice(0, 8).forEach(skill => {
-            addBulletPoint(skill);
-        });
-    }
-    
-    // 6. Career Preparation Insights
-    addSectionHeader('6. Career Preparation Insights');
-    
-    // Extract job requirements and career insights
-    const jobTitles = new Set();
-    const requiredSkills = new Set();
-    const companies = new Set();
-    
-    userData.sessions.forEach(session => {
-        if (session.results?.match_results?.jobRequirements) {
-            const req = session.results.match_results.jobRequirements;
-            if (req.jobTitle) jobTitles.add(req.jobTitle);
-            if (req.requiredSkills) {
-                req.requiredSkills.forEach(skill => requiredSkills.add(skill));
+            // Concepts to Study
+            if (prepPlan.conceptsToStudy) {
+                addBulletPoint('Concepts to Study:');
+                if (typeof prepPlan.conceptsToStudy === 'object' && !Array.isArray(prepPlan.conceptsToStudy)) {
+                    // New structured format
+                    Object.entries(prepPlan.conceptsToStudy).forEach(([category, concepts]) => {
+                        if (Array.isArray(concepts) && concepts.length > 0) {
+                            addNormalText(`${category.charAt(0).toUpperCase() + category.slice(1)}:`, 20);
+                            concepts.forEach(concept => {
+                                addNormalText(`• ${concept}`, 25);
+                            });
+                        }
+                    });
+                } else if (Array.isArray(prepPlan.conceptsToStudy)) {
+                    // Old format
+                    prepPlan.conceptsToStudy.forEach(concept => {
+                        addNormalText(`• ${concept}`, 20);
+                    });
+                }
+                yPosition += 3;
+            }
+            
+            // Gap Strategies
+            if (prepPlan.gapStrategies && Array.isArray(prepPlan.gapStrategies) && prepPlan.gapStrategies.length > 0) {
+                addBulletPoint('Addressing Potential Gaps:');
+                prepPlan.gapStrategies.forEach(strategy => {
+                    if (strategy.gap) {
+                        addNormalText(`Gap: ${strategy.gap}`, 20);
+                        if (strategy.strategy) {
+                            addNormalText(`Strategy: ${strategy.strategy}`, 25);
+                        }
+                        if (strategy.focus_during_prep) {
+                            addNormalText(`Focus: ${strategy.focus_during_prep}`, 25);
+                        }
+                        yPosition += 2;
+                    }
+                });
+                yPosition += 3;
             }
         }
-        if (session.results?.parsed_resume?.companiesWorkedAt) {
-            session.results.parsed_resume.companiesWorkedAt.forEach(company => companies.add(company));
-        }
-    });
-    
-    if (jobTitles.size > 0) {
-        addSubHeader('Target Job Roles Analyzed');
-        Array.from(jobTitles).forEach(title => {
-            addBulletPoint(title);
-        });
-    }
-    
-    if (requiredSkills.size > 0) {
-        addSubHeader('In-Demand Skills Identified');
-        Array.from(requiredSkills).slice(0, 12).forEach(skill => {
-            addBulletPoint(skill);
-        });
-    }
-    
-    // 7. Study Plan & Practice Exercises
-    addSectionHeader('7. Study Plan & Practice Exercises');
-    
-    // Extract practice exercises from interview analyses
-    const practiceExercises = new Set();
-    userData.interviews.forEach(interview => {
-        if (interview.analysis?.keyImprovementAreas) {
-            interview.analysis.keyImprovementAreas.forEach(area => {
-                if (area.practiceExercise) {
-                    practiceExercises.add(`${area.area}: ${area.practiceExercise}`);
+        
+        // 4. Find related interviews for this session
+        const relatedInterviews = userData.interviews.filter(interview => 
+            interview.sessionId === session.id || 
+            (interview.start_time && session.start_time && 
+             Math.abs(new Date(interview.start_time) - new Date(session.start_time)) < 24 * 60 * 60 * 1000) // Within 24 hours
+        );
+        
+        if (relatedInterviews.length > 0) {
+            relatedInterviews.forEach((interview, interviewIndex) => {
+                checkPageBreak(40);
+                addSubHeader(`Mock Interview ${interviewIndex + 1} Performance`);
+                addNormalText(`Interview Type: ${interview.interviewType || 'General'}`);
+                addNormalText(`Status: ${interview.status || 'Unknown'}`);
+                addNormalText(`Duration: ${interview.start_time && interview.end_time ? 
+                    Math.round((new Date(interview.end_time) - new Date(interview.start_time)) / 60000) + ' minutes' : 'Unknown'}`);
+                yPosition += 3;
+                
+                // Interview Performance Analysis
+                if (interview.analysis) {
+                    const analysis = interview.analysis;
+                    
+                    addBulletPoint('Performance Scores:');
+                    if (analysis.overallScore) addNormalText(`Overall Performance: ${analysis.overallScore}/100`, 15);
+                    if (analysis.technicalAssessment?.score) addNormalText(`Technical Skills: ${analysis.technicalAssessment.score}/100`, 15);
+                    if (analysis.communicationAssessment?.score) addNormalText(`Communication: ${analysis.communicationAssessment.score}/100`, 15);
+                    if (analysis.behavioralAssessment?.score) addNormalText(`Behavioral Responses: ${analysis.behavioralAssessment.score}/100`, 15);
+                    yPosition += 3;
+                    
+                    if (analysis.overallAssessment) {
+                        addBulletPoint('Overall Assessment:');
+                        addNormalText(analysis.overallAssessment, 15);
+                        yPosition += 3;
+                    }
+                    
+                    // Detailed Assessment Breakdown
+                    const assessmentSections = [
+                        { name: 'Technical', data: analysis.technicalAssessment },
+                        { name: 'Communication', data: analysis.communicationAssessment },
+                        { name: 'Behavioral', data: analysis.behavioralAssessment }
+                    ];
+                    
+                    assessmentSections.forEach(section => {
+                        if (section.data && (section.data.strengths?.length > 0 || section.data.weaknesses?.length > 0)) {
+                            checkPageBreak(25);
+                            addBulletPoint(`${section.name} Assessment Details:`);
+                            if (section.data.strengths?.length > 0) {
+                                addNormalText('Strengths:', 20);
+                                section.data.strengths.forEach(strength => {
+                                    addNormalText(`• ${strength}`, 25);
+                                });
+                            }
+                            if (section.data.weaknesses?.length > 0) {
+                                addNormalText('Areas to Improve:', 20);
+                                section.data.weaknesses.forEach(weakness => {
+                                    addNormalText(`• ${weakness}`, 25);
+                                });
+                            }
+                            yPosition += 2;
+                        }
+                    });
+                    
+                    if (analysis.keyImprovementAreas && Array.isArray(analysis.keyImprovementAreas) && analysis.keyImprovementAreas.length > 0) {
+                        checkPageBreak(25);
+                        addBulletPoint('Key Improvement Areas:');
+                        analysis.keyImprovementAreas.forEach(area => {
+                            if (area && area.area) {
+                                addNormalText(`• ${area.area}`, 20);
+                                if (area.recommendation) {
+                                    addNormalText(`  Recommendation: ${area.recommendation}`, 25);
+                                }
+                                if (area.practiceExercise) {
+                                    addNormalText(`  Practice: ${area.practiceExercise}`, 25);
+                                }
+                            }
+                        });
+                        yPosition += 3;
+                    }
+                }
+                
+                // Full Interview Transcript - ENHANCED
+                if (interview.conversation && Array.isArray(interview.conversation) && interview.conversation.length > 0) {
+                    checkPageBreak(30);
+                    addSubHeader('Complete Interview Transcript');
+                    
+                    interview.conversation.forEach((message, msgIndex) => {
+                        checkPageBreak(15);
+                        const speaker = message.role === 'user' ? 'Student' : 'IRIS Interviewer';
+                        const timestamp = message.timestamp ? new Date(message.timestamp).toLocaleTimeString() : `${msgIndex + 1}`;
+                        
+                        doc.setFont(undefined, 'bold');
+                        addNormalText(`[${timestamp}] ${speaker}:`);
+                        doc.setFont(undefined, 'normal');
+                        addNormalText(message.content || message.text || '(No content)', 10);
+                        yPosition += 2;
+                    });
+                    yPosition += 5;
+                }
+                
+                // Suggested Answers with Rationale - NEW ENHANCED SECTION
+                if (interview.suggestedAnswers && Array.isArray(interview.suggestedAnswers) && interview.suggestedAnswers.length > 0) {
+                    checkPageBreak(30);
+                    addSubHeader('Suggested Answers & Expert Rationale');
+                    
+                    interview.suggestedAnswers.forEach((item, answerIndex) => {
+                        checkPageBreak(25);
+                        addBulletPoint(`Question ${answerIndex + 1}:`);
+                        addNormalText(item.question || 'Question not available', 15);
+                        yPosition += 2;
+                        
+                        if (item.suggestions && Array.isArray(item.suggestions)) {
+                            item.suggestions.forEach((suggestion, sugIndex) => {
+                                checkPageBreak(20);
+                                addNormalText(`Suggested Answer ${sugIndex + 1}:`, 20);
+                                if (suggestion.answer) {
+                                    addNormalText(suggestion.answer, 25);
+                                }
+                                if (suggestion.rationale) {
+                                    doc.setFont(undefined, 'italic');
+                                    addNormalText(`Expert Rationale: ${suggestion.rationale}`, 25);
+                                    doc.setFont(undefined, 'normal');
+                                }
+                                yPosition += 3;
+                            });
+                        }
+                        yPosition += 2;
+                    });
                 }
             });
+        } else {
+            checkPageBreak(15);
+            addSubHeader('Mock Interview');
+            addNormalText('No mock interview conducted for this job analysis yet.');
+            yPosition += 5;
+        }
+        
+        // Add separator between job analyses
+        if (sessionIndex < userData.sessions.length - 1) {
+            checkPageBreak(20);
+            doc.setLineWidth(1);
+            doc.line(margin, yPosition, margin + maxWidth, yPosition);
+            yPosition += 10;
         }
     });
     
-    if (practiceExercises.size > 0) {
-        addSubHeader('Recommended Practice Exercises');
-        Array.from(practiceExercises).slice(0, 6).forEach(exercise => {
-            addBulletPoint(exercise);
-        });
-    }
+    // Overall Progress Summary
+    doc.addPage();
+    yPosition = 20;
     
-    // Extract likely questions for preparation
-    const likelyQuestions = [];
-    userData.sessions.forEach(session => {
-        if (session.results?.prep_plan?.likelyQuestions) {
-            likelyQuestions.push(...session.results.prep_plan.likelyQuestions.slice(0, 3));
-        }
-    });
+    addSectionHeader('Overall Learning Progress Summary');
     
-    if (likelyQuestions.length > 0) {
-        addSubHeader('Common Interview Questions to Prepare');
-        likelyQuestions.slice(0, 8).forEach((q, index) => {
-            addBulletPoint(`${q.question}`);
-            if (q.guidance) {
-                addNormalText(`Guidance: ${q.guidance}`, 20);
-            }
-            yPosition += 2;
-        });
-    }
-    
-    // 8. Progress Tracking & Analytics
-    addSectionHeader('8. Progress Tracking & Analytics');
-    
-    if (userData.sessions.length > 0) {
-        const firstSession = userData.sessions[userData.sessions.length - 1];
-        const latestSession = userData.sessions[0];
-        
-        addSubHeader('Journey Timeline');
-        addNormalText(`First Analysis: ${firstSession.start_time ? new Date(firstSession.start_time).toLocaleDateString() : 'Unknown'}`);
-        addNormalText(`Latest Analysis: ${latestSession.start_time ? new Date(latestSession.start_time).toLocaleDateString() : 'Unknown'}`);
-        
-        // Calculate time span
-        if (firstSession.start_time && latestSession.start_time) {
-            const daysDiff = Math.ceil((new Date(latestSession.start_time) - new Date(firstSession.start_time)) / (1000 * 60 * 60 * 24));
-            addNormalText(`Learning Period: ${daysDiff} days`);
-        }
-    }
-    
-    // Match score progression
-    const matchScores = userData.sessions
+    // Calculate overall statistics
+    const totalMatchScores = userData.sessions
         .filter(s => s.results?.match_results?.matchScore)
         .map(s => s.results.match_results.matchScore);
     
-    if (matchScores.length > 1) {
-        addSubHeader('Resume Match Score Progression');
-        addNormalText(`Initial Score: ${matchScores[matchScores.length - 1]}%`);
-        addNormalText(`Current Score: ${matchScores[0]}%`);
-        const scoreImprovement = matchScores[0] - matchScores[matchScores.length - 1];
-        addNormalText(`Improvement: ${scoreImprovement > 0 ? '+' : ''}${scoreImprovement}%`);
-    }
-    
-    // Interview performance progression
-    const interviewScores = userData.interviews
+    const totalInterviewScores = userData.interviews
         .filter(i => i.analysis?.overallScore)
-        .sort((a, b) => new Date(a.start_time) - new Date(b.start_time))
         .map(i => i.analysis.overallScore);
     
-    if (interviewScores.length > 1) {
-        addSubHeader('Interview Performance Progression');
-        addNormalText(`First Interview: ${interviewScores[0]}/100`);
-        addNormalText(`Latest Interview: ${interviewScores[interviewScores.length - 1]}/100`);
-        const perfImprovement = interviewScores[interviewScores.length - 1] - interviewScores[0];
-        addNormalText(`Performance Improvement: ${perfImprovement > 0 ? '+' : ''}${perfImprovement} points`);
+    if (totalMatchScores.length > 0) {
+        const avgMatchScore = Math.round(totalMatchScores.reduce((a, b) => a + b, 0) / totalMatchScores.length);
+        const bestMatchScore = Math.max(...totalMatchScores);
+        addNormalText(`Average Resume Match Score: ${avgMatchScore}%`);
+        addNormalText(`Best Resume Match Score: ${bestMatchScore}%`);
+        
+        if (totalMatchScores.length > 1) {
+            const improvement = totalMatchScores[0] - totalMatchScores[totalMatchScores.length - 1];
+            addNormalText(`Resume Match Score Improvement: ${improvement > 0 ? '+' : ''}${improvement}%`);
+        }
+        yPosition += 5;
     }
     
-    // Payment and subscription info
-    if (userData.payments.length > 0 || userData.addonPurchases.length > 0) {
-        addSubHeader('Investment in Learning');
-        if (userData.payments.length > 0) {
-            addNormalText(`Total Payments: ${userData.payments.length}`);
+    if (totalInterviewScores.length > 0) {
+        const avgInterviewScore = Math.round(totalInterviewScores.reduce((a, b) => a + b, 0) / totalInterviewScores.length);
+        const bestInterviewScore = Math.max(...totalInterviewScores);
+        addNormalText(`Average Interview Performance: ${avgInterviewScore}/100`);
+        addNormalText(`Best Interview Performance: ${bestInterviewScore}/100`);
+        
+        if (totalInterviewScores.length > 1) {
+            const improvement = totalInterviewScores[totalInterviewScores.length - 1] - totalInterviewScores[0];
+            addNormalText(`Interview Score Improvement: ${improvement > 0 ? '+' : ''}${improvement} points`);
         }
-        if (userData.addonPurchases.length > 0) {
-            addNormalText(`Add-on Purchases: ${userData.addonPurchases.length}`);
-        }
+        yPosition += 5;
     }
     
-    // Next Steps and Recommendations
-    addSectionHeader('Next Steps & Action Plan');
-    
-    addSubHeader('Immediate Actions (Next 7 Days)');
-    addBulletPoint('Review and practice the specific feedback from your latest mock interview');
-    addBulletPoint('Focus on the top 3 improvement areas identified in your analyses');
+    // Next Steps
+    addSubHeader('Recommended Next Steps');
+    addBulletPoint('Continue practicing with mock interviews to improve performance');
+    addBulletPoint('Focus on the improvement areas identified in your latest analysis');
     addBulletPoint('Update your resume based on the enhancement suggestions provided');
-    
-    addSubHeader('Short-term Goals (Next 30 Days)');
-    addBulletPoint('Complete practice exercises for your weakest skill areas');
-    addBulletPoint('Conduct additional mock interviews to track improvement');
-    addBulletPoint('Research and apply to positions that match your growing skill set');
-    
-    addSubHeader('Long-term Development (Next 3 Months)');
-    addBulletPoint('Develop expertise in the in-demand skills identified in your analyses');
-    addBulletPoint('Build portfolio projects that demonstrate your enhanced capabilities');
-    addBulletPoint('Network with professionals in your target industry');
+    addBulletPoint('Study the concepts and focus areas highlighted in your preparation plans');
+    addBulletPoint('Practice answering the likely interview questions with the suggested approaches');
     
     // Footer
     checkPageBreak(30);
@@ -1080,7 +1166,8 @@ function generateComprehensivePDFReport(userData) {
     doc.setTextColor(128, 128, 128);
     doc.text('Generated by IRIS - Interview Readiness & Improvement System', margin, yPosition);
     doc.text('Continue practicing and learning. Your next opportunity is waiting!', margin, yPosition + 7);
-    doc.text(`Report contains ${userData.sessions.length} resume analyses and ${userData.interviews.length} mock interviews`, margin, yPosition + 14);
+    doc.text(`Report contains ${userData.sessions.length} job analyses and ${userData.interviews.length} mock interviews`, margin, yPosition + 14);
+    doc.text('Visit iris-ai.com for more learning resources and practice opportunities', margin, yPosition + 21);
     
     // Save PDF
     const userName = userData.profile?.displayName?.replace(/\s+/g, '_') || 'Student';
