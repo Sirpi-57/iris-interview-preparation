@@ -478,7 +478,6 @@ function showPaymentModal() {
 }
 
 function downloadUserData() {
-    // Placeholder for user data download
     const user = firebase.auth().currentUser;
     if (!user || !firebase.firestore) {
         showMessage('Unable to download data at this time', 'danger');
@@ -486,13 +485,16 @@ function downloadUserData() {
     }
     
     // Show loading message
-    showMessage('Preparing your data for download...', 'info');
+    showMessage('Preparing your comprehensive learning report...', 'info');
     
     // Collect user data from Firestore
     const userData = {
         profile: null,
         sessions: [],
-        interviews: []
+        interviews: [],
+        addonPurchases: [],
+        payments: [],
+        jobPostings: []
     };
     
     // Get user profile
@@ -509,6 +511,7 @@ function downloadUserData() {
             // Get user sessions
             return firebase.firestore().collection('sessions')
                 .where('userId', '==', user.uid)
+                .orderBy('start_time', 'desc')
                 .get();
         })
         .then(snapshot => {
@@ -522,6 +525,7 @@ function downloadUserData() {
             // Get user interviews
             return firebase.firestore().collection('interviews')
                 .where('userId', '==', user.uid)
+                .orderBy('start_time', 'desc')
                 .get();
         })
         .then(snapshot => {
@@ -532,24 +536,558 @@ function downloadUserData() {
                 });
             });
             
-            // Create and download JSON file
-            const dataStr = JSON.stringify(userData, null, 2);
-            const dataBlob = new Blob([dataStr], { type: 'application/json' });
-            const url = URL.createObjectURL(dataBlob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `iris-data-${new Date().toISOString().split('T')[0]}.json`;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
+            // Get addon purchases
+            return firebase.firestore().collection('addonPurchases')
+                .where('userId', '==', user.uid)
+                .get();
+        })
+        .then(snapshot => {
+            snapshot.forEach(doc => {
+                userData.addonPurchases.push({
+                    id: doc.id,
+                    ...doc.data()
+                });
+            });
             
-            showMessage('Your data has been downloaded', 'success');
+            // Get payments
+            return firebase.firestore().collection('payments')
+                .where('userId', '==', user.uid)
+                .get();
+        })
+        .then(snapshot => {
+            snapshot.forEach(doc => {
+                userData.payments.push({
+                    id: doc.id,
+                    ...doc.data()
+                });
+            });
+            
+            // Get relevant job postings (if any are saved/applied)
+            return firebase.firestore().collection('jobPostings')
+                .limit(5) // Get recent job postings for reference
+                .get();
+        })
+        .then(snapshot => {
+            snapshot.forEach(doc => {
+                userData.jobPostings.push({
+                    id: doc.id,
+                    ...doc.data()
+                });
+            });
+            
+            // Generate comprehensive PDF
+            generateComprehensivePDFReport(userData);
         })
         .catch(error => {
             console.error('Error downloading user data:', error);
             showMessage(`Error downloading data: ${error.message}`, 'danger');
         });
+}
+
+function generateComprehensivePDFReport(userData) {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+    
+    let yPosition = 20;
+    const pageHeight = doc.internal.pageSize.height;
+    const margin = 20;
+    const lineHeight = 7;
+    const maxWidth = 170;
+    
+    // Helper functions
+    function checkPageBreak(requiredSpace = 20) {
+        if (yPosition + requiredSpace > pageHeight - margin) {
+            doc.addPage();
+            yPosition = 20;
+            return true;
+        }
+        return false;
+    }
+    
+    function addWrappedText(text, x, y, maxWidth) {
+        const lines = doc.splitTextToSize(text, maxWidth);
+        doc.text(lines, x, y);
+        return lines.length * lineHeight;
+    }
+    
+    function addSectionHeader(title, fontSize = 16) {
+        checkPageBreak(25);
+        doc.setFontSize(fontSize);
+        doc.setFont(undefined, 'bold');
+        doc.text(title, margin, yPosition);
+        yPosition += 12;
+        
+        // Add a line under the header
+        doc.setLineWidth(0.5);
+        doc.line(margin, yPosition - 5, margin + maxWidth, yPosition - 5);
+        yPosition += 5;
+    }
+    
+    function addSubHeader(title, fontSize = 14) {
+        checkPageBreak(15);
+        doc.setFontSize(fontSize);
+        doc.setFont(undefined, 'bold');
+        doc.text(title, margin, yPosition);
+        yPosition += 8;
+    }
+    
+    function addNormalText(text, indent = 0) {
+        doc.setFontSize(11);
+        doc.setFont(undefined, 'normal');
+        if (text) {
+            const height = addWrappedText(text, margin + indent, yPosition, maxWidth - indent);
+            yPosition += height + 2;
+        }
+    }
+    
+    function addBulletPoint(text, indent = 5) {
+        checkPageBreak(10);
+        doc.setFontSize(11);
+        doc.setFont(undefined, 'normal');
+        doc.text('•', margin + indent, yPosition);
+        const height = addWrappedText(text, margin + indent + 8, yPosition, maxWidth - indent - 8);
+        yPosition += Math.max(height, lineHeight) + 1;
+    }
+    
+    // Title Page
+    doc.setFontSize(28);
+    doc.setFont(undefined, 'bold');
+    doc.setTextColor(41, 128, 185); // Professional blue
+    doc.text('IRIS Learning Report', margin, yPosition);
+    yPosition += 20;
+    
+    doc.setFontSize(18);
+    doc.setTextColor(0, 0, 0);
+    doc.text('Interview Readiness & Career Development', margin, yPosition);
+    yPosition += 15;
+    
+    doc.setFontSize(14);
+    doc.setFont(undefined, 'normal');
+    doc.text(`Student: ${userData.profile?.displayName || 'Student'}`, margin, yPosition);
+    yPosition += 8;
+    doc.text(`Generated: ${new Date().toLocaleDateString('en-US', { 
+        year: 'numeric', 
+        month: 'long', 
+        day: 'numeric' 
+    })}`, margin, yPosition);
+    yPosition += 8;
+    doc.text(`Plan: ${userData.profile?.plan?.toUpperCase() || 'FREE'}`, margin, yPosition);
+    yPosition += 20;
+    
+    // Table of Contents
+    addSectionHeader('Table of Contents');
+    addNormalText('1. Student Profile & Overview');
+    addNormalText('2. Learning Progress Summary');
+    addNormalText('3. Resume Analysis Results');
+    addNormalText('4. Mock Interview Performance');
+    addNormalText('5. Skill Development Recommendations');
+    addNormalText('6. Career Preparation Insights');
+    addNormalText('7. Study Plan & Focus Areas');
+    addNormalText('8. Progress Tracking & Analytics');
+    
+    doc.addPage();
+    yPosition = 20;
+    
+    // 1. Student Profile & Overview
+    addSectionHeader('1. Student Profile & Overview');
+    
+    if (userData.profile) {
+        addSubHeader('Personal Information');
+        addNormalText(`Name: ${userData.profile.displayName || 'Not specified'}`);
+        addNormalText(`Email: ${userData.profile.email || 'Not specified'}`);
+        addNormalText(`Role: ${userData.profile.role || 'Student'}`);
+        addNormalText(`College ID: ${userData.profile.collegeId || 'Not specified'}`);
+        addNormalText(`Department: ${userData.profile.deptId || 'Not specified'}`);
+        addNormalText(`Section: ${userData.profile.sectionId || 'Not specified'}`);
+        addNormalText(`Account Created: ${userData.profile.createdAt ? new Date(userData.profile.createdAt).toLocaleDateString() : 'Unknown'}`);
+        yPosition += 5;
+        
+        addSubHeader('Subscription & Usage');
+        addNormalText(`Current Plan: ${userData.profile.plan?.toUpperCase() || 'FREE'}`);
+        if (userData.profile.planPurchasedAt) {
+            addNormalText(`Plan Purchased: ${new Date(userData.profile.planPurchasedAt).toLocaleDateString()}`);
+        }
+        if (userData.profile.planExpiresAt) {
+            addNormalText(`Plan Expires: ${new Date(userData.profile.planExpiresAt).toLocaleDateString()}`);
+        }
+        
+        if (userData.profile.usage) {
+            yPosition += 5;
+            addSubHeader('Current Usage Statistics');
+            const usage = userData.profile.usage;
+            
+            if (usage.resumeAnalyses) {
+                addBulletPoint(`Resume Analyses: ${usage.resumeAnalyses.used}/${usage.resumeAnalyses.limit} used`);
+            }
+            if (usage.mockInterviews) {
+                addBulletPoint(`Mock Interviews: ${usage.mockInterviews.used}/${usage.mockInterviews.limit} conducted`);
+            }
+            if (usage.aiEnhance) {
+                addBulletPoint(`AI Enhancement: ${usage.aiEnhance.used}/${usage.aiEnhance.limit} uses`);
+            }
+            if (usage.pdfDownloads) {
+                addBulletPoint(`PDF Downloads: ${usage.pdfDownloads.used}/${usage.pdfDownloads.limit} downloads`);
+            }
+        }
+    }
+    
+    // 2. Learning Progress Summary
+    addSectionHeader('2. Learning Progress Summary');
+    
+    const totalSessions = userData.sessions.length;
+    const completedSessions = userData.sessions.filter(s => s.status === 'completed').length;
+    const totalInterviews = userData.interviews.length;
+    const completedInterviews = userData.interviews.filter(i => i.status === 'completed').length;
+    
+    addNormalText(`Total Resume Analysis Sessions: ${totalSessions}`);
+    addNormalText(`Completed Sessions: ${completedSessions}`);
+    addNormalText(`Total Mock Interviews: ${totalInterviews}`);
+    addNormalText(`Completed Interviews: ${completedInterviews}`);
+    
+    if (userData.sessions.length > 0) {
+        const latestSession = userData.sessions[0];
+        addNormalText(`Latest Activity: ${latestSession.start_time ? new Date(latestSession.start_time).toLocaleDateString() : 'Unknown'}`);
+    }
+    
+    // Calculate improvement trends
+    if (userData.interviews.length > 1) {
+        const sortedInterviews = userData.interviews
+            .filter(i => i.analysis && i.analysis.overallScore)
+            .sort((a, b) => new Date(a.start_time) - new Date(b.start_time));
+        
+        if (sortedInterviews.length >= 2) {
+            const firstScore = sortedInterviews[0].analysis.overallScore;
+            const lastScore = sortedInterviews[sortedInterviews.length - 1].analysis.overallScore;
+            const improvement = lastScore - firstScore;
+            
+            yPosition += 5;
+            addSubHeader('Performance Improvement');
+            addNormalText(`Overall Score Improvement: ${improvement > 0 ? '+' : ''}${improvement} points`);
+            addNormalText(`First Interview Score: ${firstScore}/100`);
+            addNormalText(`Latest Interview Score: ${lastScore}/100`);
+        }
+    }
+    
+    // 3. Resume Analysis Results
+    if (userData.sessions.length > 0) {
+        addSectionHeader('3. Resume Analysis Results');
+        
+        userData.sessions.slice(0, 3).forEach((session, index) => {
+            addSubHeader(`Analysis ${index + 1} - ${session.start_time ? new Date(session.start_time).toLocaleDateString() : 'Unknown Date'}`);
+            
+            addNormalText(`Status: ${session.status || 'Unknown'}`);
+            addNormalText(`Progress: ${session.progress || 0}%`);
+            
+            if (session.job_description) {
+                yPosition += 3;
+                addBulletPoint('Job Description Analysis:');
+                const jobDesc = session.job_description.length > 200 
+                    ? session.job_description.substring(0, 200) + '...' 
+                    : session.job_description;
+                addNormalText(jobDesc, 15);
+            }
+            
+            if (session.results && session.results.match_results) {
+                const match = session.results.match_results;
+                
+                yPosition += 3;
+                addBulletPoint(`Match Score: ${match.matchScore || 'N/A'}%`);
+                
+                if (match.keyStrengths && match.keyStrengths.length > 0) {
+                    addBulletPoint('Key Strengths Identified:');
+                    match.keyStrengths.slice(0, 3).forEach(strength => {
+                        addNormalText(`• ${strength.strength}`, 20);
+                    });
+                }
+                
+                if (match.skillGaps && match.skillGaps.length > 0) {
+                    addBulletPoint('Areas for Improvement:');
+                    match.skillGaps.slice(0, 3).forEach(gap => {
+                        addNormalText(`• ${gap.missingSkill} (${gap.importance} priority)`, 20);
+                    });
+                }
+                
+                if (match.resumeImprovements && match.resumeImprovements.length > 0) {
+                    addBulletPoint('Resume Enhancement Suggestions:');
+                    match.resumeImprovements.slice(0, 2).forEach(improvement => {
+                        addNormalText(`• ${improvement.section}: ${improvement.recommendation}`, 20);
+                    });
+                }
+            }
+            
+            if (session.results && session.results.parsed_resume) {
+                const resume = session.results.parsed_resume;
+                yPosition += 3;
+                addBulletPoint('Resume Summary:');
+                if (resume.name) addNormalText(`Name: ${resume.name}`, 15);
+                if (resume.currentPosition) addNormalText(`Position: ${resume.currentPosition}`, 15);
+                if (resume.yearsOfExperience) addNormalText(`Experience: ${resume.yearsOfExperience} years`, 15);
+                if (resume.education && resume.education.length > 0) {
+                    addNormalText(`Education: ${resume.education[0]}`, 15);
+                }
+            }
+            
+            yPosition += 10;
+        });
+    }
+    
+    // 4. Mock Interview Performance
+    if (userData.interviews.length > 0) {
+        addSectionHeader('4. Mock Interview Performance');
+        
+        userData.interviews.slice(0, 5).forEach((interview, index) => {
+            addSubHeader(`Interview ${index + 1} - ${interview.start_time ? new Date(interview.start_time).toLocaleDateString() : 'Unknown Date'}`);
+            
+            addNormalText(`Type: ${interview.interviewType || 'General'}`);
+            addNormalText(`Status: ${interview.status || 'Unknown'}`);
+            addNormalText(`Duration: ${interview.start_time && interview.end_time ? 
+                Math.round((new Date(interview.end_time) - new Date(interview.start_time)) / 60000) + ' minutes' : 'Unknown'}`);
+            
+            if (interview.analysis) {
+                const analysis = interview.analysis;
+                
+                yPosition += 3;
+                addBulletPoint('Performance Scores:');
+                if (analysis.overallScore) addNormalText(`Overall: ${analysis.overallScore}/100`, 15);
+                if (analysis.technicalAssessment?.score) addNormalText(`Technical: ${analysis.technicalAssessment.score}/100`, 15);
+                if (analysis.communicationAssessment?.score) addNormalText(`Communication: ${analysis.communicationAssessment.score}/100`, 15);
+                if (analysis.behavioralAssessment?.score) addNormalText(`Behavioral: ${analysis.behavioralAssessment.score}/100`, 15);
+                
+                if (analysis.keyImprovementAreas && analysis.keyImprovementAreas.length > 0) {
+                    yPosition += 3;
+                    addBulletPoint('Key Improvement Areas:');
+                    analysis.keyImprovementAreas.slice(0, 3).forEach(area => {
+                        addNormalText(`• ${area.area}: ${area.recommendation}`, 20);
+                    });
+                }
+                
+                if (analysis.specificFeedback && analysis.specificFeedback.length > 0) {
+                    yPosition += 3;
+                    addBulletPoint('Specific Feedback Highlights:');
+                    analysis.specificFeedback.slice(0, 2).forEach(feedback => {
+                        addNormalText(`• Q: ${feedback.question.substring(0, 80)}...`, 20);
+                        addNormalText(`  Improvement: ${feedback.improvement}`, 20);
+                    });
+                }
+            }
+            
+            // Add conversation highlights if available
+            if (interview.conversation && interview.conversation.length > 0) {
+                const userResponses = interview.conversation.filter(msg => msg.role === 'user').length;
+                addBulletPoint(`Total Questions Answered: ${userResponses}`);
+            }
+            
+            yPosition += 8;
+        });
+    }
+    
+    // 5. Skill Development Recommendations
+    addSectionHeader('5. Skill Development Recommendations');
+    
+    // Aggregate recommendations from all sessions
+    const allRecommendations = new Set();
+    const allSkillGaps = new Set();
+    const allFocusAreas = new Set();
+    
+    userData.sessions.forEach(session => {
+        if (session.results?.prep_plan?.focusAreas) {
+            session.results.prep_plan.focusAreas.forEach(area => allFocusAreas.add(area));
+        }
+        if (session.results?.prep_plan?.conceptsToStudy) {
+            session.results.prep_plan.conceptsToStudy.forEach(concept => allRecommendations.add(concept));
+        }
+        if (session.results?.match_results?.skillGaps) {
+            session.results.match_results.skillGaps.forEach(gap => allSkillGaps.add(gap.missingSkill));
+        }
+    });
+    
+    if (allFocusAreas.size > 0) {
+        addSubHeader('Primary Focus Areas');
+        Array.from(allFocusAreas).slice(0, 8).forEach(area => {
+            addBulletPoint(area);
+        });
+    }
+    
+    if (allRecommendations.size > 0) {
+        addSubHeader('Recommended Study Topics');
+        Array.from(allRecommendations).slice(0, 10).forEach(concept => {
+            addBulletPoint(concept);
+        });
+    }
+    
+    if (allSkillGaps.size > 0) {
+        addSubHeader('Skills to Develop');
+        Array.from(allSkillGaps).slice(0, 8).forEach(skill => {
+            addBulletPoint(skill);
+        });
+    }
+    
+    // 6. Career Preparation Insights
+    addSectionHeader('6. Career Preparation Insights');
+    
+    // Extract job requirements and career insights
+    const jobTitles = new Set();
+    const requiredSkills = new Set();
+    const companies = new Set();
+    
+    userData.sessions.forEach(session => {
+        if (session.results?.match_results?.jobRequirements) {
+            const req = session.results.match_results.jobRequirements;
+            if (req.jobTitle) jobTitles.add(req.jobTitle);
+            if (req.requiredSkills) {
+                req.requiredSkills.forEach(skill => requiredSkills.add(skill));
+            }
+        }
+        if (session.results?.parsed_resume?.companiesWorkedAt) {
+            session.results.parsed_resume.companiesWorkedAt.forEach(company => companies.add(company));
+        }
+    });
+    
+    if (jobTitles.size > 0) {
+        addSubHeader('Target Job Roles Analyzed');
+        Array.from(jobTitles).forEach(title => {
+            addBulletPoint(title);
+        });
+    }
+    
+    if (requiredSkills.size > 0) {
+        addSubHeader('In-Demand Skills Identified');
+        Array.from(requiredSkills).slice(0, 12).forEach(skill => {
+            addBulletPoint(skill);
+        });
+    }
+    
+    // 7. Study Plan & Practice Exercises
+    addSectionHeader('7. Study Plan & Practice Exercises');
+    
+    // Extract practice exercises from interview analyses
+    const practiceExercises = new Set();
+    userData.interviews.forEach(interview => {
+        if (interview.analysis?.keyImprovementAreas) {
+            interview.analysis.keyImprovementAreas.forEach(area => {
+                if (area.practiceExercise) {
+                    practiceExercises.add(`${area.area}: ${area.practiceExercise}`);
+                }
+            });
+        }
+    });
+    
+    if (practiceExercises.size > 0) {
+        addSubHeader('Recommended Practice Exercises');
+        Array.from(practiceExercises).slice(0, 6).forEach(exercise => {
+            addBulletPoint(exercise);
+        });
+    }
+    
+    // Extract likely questions for preparation
+    const likelyQuestions = [];
+    userData.sessions.forEach(session => {
+        if (session.results?.prep_plan?.likelyQuestions) {
+            likelyQuestions.push(...session.results.prep_plan.likelyQuestions.slice(0, 3));
+        }
+    });
+    
+    if (likelyQuestions.length > 0) {
+        addSubHeader('Common Interview Questions to Prepare');
+        likelyQuestions.slice(0, 8).forEach((q, index) => {
+            addBulletPoint(`${q.question}`);
+            if (q.guidance) {
+                addNormalText(`Guidance: ${q.guidance}`, 20);
+            }
+            yPosition += 2;
+        });
+    }
+    
+    // 8. Progress Tracking & Analytics
+    addSectionHeader('8. Progress Tracking & Analytics');
+    
+    if (userData.sessions.length > 0) {
+        const firstSession = userData.sessions[userData.sessions.length - 1];
+        const latestSession = userData.sessions[0];
+        
+        addSubHeader('Journey Timeline');
+        addNormalText(`First Analysis: ${firstSession.start_time ? new Date(firstSession.start_time).toLocaleDateString() : 'Unknown'}`);
+        addNormalText(`Latest Analysis: ${latestSession.start_time ? new Date(latestSession.start_time).toLocaleDateString() : 'Unknown'}`);
+        
+        // Calculate time span
+        if (firstSession.start_time && latestSession.start_time) {
+            const daysDiff = Math.ceil((new Date(latestSession.start_time) - new Date(firstSession.start_time)) / (1000 * 60 * 60 * 24));
+            addNormalText(`Learning Period: ${daysDiff} days`);
+        }
+    }
+    
+    // Match score progression
+    const matchScores = userData.sessions
+        .filter(s => s.results?.match_results?.matchScore)
+        .map(s => s.results.match_results.matchScore);
+    
+    if (matchScores.length > 1) {
+        addSubHeader('Resume Match Score Progression');
+        addNormalText(`Initial Score: ${matchScores[matchScores.length - 1]}%`);
+        addNormalText(`Current Score: ${matchScores[0]}%`);
+        const scoreImprovement = matchScores[0] - matchScores[matchScores.length - 1];
+        addNormalText(`Improvement: ${scoreImprovement > 0 ? '+' : ''}${scoreImprovement}%`);
+    }
+    
+    // Interview performance progression
+    const interviewScores = userData.interviews
+        .filter(i => i.analysis?.overallScore)
+        .sort((a, b) => new Date(a.start_time) - new Date(b.start_time))
+        .map(i => i.analysis.overallScore);
+    
+    if (interviewScores.length > 1) {
+        addSubHeader('Interview Performance Progression');
+        addNormalText(`First Interview: ${interviewScores[0]}/100`);
+        addNormalText(`Latest Interview: ${interviewScores[interviewScores.length - 1]}/100`);
+        const perfImprovement = interviewScores[interviewScores.length - 1] - interviewScores[0];
+        addNormalText(`Performance Improvement: ${perfImprovement > 0 ? '+' : ''}${perfImprovement} points`);
+    }
+    
+    // Payment and subscription info
+    if (userData.payments.length > 0 || userData.addonPurchases.length > 0) {
+        addSubHeader('Investment in Learning');
+        if (userData.payments.length > 0) {
+            addNormalText(`Total Payments: ${userData.payments.length}`);
+        }
+        if (userData.addonPurchases.length > 0) {
+            addNormalText(`Add-on Purchases: ${userData.addonPurchases.length}`);
+        }
+    }
+    
+    // Next Steps and Recommendations
+    addSectionHeader('Next Steps & Action Plan');
+    
+    addSubHeader('Immediate Actions (Next 7 Days)');
+    addBulletPoint('Review and practice the specific feedback from your latest mock interview');
+    addBulletPoint('Focus on the top 3 improvement areas identified in your analyses');
+    addBulletPoint('Update your resume based on the enhancement suggestions provided');
+    
+    addSubHeader('Short-term Goals (Next 30 Days)');
+    addBulletPoint('Complete practice exercises for your weakest skill areas');
+    addBulletPoint('Conduct additional mock interviews to track improvement');
+    addBulletPoint('Research and apply to positions that match your growing skill set');
+    
+    addSubHeader('Long-term Development (Next 3 Months)');
+    addBulletPoint('Develop expertise in the in-demand skills identified in your analyses');
+    addBulletPoint('Build portfolio projects that demonstrate your enhanced capabilities');
+    addBulletPoint('Network with professionals in your target industry');
+    
+    // Footer
+    checkPageBreak(30);
+    yPosition += 20;
+    doc.setFontSize(10);
+    doc.setFont(undefined, 'italic');
+    doc.setTextColor(128, 128, 128);
+    doc.text('Generated by IRIS - Interview Readiness & Improvement System', margin, yPosition);
+    doc.text('Continue practicing and learning. Your next opportunity is waiting!', margin, yPosition + 7);
+    doc.text(`Report contains ${userData.sessions.length} resume analyses and ${userData.interviews.length} mock interviews`, margin, yPosition + 14);
+    
+    // Save PDF
+    const userName = userData.profile?.displayName?.replace(/\s+/g, '_') || 'Student';
+    const fileName = `IRIS-Complete-Learning-Report-${userName}-${new Date().toISOString().split('T')[0]}.pdf`;
+    doc.save(fileName);
+    
+    showMessage('Your comprehensive learning report has been downloaded successfully!', 'success');
 }
 
 function showMessage(message, type = 'info') {
