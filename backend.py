@@ -1618,9 +1618,9 @@ def call_haiku_for_enhancement(section_type, original_content):
 
     # --- Define specific prompts based on section type ---
     if section_type == 'objective':
-        system_prompt = "You are an expert resume writer. Rewrite this professional summary/objective to be concise, impactful, and ATS-friendly. Keep it 2-3 sentences maximum. Do not include any headers, labels, or introductory text. Return ONLY the enhanced objective text."
+        system_prompt = "You are an expert resume writer. Rewrite this professional summary/objective to be concise, impactful, and ATS-friendly. Make it exactly 2-3 sentences long with strong action words and quantifiable achievements where possible. Do not include any headers, labels, or introductory text. Return ONLY the enhanced objective text."
         user_content = f"Original Objective/Summary:\n{original_content}"
-        max_tokens = 150
+        max_tokens = 200
         temperature = 0.6
     elif section_type == 'experience':
         system_prompt = "You are an expert resume writer. Rewrite the following work experience description using strong action verbs and quantified achievements. Format as clean bullet points using '*' or '-'. Keep each bullet concise (1-2 lines max). Do not include headers or labels. Return ONLY the bullet points."
@@ -1668,9 +1668,24 @@ def call_haiku_for_enhancement(section_type, original_content):
         max_tokens = 250
         temperature = 0.6
     elif section_type == 'skills':
-        system_prompt = "You are an expert resume formatter. Clean up and organize the following skills list. Format as a simple comma-separated list. Remove duplicates and fix capitalization. Group similar technologies together naturally. Do not categorize with headers. Do not include any labels or introductory text. Return ONLY the clean comma-separated skills list."
-        user_content = f"Original Skills List:\n{original_content}"
-        max_tokens = 200
+        system_prompt = """You are an expert resume writer. Analyze the following skills and intelligently organize them into logical categories based on their type and domain. Create appropriate category names that fit the skills provided (e.g., for software engineers: Programming Languages, Web Technologies, etc.; for mechanical engineers: CAD Software, Manufacturing Tools, etc.; for marketing: Digital Marketing Tools, Analytics Platforms, etc.).
+
+Format the output exactly like this example:
+**Category Name 1:** skill1, skill2, skill3
+**Category Name 2:** skill1, skill2, skill3
+**Category Name 3:** skill1, skill2, skill3
+
+Rules:
+- Use bold formatting (**) for category titles
+- Use comma-separated lists for skills within each category
+- Create 3-7 relevant categories based on the skills provided
+- Don't force predefined categories - create them based on what skills are actually provided
+- Group related skills together logically
+- Include soft skills as a separate category if any are mentioned
+- Do not include any other text, headers, or explanations
+- Return ONLY the categorized skills in the format shown above"""
+        user_content = f"Skills to organize and categorize:\n{original_content}"
+        max_tokens = 300
         temperature = 0.3
     else:
         # Fallback for unknown types

@@ -70,6 +70,8 @@ function handleAuthStateChanged(user) {
       
       return loadUserProfile(user)
         .then(() => {
+          // COMMENT OUT EMAIL VERIFICATION CHECK - START
+          /*
           // Check email verification FIRST and block payment if not verified
           return checkEmailVerification(user)
             .then(isVerified => {
@@ -141,6 +143,50 @@ function handleAuthStateChanged(user) {
               }
               return isVerified; // Return verification status
             });
+          */
+          // COMMENT OUT EMAIL VERIFICATION CHECK - END
+          
+          // TEMPORARY: Skip email verification and process payments immediately
+          authState.isEmailVerified = true; // Set as verified
+          console.log("Email verification temporarily disabled - treating as verified");
+          
+          // Process any pending payments immediately
+          if (pendingPlan) {
+            localStorage.removeItem('pendingPlanSelection');
+            
+            // Give a moment for everything to fully initialize
+            setTimeout(() => {
+                console.log(`Processing plan selection: ${pendingPlan}`);
+                // Trigger plan selection with payment
+                if (typeof selectPlanFixed === 'function') {
+                    selectPlanFixed(pendingPlan);
+                } else {
+                    console.warn("selectPlanFixed function not found. Cannot process pending plan.");
+                    showMessage("Unable to continue with plan selection. Please try again from your profile.", "warning");
+                }
+            }, 1500);
+          } else if (pendingAddonStr) {
+            // Process addon purchase if there's no pending plan
+            try {
+                const pendingAddon = JSON.parse(pendingAddonStr);
+                localStorage.removeItem('pendingAddonPurchase');
+                
+                setTimeout(() => {
+                    console.log(`Processing addon purchase:`, pendingAddon);
+                    if (typeof purchaseAddonItem === 'function') {
+                        purchaseAddonItem(pendingAddon.featureType, pendingAddon.quantity);
+                    } else {
+                        console.warn("purchaseAddonItem function not found. Cannot process pending addon.");
+                        showMessage("Unable to continue with add-on purchase. Please try again from your profile.", "warning");
+                    }
+                }, 1500);
+            } catch (e) {
+                console.error("Error parsing pending addon data:", e);
+                localStorage.removeItem('pendingAddonPurchase');
+            }
+          }
+          
+          return true; // Return as if verified
         })
         .finally(() => {
           // This block runs *after* loadUserProfile and email verification check
@@ -711,8 +757,14 @@ function signUpWithEmailPassword(email, password, displayName) {
         
       return updatePromise
         .then(() => {
+          // COMMENT OUT EMAIL VERIFICATION SENDING - START
+          /*
           // Send verification email
           return sendEmailVerification(userCredential.user);
+          */
+          // COMMENT OUT EMAIL VERIFICATION SENDING - END
+          
+          return Promise.resolve(); // Skip verification email
         })
         .then(() => {
           // Add additional user data to Firestore
@@ -722,7 +774,7 @@ function signUpWithEmailPassword(email, password, displayName) {
               uid: userCredential.user.uid,
               email: email,
               displayName: displayName || email.split('@')[0],
-              emailVerified: false, // Initially set to false
+              emailVerified: true, // CHANGED: Set to true by default
               role: 'student',
               collegeId: null,
               deptId: null,
@@ -739,14 +791,25 @@ function signUpWithEmailPassword(email, password, displayName) {
             }, { merge: true }).then(() => {
               hideAuthModal();
               
+              // COMMENT OUT EMAIL VERIFICATION MODAL - START
+              /*
               // Show email verification notice
               showEmailVerificationModal(email);
+              */
+              // COMMENT OUT EMAIL VERIFICATION MODAL - END
+              
+              // TEMPORARY: Show success message instead
+              showMessage('Account created successfully! You can now use all features.', 'success');
               
               return userCredential.user;
             });
           } else {
             hideAuthModal();
-            showEmailVerificationModal(email);
+            // COMMENT OUT EMAIL VERIFICATION MODAL
+            // showEmailVerificationModal(email);
+            
+            // TEMPORARY: Show success message instead
+            showMessage('Account created successfully! You can now use all features.', 'success');
             return userCredential.user;
           }
         });
@@ -757,6 +820,7 @@ function signUpWithEmailPassword(email, password, displayName) {
       throw error;
     });
 }
+
 
 // Function to check email verification status
 function checkEmailVerification(user) {

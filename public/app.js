@@ -4959,6 +4959,7 @@ let awardCounter = 0;
 let extracurricularCounter = 0;
 let languageCounter = 0;
 let customSectionCounter = 0;
+let certificationCounter = 0;
 
 // Function to initialize resume builder listeners (call when navigating to it)
 function initResumeBuilder() {
@@ -5679,61 +5680,77 @@ function downloadResumePDF() {
 
     // --- 4. Work Experience Section ---
     if (resumeData.experience && resumeData.experience.length > 0) {
-        if (addSectionHeading('Work Experience')) { // Only proceed if heading was added (section not hidden)
-            resumeData.experience.forEach((exp, index) => {
-                // Add item spacing between experiences
-                if (index > 0) {
-                    currentY += bodyFontSize * 0.4 * itemSpacing;
-                }
-                
-                checkAddPage(subHeadingFontSize * 2 + bodyFontSize * 3); // Estimate space needed
-                pdf.setFontSize(subHeadingFontSize);
-                pdf.setFont(standardFont, 'bold');
-                // Add Job Title (left aligned)
-                pdf.text(exp.jobTitle || 'Job Title', margin, currentY);
-                
-                // Add Date Range (right aligned)
-                if (exp.date) {
-                    pdf.setFont(standardFont, 'normal');
-                    pdf.text(exp.date, pageWidth - margin, currentY, { align: 'right' });
-                }
-                currentY += subHeadingFontSize * 1.05 * spacingFactor; // Move Y down with spacing factor
-
-                // Add Company & Location (italicized)
-                pdf.setFontSize(bodyFontSize);
-                pdf.setFont(standardFont, 'italic');
-                pdf.text(`${exp.company || 'Company'} | ${exp.location || 'Location'}`, margin, currentY);
-                currentY += bodyFontSize * 1.1 * spacingFactor; // Move Y down with spacing factor
-
-                // Add Description (as bullet points)
-                if (exp.description) {
-                    const descLines = exp.description.split('\n').map(line => line.trim()).filter(line => line);
-                    descLines.forEach((line, i) => {
-                        const cleanLine = line.replace(/^[\*\-\•]\s*/, ''); // Remove leading bullet characters
-                        
-                        // Check for page break, but only if not the first line
-                        if (i > 0) {
-                            checkAddPage(bodyFontSize * 1.2);
-                        }
-                        
-                        pdf.setFontSize(bodyFontSize);
-                        pdf.setFont(standardFont, 'normal');
-                        pdf.text('•', margin + 3, currentY); // Draw bullet point
-                        
-                        // Add the wrapped text line, indented
-                        currentY = addWrappedText(cleanLine, margin + 12, currentY, contentWidth - 12);
-                    });
-                }
-                
-                // Add spacing after each experience item (except last) based on item spacing
-                if (index < resumeData.experience.length - 1) {
-                    currentY += bodyFontSize * 0.5 * itemSpacing;
-                }
-            });
+        console.log("Adding Work Experience section to PDF, found", resumeData.experience.length, "experiences");
+        addSectionHeading('Work Experience');
+        
+        resumeData.experience.forEach((exp, index) => {
+            console.log(`Processing experience ${index + 1}:`, exp);
             
-            // Add spacing after the section
-            currentY += bodyFontSize * 0.5 * sectionSpacing;
-        }
+            // Add item spacing between experiences
+            if (index > 0) {
+                currentY += bodyFontSize * 0.4 * itemSpacing;
+            }
+            
+            checkAddPage(subHeadingFontSize * 2 + bodyFontSize * 3); // Estimate space needed
+            pdf.setFontSize(subHeadingFontSize);
+            pdf.setFont(standardFont, 'bold');
+            
+            // Add Job Title (left aligned)
+            const jobTitle = exp.jobTitle || 'Job Title';
+            pdf.text(jobTitle, margin, currentY);
+            console.log("Added job title:", jobTitle);
+            
+            // Add Date Range (right aligned)
+            if (exp.date) {
+                pdf.setFont(standardFont, 'normal');
+                pdf.text(exp.date, pageWidth - margin, currentY, { align: 'right' });
+                console.log("Added date:", exp.date);
+            }
+            currentY += subHeadingFontSize * 1.05 * spacingFactor; // Move Y down with spacing factor
+
+            // Add Company & Location (italicized)
+            pdf.setFontSize(bodyFontSize);
+            pdf.setFont(standardFont, 'italic');
+            const companyLocation = `${exp.company || 'Company'} | ${exp.location || 'Location'}`;
+            pdf.text(companyLocation, margin, currentY);
+            console.log("Added company/location:", companyLocation);
+            currentY += bodyFontSize * 1.1 * spacingFactor; // Move Y down with spacing factor
+
+            // Add Description (as bullet points)
+            if (exp.description) {
+                console.log("Adding description:", exp.description);
+                const descLines = exp.description.split('\n').map(line => line.trim()).filter(line => line);
+                descLines.forEach((line, i) => {
+                    const cleanLine = line.replace(/^[\*\-\•]\s*/, ''); // Remove leading bullet characters
+                    
+                    // Check for page break, but only if not the first line
+                    if (i > 0) {
+                        checkAddPage(bodyFontSize * 1.2);
+                    }
+                    
+                    pdf.setFontSize(bodyFontSize);
+                    pdf.setFont(standardFont, 'normal');
+                    pdf.text('•', margin + 3, currentY); // Draw bullet point
+                    
+                    // Add the wrapped text line, indented
+                    currentY = addWrappedText(cleanLine, margin + 12, currentY, contentWidth - 12);
+                    console.log("Added bullet point:", cleanLine);
+                });
+            } else {
+                console.log("No description found for this experience");
+            }
+            
+            // Add spacing after each experience item (except last) based on item spacing
+            if (index < resumeData.experience.length - 1) {
+                currentY += bodyFontSize * 0.5 * itemSpacing;
+            }
+        });
+        
+        // Add spacing after the section
+        currentY += bodyFontSize * 0.5 * sectionSpacing;
+        console.log("Work Experience section completed");
+    } else {
+        console.log("No work experience data found or empty array:", resumeData.experience);
     }
 
     // --- 5. Projects Section ---
@@ -6165,7 +6182,7 @@ function debounce(func, wait) {
 // --- Live Preview Update Function (Enhanced) ---
 function updateResumePreview() {
     console.log("Updating resume preview content...");
-    const resumeData = getResumeData(); // Calls the function you already have
+    const resumeData = getResumeData();
     const previewArea = document.getElementById('resumePreviewArea');
     if (!previewArea) return;
 
@@ -6185,7 +6202,7 @@ function updateResumePreview() {
     // Update preview area data attributes for proper sizing
     previewArea.setAttribute('data-doc-size', resumeData.settings.docSize || 'letter');
 
-    // Check if there's any data to render - updated to include new sections
+    // Check if there's any data to render
     if (Object.values(resumeData.personal).every(val => !val) && 
         !resumeData.objective && 
         !resumeData.education.length && 
@@ -6201,18 +6218,17 @@ function updateResumePreview() {
         !resumeData.languages.length &&
         !resumeData.customSections.length) {
         previewArea.innerHTML = '<p class="text-center text-muted initial-preview-message">Resume preview will appear here as you enter details.</p>';
-        return; // Show placeholder if no data
+        return;
     }
 
-    // --- Helper function to safely create HTML ---
+    // Helper function to safely create HTML
     const createHtml = (tag, className = '', content = '', attributes = {}) => {
         const el = document.createElement(tag);
         if (className) el.className = className;
-        // Use textContent for safety unless HTML is intended (like lists)
         if (typeof content === 'string' && !content.startsWith('<')) {
              el.textContent = content;
         } else if (typeof content === 'string') {
-             el.innerHTML = content; // Use innerHTML carefully for list structures etc.
+             el.innerHTML = content;
         } else if (Array.isArray(content)) {
              content.forEach(child => el.appendChild(child));
         } else if (content instanceof Node) {
@@ -6224,7 +6240,7 @@ function updateResumePreview() {
         return el;
     };
 
-    // --- Build Preview HTML ---
+    // Build Preview HTML
     const fragment = document.createDocumentFragment();
 
     // Header
@@ -6252,332 +6268,388 @@ function updateResumePreview() {
         fragment.appendChild(objectiveDiv);
     }
 
-    // Function to render section items (enhanced for all new sections)
-    const renderSectionItems = (title, sectionKey, items) => {
-        // Check if section should be hidden
+    // Helper function to check if section is hidden
+    const isSectionHidden = (sectionKey) => {
         const editorSection = document.querySelector(`.resume-section[data-section="${sectionKey}"]`);
-        const isHidden = editorSection?.classList.contains('hidden');
+        return editorSection?.classList.contains('hidden');
+    };
 
-        if (!items || items.length === 0) return null;
+    // Education Section
+    if (resumeData.education && resumeData.education.length > 0 && !isSectionHidden('education')) {
+        const sectionDiv = createHtml('div', 'preview-section preview-education');
+        sectionDiv.appendChild(createHtml('h2', '', 'Education'));
 
-        const sectionDiv = createHtml('div', `preview-section preview-${sectionKey} ${isHidden ? 'hidden' : ''}`);
-        sectionDiv.appendChild(createHtml('h2', '', title));
-
-        items.forEach((item, index) => {
+        resumeData.education.forEach((item, index) => {
             const itemDiv = createHtml('div', 'preview-item');
-            // Add spacing classes based on position
-            if (index > 0) {
-                itemDiv.classList.add('mt-item'); // Add class for margin top when not first item
-            }
+            if (index > 0) itemDiv.classList.add('mt-item');
             
-            // Handle different section types
-            if (sectionKey === 'experience' || sectionKey === 'internships') {
-                renderExperienceItem(itemDiv, item, sectionKey);
-            } else if (sectionKey === 'education') {
-                renderEducationItem(itemDiv, item);
-            } else if (sectionKey === 'projects') {
-                renderProjectItem(itemDiv, item);
-            } else if (sectionKey === 'publications') {
-                renderPublicationItem(itemDiv, item);
-            } else if (sectionKey === 'accomplishments') {
-                renderAccomplishmentItem(itemDiv, item);
-            } else if (sectionKey === 'awards') {
-                renderAwardItem(itemDiv, item);
-            } else if (sectionKey === 'extracurriculars') {
-                renderExtracurricularItem(itemDiv, item);
-            } else if (sectionKey === 'languages') {
-                renderLanguageItem(itemDiv, item);
-            } else if (sectionKey === 'certifications') {
-                renderCertificationItem(itemDiv, item);
+            const itemHeader = createHtml('div', 'item-header');
+            itemHeader.appendChild(createHtml('span', 'item-title', item.degreeMajor || 'Degree/Major'));
+            if (item.date) {
+                itemHeader.appendChild(createHtml('span', 'item-date', item.date));
+            }
+            itemDiv.appendChild(itemHeader);
+
+            let subtitleText = `${item.school || 'School'} | ${item.location || 'Location'}`;
+            if (item.gpa) {
+                subtitleText += ` | GPA: ${item.gpa}`;
+            }
+            itemDiv.appendChild(createHtml('div', 'item-subtitle', subtitleText));
+
+            if (item.additionalInfo) {
+                itemDiv.appendChild(createHtml('p', 'small text-muted', `Relevant Info: ${item.additionalInfo}`));
             }
 
             sectionDiv.appendChild(itemDiv);
         });
-        return sectionDiv;
-    };
+        fragment.appendChild(sectionDiv);
+    }
 
-    // Individual item renderers
-    function renderExperienceItem(itemDiv, item, sectionKey) {
-        const itemHeader = createHtml('div', 'item-header');
-        const titleText = sectionKey === 'internships' ? (item.role || 'Internship Role') : (item.jobTitle || 'Job Title');
-        const dateText = item.date || '';
-        
-        itemHeader.appendChild(createHtml('span', 'item-title', titleText));
-        if (dateText) {
-            itemHeader.appendChild(createHtml('span', 'item-date', dateText));
-        }
-        itemDiv.appendChild(itemHeader);
+    // Work Experience Section
+    if (resumeData.experience && resumeData.experience.length > 0 && !isSectionHidden('experience')) {
+        const sectionDiv = createHtml('div', 'preview-section preview-experience');
+        sectionDiv.appendChild(createHtml('h2', '', 'Work Experience'));
 
-        const subtitleText = `${item.company || 'Company'} | ${item.location || 'Location'}`;
-        itemDiv.appendChild(createHtml('div', 'item-subtitle', subtitleText));
-
-        if (item.description) {
-            const descLines = item.description.split('\n').map(line => line.trim()).filter(line => line);
-            if (descLines.length > 0) {
-                const ul = createHtml('ul');
-                descLines.forEach(line => {
-                    const cleanLine = line.replace(/^[\*\-\•]\s*/, '');
-                    ul.appendChild(createHtml('li', '', cleanLine));
-                });
-                itemDiv.appendChild(ul);
+        resumeData.experience.forEach((item, index) => {
+            const itemDiv = createHtml('div', 'preview-item');
+            if (index > 0) itemDiv.classList.add('mt-item');
+            
+            const itemHeader = createHtml('div', 'item-header');
+            itemHeader.appendChild(createHtml('span', 'item-title', item.jobTitle || 'Job Title'));
+            if (item.date) {
+                itemHeader.appendChild(createHtml('span', 'item-date', item.date));
             }
-        }
-    }
+            itemDiv.appendChild(itemHeader);
 
-    function renderEducationItem(itemDiv, item) {
-        const itemHeader = createHtml('div', 'item-header');
-        itemHeader.appendChild(createHtml('span', 'item-title', item.degreeMajor || 'Degree/Major'));
-        if (item.date) {
-            itemHeader.appendChild(createHtml('span', 'item-date', item.date));
-        }
-        itemDiv.appendChild(itemHeader);
+            const subtitleText = `${item.company || 'Company'} | ${item.location || 'Location'}`;
+            itemDiv.appendChild(createHtml('div', 'item-subtitle', subtitleText));
 
-        let subtitleText = `${item.school || 'School'} | ${item.location || 'Location'}`;
-        if (item.gpa) {
-            subtitleText += ` | GPA: ${item.gpa}`;
-        }
-        itemDiv.appendChild(createHtml('div', 'item-subtitle', subtitleText));
-
-        if (item.additionalInfo) {
-            itemDiv.appendChild(createHtml('p', 'small text-muted', `Relevant Info: ${item.additionalInfo}`));
-        }
-    }
-
-    function renderProjectItem(itemDiv, item) {
-        const itemHeader = createHtml('div', 'item-header');
-        itemHeader.appendChild(createHtml('span', 'item-title', item.projectName || 'Project Name'));
-        if (item.date) {
-            itemHeader.appendChild(createHtml('span', 'item-date', item.date));
-        }
-        itemDiv.appendChild(itemHeader);
-
-        if (item.link) {
-            const linkDiv = createHtml('div', 'item-subtitle');
-            linkDiv.innerHTML = `<a href="${item.link}" target="_blank">${item.link}</a>`;
-            itemDiv.appendChild(linkDiv);
-        }
-
-        if (item.description) {
-            const descLines = item.description.split('\n').map(line => line.trim()).filter(line => line);
-            if (descLines.length > 0) {
-                const ul = createHtml('ul');
-                descLines.forEach(line => {
-                    const cleanLine = line.replace(/^[\*\-\•]\s*/, '');
-                    ul.appendChild(createHtml('li', '', cleanLine));
-                });
-                itemDiv.appendChild(ul);
+            if (item.description) {
+                const descLines = item.description.split('\n').map(line => line.trim()).filter(line => line);
+                if (descLines.length > 0) {
+                    const ul = createHtml('ul');
+                    descLines.forEach(line => {
+                        const cleanLine = line.replace(/^[\*\-\•]\s*/, '');
+                        ul.appendChild(createHtml('li', '', cleanLine));
+                    });
+                    itemDiv.appendChild(ul);
+                }
             }
-        }
+
+            sectionDiv.appendChild(itemDiv);
+        });
+        fragment.appendChild(sectionDiv);
     }
 
-    function renderPublicationItem(itemDiv, item) {
-        const itemHeader = createHtml('div', 'item-header');
-        itemHeader.appendChild(createHtml('span', 'item-title', item.title || 'Publication Title'));
-        if (item.date) {
-            itemHeader.appendChild(createHtml('span', 'item-date', item.date));
-        }
-        itemDiv.appendChild(itemHeader);
+    // Projects Section
+    if (resumeData.projects && resumeData.projects.length > 0 && !isSectionHidden('projects')) {
+        const sectionDiv = createHtml('div', 'preview-section preview-projects');
+        sectionDiv.appendChild(createHtml('h2', '', 'Projects'));
 
-        let subtitleText = item.venue || 'Publication Venue';
-        if (item.coAuthors) {
-            subtitleText += ` | Co-Authors: ${item.coAuthors}`;
-        }
-        itemDiv.appendChild(createHtml('div', 'item-subtitle', subtitleText));
-
-        if (item.link) {
-            const linkDiv = createHtml('div', 'small');
-            linkDiv.innerHTML = `<a href="${item.link}" target="_blank">${item.link}</a>`;
-            itemDiv.appendChild(linkDiv);
-        }
-
-        if (item.description) {
-            itemDiv.appendChild(createHtml('p', '', item.description));
-        }
-    }
-
-    function renderAccomplishmentItem(itemDiv, item) {
-        const itemHeader = createHtml('div', 'item-header');
-        itemHeader.appendChild(createHtml('span', 'item-title', item.title || 'Accomplishment'));
-        if (item.date) {
-            itemHeader.appendChild(createHtml('span', 'item-date', item.date));
-        }
-        itemDiv.appendChild(itemHeader);
-
-        if (item.description) {
-            itemDiv.appendChild(createHtml('p', '', item.description));
-        }
-    }
-
-    function renderAwardItem(itemDiv, item) {
-        const itemHeader = createHtml('div', 'item-header');
-        let titleText = item.awardName || 'Award Name';
-        if (item.issuingOrganization) {
-            titleText += ` - ${item.issuingOrganization}`;
-        }
-        itemHeader.appendChild(createHtml('span', 'item-title', titleText));
-        if (item.date) {
-            itemHeader.appendChild(createHtml('span', 'item-date', item.date));
-        }
-        itemDiv.appendChild(itemHeader);
-
-        if (item.category) {
-            itemDiv.appendChild(createHtml('div', 'item-subtitle', `Category: ${item.category}`));
-        }
-
-        if (item.description) {
-            itemDiv.appendChild(createHtml('p', '', item.description));
-        }
-    }
-
-    function renderExtracurricularItem(itemDiv, item) {
-        const itemHeader = createHtml('div', 'item-header');
-        let titleText = item.activityName || 'Activity';
-        if (item.role) {
-            titleText += ` - ${item.role}`;
-        }
-        itemHeader.appendChild(createHtml('span', 'item-title', titleText));
-        if (item.date) {
-            itemHeader.appendChild(createHtml('span', 'item-date', item.date));
-        }
-        itemDiv.appendChild(itemHeader);
-
-        if (item.organization) {
-            itemDiv.appendChild(createHtml('div', 'item-subtitle', item.organization));
-        }
-
-        if (item.description) {
-            const descLines = item.description.split('\n').map(line => line.trim()).filter(line => line);
-            if (descLines.length > 0) {
-                const ul = createHtml('ul');
-                descLines.forEach(line => {
-                    const cleanLine = line.replace(/^[\*\-\•]\s*/, '');
-                    ul.appendChild(createHtml('li', '', cleanLine));
-                });
-                itemDiv.appendChild(ul);
+        resumeData.projects.forEach((item, index) => {
+            const itemDiv = createHtml('div', 'preview-item');
+            if (index > 0) itemDiv.classList.add('mt-item');
+            
+            const itemHeader = createHtml('div', 'item-header');
+            itemHeader.appendChild(createHtml('span', 'item-title', item.projectName || 'Project Name'));
+            if (item.date) {
+                itemHeader.appendChild(createHtml('span', 'item-date', item.date));
             }
-        }
-    }
+            itemDiv.appendChild(itemHeader);
 
-    function renderLanguageItem(itemDiv, item) {
-        const itemHeader = createHtml('div', 'item-header');
-        let titleText = item.language || 'Language';
-        if (item.proficiency) {
-            titleText += ` - ${item.proficiency}`;
-        }
-        itemHeader.appendChild(createHtml('span', 'item-title', titleText));
-        itemDiv.appendChild(itemHeader);
-    }
-
-    function renderCertificationItem(itemDiv, item) {
-        const itemHeader = createHtml('div', 'item-header');
-        const titleSpan = createHtml('span', 'item-title');
-        titleSpan.innerHTML = `<strong>${item.certificationName || 'Certification'}</strong>`;
-        if (item.issuingBody) {
-            titleSpan.innerHTML += ` - ${item.issuingBody}`;
-        }
-        itemHeader.appendChild(titleSpan);
-        if (item.date) {
-            itemHeader.appendChild(createHtml('span', 'item-date', item.date));
-        }
-        itemDiv.appendChild(itemHeader);
-    }
-
-    function renderCustomSectionItem(itemDiv, item) {
-        if (item.sectionTitle) {
-            itemDiv.appendChild(createHtml('h3', 'custom-section-title', item.sectionTitle));
-        }
-        
-        if (item.content) {
-            const contentLines = item.content.split('\n').map(line => line.trim()).filter(line => line);
-            if (contentLines.length > 1) {
-                // Multiple lines - treat as bullet points
-                const ul = createHtml('ul');
-                contentLines.forEach(line => {
-                    const cleanLine = line.replace(/^[\*\-\•]\s*/, '');
-                    ul.appendChild(createHtml('li', '', cleanLine));
-                });
-                itemDiv.appendChild(ul);
-            } else {
-                // Single line or paragraph
-                itemDiv.appendChild(createHtml('p', '', item.content));
+            if (item.link) {
+                const linkDiv = createHtml('div', 'item-subtitle');
+                linkDiv.innerHTML = `<a href="${item.link}" target="_blank">${item.link}</a>`;
+                itemDiv.appendChild(linkDiv);
             }
-        }
+
+            if (item.description) {
+                const descLines = item.description.split('\n').map(line => line.trim()).filter(line => line);
+                if (descLines.length > 0) {
+                    const ul = createHtml('ul');
+                    descLines.forEach(line => {
+                        const cleanLine = line.replace(/^[\*\-\•]\s*/, '');
+                        ul.appendChild(createHtml('li', '', cleanLine));
+                    });
+                    itemDiv.appendChild(ul);
+                }
+            }
+
+            sectionDiv.appendChild(itemDiv);
+        });
+        fragment.appendChild(sectionDiv);
     }
 
-    // Render sections in the correct order
-    // 1. Education
-    const eduSection = renderSectionItems('Education', 'education', resumeData.education);
-    if (eduSection) fragment.appendChild(eduSection);
+    // Internships Section
+    if (resumeData.internships && resumeData.internships.length > 0 && !isSectionHidden('internships')) {
+        const sectionDiv = createHtml('div', 'preview-section preview-internships');
+        sectionDiv.appendChild(createHtml('h2', '', 'Internships'));
 
-    // 2. Experience
-    const expSection = renderSectionItems('Work Experience', 'experience', resumeData.experience);
-    if (expSection) fragment.appendChild(expSection);
+        resumeData.internships.forEach((item, index) => {
+            const itemDiv = createHtml('div', 'preview-item');
+            if (index > 0) itemDiv.classList.add('mt-item');
+            
+            const itemHeader = createHtml('div', 'item-header');
+            itemHeader.appendChild(createHtml('span', 'item-title', item.role || 'Internship Role'));
+            if (item.date) {
+                itemHeader.appendChild(createHtml('span', 'item-date', item.date));
+            }
+            itemDiv.appendChild(itemHeader);
 
-    // 3. Projects
-    const projSection = renderSectionItems('Projects', 'projects', resumeData.projects);
-    if (projSection) fragment.appendChild(projSection);
+            const subtitleText = `${item.company || 'Company'} | ${item.location || 'Location'}`;
+            itemDiv.appendChild(createHtml('div', 'item-subtitle', subtitleText));
 
-    // 4. Internships
-    const internSection = renderSectionItems('Internships', 'internships', resumeData.internships);
-    if (internSection) fragment.appendChild(internSection);
+            if (item.description) {
+                const descLines = item.description.split('\n').map(line => line.trim()).filter(line => line);
+                if (descLines.length > 0) {
+                    const ul = createHtml('ul');
+                    descLines.forEach(line => {
+                        const cleanLine = line.replace(/^[\*\-\•]\s*/, '');
+                        ul.appendChild(createHtml('li', '', cleanLine));
+                    });
+                    itemDiv.appendChild(ul);
+                }
+            }
 
-    // 5. Skills
-    const skillsSectionEditor = document.querySelector('.resume-section[data-section="skills"]');
-    const skillsHidden = skillsSectionEditor?.classList.contains('hidden');
-    if (resumeData.skills && !skillsHidden) {
+            sectionDiv.appendChild(itemDiv);
+        });
+        fragment.appendChild(sectionDiv);
+    }
+
+    // Skills Section - FIXED to handle categorized skills properly
+    if (resumeData.skills && !isSectionHidden('skills')) {
         const skillsSection = createHtml('div', 'preview-section preview-skills');
         skillsSection.appendChild(createHtml('h2', '', 'Skills'));
-        const skillsList = resumeData.skills.split(/[\n,]+/).map(s => s.trim()).filter(s => s);
-        skillsSection.appendChild(createHtml('p', '', skillsList.join(', ')));
+        
+        // Check if skills are categorized (contain ** formatting)
+        if (resumeData.skills.includes('**')) {
+            // Skills are categorized, preserve the formatting
+            const skillsDiv = createHtml('div', 'categorized-skills');
+            skillsDiv.innerHTML = resumeData.skills
+                .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') // Convert **text** to <strong>text</strong>
+                .replace(/\n/g, '<br>'); // Convert newlines to <br>
+            skillsSection.appendChild(skillsDiv);
+        } else {
+            // Skills are not categorized, show as comma-separated
+            const skillsList = resumeData.skills.split(/[\n,]+/).map(s => s.trim()).filter(s => s);
+            skillsSection.appendChild(createHtml('p', '', skillsList.join(', ')));
+        }
         fragment.appendChild(skillsSection);
     }
 
-    // 6. Publications
-    const pubSection = renderSectionItems('Publications', 'publications', resumeData.publications);
-    if (pubSection) fragment.appendChild(pubSection);
+    // Publications Section
+    if (resumeData.publications && resumeData.publications.length > 0 && !isSectionHidden('publications')) {
+        const sectionDiv = createHtml('div', 'preview-section preview-publications');
+        sectionDiv.appendChild(createHtml('h2', '', 'Publications'));
 
-    // 7. Certifications
-    const certSection = renderSectionItems('Certifications', 'certifications', resumeData.certifications);
-    if (certSection) fragment.appendChild(certSection);
+        resumeData.publications.forEach((item, index) => {
+            const itemDiv = createHtml('div', 'preview-item');
+            if (index > 0) itemDiv.classList.add('mt-item');
+            
+            const itemHeader = createHtml('div', 'item-header');
+            itemHeader.appendChild(createHtml('span', 'item-title', item.title || 'Publication Title'));
+            if (item.date) {
+                itemHeader.appendChild(createHtml('span', 'item-date', item.date));
+            }
+            itemDiv.appendChild(itemHeader);
 
-    // 8. Accomplishments
-    const accompSection = renderSectionItems('Accomplishments', 'accomplishments', resumeData.accomplishments);
-    if (accompSection) fragment.appendChild(accompSection);
+            let subtitleText = item.venue || 'Publication Venue';
+            if (item.coAuthors) {
+                subtitleText += ` | Co-Authors: ${item.coAuthors}`;
+            }
+            itemDiv.appendChild(createHtml('div', 'item-subtitle', subtitleText));
 
-    // 9. Awards
-    const awardSection = renderSectionItems('Awards', 'awards', resumeData.awards);
-    if (awardSection) fragment.appendChild(awardSection);
+            if (item.link) {
+                const linkDiv = createHtml('div', 'small');
+                linkDiv.innerHTML = `<a href="${item.link}" target="_blank">${item.link}</a>`;
+                itemDiv.appendChild(linkDiv);
+            }
 
-    // 10. Extra Curricular Activities
-    const extraSection = renderSectionItems('Extra Curricular Activities', 'extracurriculars', resumeData.extracurriculars);
-    if (extraSection) fragment.appendChild(extraSection);
+            if (item.description) {
+                itemDiv.appendChild(createHtml('p', '', item.description));
+            }
 
-    // 11. Languages
-    const langSection = renderSectionItems('Languages', 'languages', resumeData.languages);
-    if (langSection) fragment.appendChild(langSection);
+            sectionDiv.appendChild(itemDiv);
+        });
+        fragment.appendChild(sectionDiv);
+    }
 
-    // 12. Custom sections - handle each one individually since they have dynamic titles
-    if (resumeData.customSections && resumeData.customSections.length > 0) {
-        const customSectionEditor = document.querySelector('.resume-section[data-section="customSections"]');
-        const customHidden = customSectionEditor?.classList.contains('hidden');
+    // Certifications Section
+    if (resumeData.certifications && resumeData.certifications.length > 0 && !isSectionHidden('certifications')) {
+        const sectionDiv = createHtml('div', 'preview-section preview-certifications');
+        sectionDiv.appendChild(createHtml('h2', '', 'Certifications'));
+
+        resumeData.certifications.forEach((item, index) => {
+            const itemDiv = createHtml('div', 'preview-item');
+            if (index > 0) itemDiv.classList.add('mt-item');
+            
+            const itemHeader = createHtml('div', 'item-header');
+            const titleSpan = createHtml('span', 'item-title');
+            titleSpan.innerHTML = `<strong>${item.certificationName || 'Certification'}</strong>`;
+            if (item.issuingBody) {
+                titleSpan.innerHTML += ` - ${item.issuingBody}`;
+            }
+            itemHeader.appendChild(titleSpan);
+            if (item.date) {
+                itemHeader.appendChild(createHtml('span', 'item-date', item.date));
+            }
+            itemDiv.appendChild(itemHeader);
+
+            sectionDiv.appendChild(itemDiv);
+        });
+        fragment.appendChild(sectionDiv);
+    }
+
+    // Accomplishments Section - FIXED to show as single section with bullet points
+    if (resumeData.accomplishments && resumeData.accomplishments.length > 0 && !isSectionHidden('accomplishments')) {
+        const accomplishmentsSection = createHtml('div', 'preview-section preview-accomplishments');
+        accomplishmentsSection.appendChild(createHtml('h2', '', 'Accomplishments'));
         
-        if (!customHidden) {
-            resumeData.customSections.forEach((customItem, index) => {
-                if (customItem.sectionTitle && customItem.content) {
-                    const customSectionDiv = createHtml('div', 'preview-section preview-custom-sections');
-                    customSectionDiv.appendChild(createHtml('h2', '', customItem.sectionTitle));
-                    
-                    const itemDiv = createHtml('div', 'preview-item');
-                    if (index > 0) {
-                        itemDiv.classList.add('mt-item');
-                    }
-                    
-                    renderCustomSectionItem(itemDiv, customItem);
-                    customSectionDiv.appendChild(itemDiv);
-                    fragment.appendChild(customSectionDiv);
+        // Create a single container for all accomplishments as bullet points
+        const accomplishmentsContainer = createHtml('div', 'accomplishments-list');
+        resumeData.accomplishments.forEach(accomplishment => {
+            if (accomplishment.description) {
+                const descLines = accomplishment.description.split('\n').map(line => line.trim()).filter(line => line);
+                descLines.forEach(line => {
+                    const cleanLine = line.replace(/^[\*\-\•]\s*/, '');
+                    const bulletItem = createHtml('div', 'accomplishment-bullet');
+                    bulletItem.innerHTML = `• ${cleanLine}`;
+                    accomplishmentsContainer.appendChild(bulletItem);
+                });
+            } else if (accomplishment.title) {
+                const bulletItem = createHtml('div', 'accomplishment-bullet');
+                bulletItem.innerHTML = `• ${accomplishment.title}`;
+                accomplishmentsContainer.appendChild(bulletItem);
+            }
+        });
+        accomplishmentsSection.appendChild(accomplishmentsContainer);
+        fragment.appendChild(accomplishmentsSection);
+    }
+
+    // Awards Section
+    if (resumeData.awards && resumeData.awards.length > 0 && !isSectionHidden('awards')) {
+        const sectionDiv = createHtml('div', 'preview-section preview-awards');
+        sectionDiv.appendChild(createHtml('h2', '', 'Awards'));
+
+        resumeData.awards.forEach((item, index) => {
+            const itemDiv = createHtml('div', 'preview-item');
+            if (index > 0) itemDiv.classList.add('mt-item');
+            
+            const itemHeader = createHtml('div', 'item-header');
+            let titleText = item.awardName || 'Award Name';
+            if (item.issuingOrganization) {
+                titleText += ` - ${item.issuingOrganization}`;
+            }
+            itemHeader.appendChild(createHtml('span', 'item-title', titleText));
+            if (item.date) {
+                itemHeader.appendChild(createHtml('span', 'item-date', item.date));
+            }
+            itemDiv.appendChild(itemHeader);
+
+            if (item.category) {
+                itemDiv.appendChild(createHtml('div', 'item-subtitle', `Category: ${item.category}`));
+            }
+
+            if (item.description) {
+                itemDiv.appendChild(createHtml('p', '', item.description));
+            }
+
+            sectionDiv.appendChild(itemDiv);
+        });
+        fragment.appendChild(sectionDiv);
+    }
+
+    // Extra Curricular Activities Section
+    if (resumeData.extracurriculars && resumeData.extracurriculars.length > 0 && !isSectionHidden('extracurriculars')) {
+        const sectionDiv = createHtml('div', 'preview-section preview-extracurriculars');
+        sectionDiv.appendChild(createHtml('h2', '', 'Extra Curricular Activities'));
+
+        resumeData.extracurriculars.forEach((item, index) => {
+            const itemDiv = createHtml('div', 'preview-item');
+            if (index > 0) itemDiv.classList.add('mt-item');
+            
+            const itemHeader = createHtml('div', 'item-header');
+            let titleText = item.activityName || 'Activity';
+            if (item.role) {
+                titleText += ` - ${item.role}`;
+            }
+            itemHeader.appendChild(createHtml('span', 'item-title', titleText));
+            if (item.date) {
+                itemHeader.appendChild(createHtml('span', 'item-date', item.date));
+            }
+            itemDiv.appendChild(itemHeader);
+
+            if (item.organization) {
+                itemDiv.appendChild(createHtml('div', 'item-subtitle', item.organization));
+            }
+
+            if (item.description) {
+                const descLines = item.description.split('\n').map(line => line.trim()).filter(line => line);
+                if (descLines.length > 0) {
+                    const ul = createHtml('ul');
+                    descLines.forEach(line => {
+                        const cleanLine = line.replace(/^[\*\-\•]\s*/, '');
+                        ul.appendChild(createHtml('li', '', cleanLine));
+                    });
+                    itemDiv.appendChild(ul);
                 }
-            });
-        }
+            }
+
+            sectionDiv.appendChild(itemDiv);
+        });
+        fragment.appendChild(sectionDiv);
+    }
+
+    // Languages Section - FIXED to show as comma-separated list below title (like PDF)
+    if (resumeData.languages && resumeData.languages.length > 0 && !isSectionHidden('languages')) {
+        const langSection = createHtml('div', 'preview-section preview-languages');
+        langSection.appendChild(createHtml('h2', '', 'Languages'));
+        
+        // Create comma-separated list like in PDF
+        const langList = resumeData.languages.map(lang => {
+            let langText = lang.language || 'Language';
+            if (lang.proficiency) {
+                langText += ` (${lang.proficiency})`;
+            }
+            return langText;
+        }).join(', ');
+        
+        langSection.appendChild(createHtml('p', '', langList));
+        fragment.appendChild(langSection);
+    }
+
+    // Custom sections - handle each one individually
+    if (resumeData.customSections && resumeData.customSections.length > 0 && !isSectionHidden('customSections')) {
+        resumeData.customSections.forEach((customItem, index) => {
+            if (customItem.sectionTitle && customItem.content) {
+                const customSectionDiv = createHtml('div', 'preview-section preview-custom-sections');
+                customSectionDiv.appendChild(createHtml('h2', '', customItem.sectionTitle));
+                
+                const itemDiv = createHtml('div', 'preview-item');
+                if (index > 0) {
+                    itemDiv.classList.add('mt-item');
+                }
+                
+                if (customItem.content) {
+                    const contentLines = customItem.content.split('\n').map(line => line.trim()).filter(line => line);
+                    if (contentLines.length > 1) {
+                        // Multiple lines - treat as bullet points
+                        const ul = createHtml('ul');
+                        contentLines.forEach(line => {
+                            const cleanLine = line.replace(/^[\*\-\•]\s*/, '');
+                            ul.appendChild(createHtml('li', '', cleanLine));
+                        });
+                        itemDiv.appendChild(ul);
+                    } else {
+                        // Single line or paragraph
+                        itemDiv.appendChild(createHtml('p', '', customItem.content));
+                    }
+                }
+                
+                customSectionDiv.appendChild(itemDiv);
+                fragment.appendChild(customSectionDiv);
+            }
+        });
     }
 
     // Append the built fragment to the preview area
