@@ -5503,14 +5503,8 @@ function downloadResumePDF() {
 
     // Helper to add a standard section heading with an underline
     const addSectionHeading = (text) => {
-        // Don't add heading if the corresponding section data was deleted (because it was hidden in the editor)
-        const sectionKey = text.toLowerCase().replace(/\s+/g, '');
-        if (!resumeData[sectionKey] && 
-            !['workeexperience', 'education', 'projects', 'internships', 'skills', 'publications', 'certifications', 'accomplishments', 'awards', 'extracurricularactivities', 'languages', 'customsections'].includes(sectionKey)) {
-            console.log(`Skipping hidden section heading: ${text}`);
-            return false; // Indicate that heading was skipped
-        }
-
+        console.log(`Adding section heading: "${text}"`);
+        
         // Add extra section spacing (multiplied by the section spacing factor)
         if (currentY > margin + 10) {
             currentY += 12 * sectionSpacing; // Add section spacing before heading (if not the first section)
@@ -5519,11 +5513,18 @@ function downloadResumePDF() {
         checkAddPage(headingFontSize + 15); // Check space for heading and line
         pdf.setFontSize(headingFontSize);
         pdf.setFont(standardFont, 'bold');
-        pdf.text(text.toUpperCase(), margin, currentY); // Add heading text in uppercase
+        
+        const headingText = text.toUpperCase();
+        pdf.text(headingText, margin, currentY); // Add heading text in uppercase
+        console.log(`Added heading text: "${headingText}" at Y position: ${currentY}`);
+        
         currentY += headingFontSize * 0.6; // Move down slightly for underline
         pdf.setLineWidth(0.5); // Set line thickness
         pdf.line(margin, currentY, pageWidth - margin, currentY); // Draw the underline
+        console.log(`Added underline at Y position: ${currentY}`);
+        
         currentY += 10 * spacingFactor; // Add space after the line with spacing factor
+        console.log(`Section heading complete, new Y position: ${currentY}`);
         return true; // Indicate heading was added
     };
 
@@ -5681,6 +5682,8 @@ function downloadResumePDF() {
     // --- 4. Work Experience Section ---
     if (resumeData.experience && resumeData.experience.length > 0) {
         console.log("Adding Work Experience section to PDF, found", resumeData.experience.length, "experiences");
+        
+        // Make sure we add the section heading
         addSectionHeading('Work Experience');
         
         resumeData.experience.forEach((exp, index) => {
@@ -5749,8 +5752,6 @@ function downloadResumePDF() {
         // Add spacing after the section
         currentY += bodyFontSize * 0.5 * sectionSpacing;
         console.log("Work Experience section completed");
-    } else {
-        console.log("No work experience data found or empty array:", resumeData.experience);
     }
 
     // --- 5. Projects Section ---
