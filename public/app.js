@@ -5859,13 +5859,84 @@ function downloadResumePDF() {
         }
     }
 
-    // --- 7. Skills Section ---
+    // --- 7. Skills Section --- (FIXED VERSION)
     if (resumeData.skills) {
         if (addSectionHeading('Skills')) {
             checkAddPage(bodyFontSize * 3); // Estimate space
-            // Format skills as a comma-separated list
-            const skillsList = resumeData.skills.split(/[\n,]+/).map(s => s.trim()).filter(s => s);
-            currentY = addWrappedText(skillsList.join(', '), margin, currentY, contentWidth);
+            
+            // Check if skills are categorized (contain ** formatting)
+            if (resumeData.skills.includes('**')) {
+                // Skills are categorized, preserve the formatting
+                const skillsText = resumeData.skills.trim();
+                const lines = skillsText.split('\n').map(line => line.trim()).filter(line => line);
+                
+                lines.forEach(line => {
+                    if (line.includes('**')) {
+                        // This line contains categories with bold formatting
+                        const parts = line.split(/(\*\*[^*]+\*\*)/); // Split by **text** pattern
+                        let xPosition = margin;
+                        
+                        parts.forEach(part => {
+                            if (part.trim()) {
+                                if (part.startsWith('**') && part.endsWith('**')) {
+                                    // This is a bold category title
+                                    const boldText = part.replace(/\*\*/g, '');
+                                    checkAddPage(bodyFontSize * 1.2);
+                                    pdf.setFontSize(bodyFontSize);
+                                    pdf.setFont(standardFont, 'bold');
+                                    
+                                    // Check if we need to wrap to next line
+                                    const textWidth = pdf.getTextWidth(boldText);
+                                    if (xPosition + textWidth > pageWidth - margin && xPosition > margin) {
+                                        // Move to next line
+                                        currentY += bodyFontSize * 1.2 * spacingFactor;
+                                        xPosition = margin;
+                                    }
+                                    
+                                    pdf.text(boldText, xPosition, currentY);
+                                    xPosition += textWidth;
+                                } else {
+                                    // This is regular text (skills list)
+                                    pdf.setFont(standardFont, 'normal');
+                                    const skillsInPart = part.split(',').map(s => s.trim()).filter(s => s);
+                                    
+                                    skillsInPart.forEach((skill, index) => {
+                                        const skillText = (index === 0 && xPosition > margin) ? ` ${skill}` : skill;
+                                        const commaText = index < skillsInPart.length - 1 ? ', ' : '';
+                                        const fullText = skillText + commaText;
+                                        
+                                        const textWidth = pdf.getTextWidth(fullText);
+                                        
+                                        // Check if we need to wrap to next line
+                                        if (xPosition + textWidth > pageWidth - margin && xPosition > margin) {
+                                            currentY += bodyFontSize * 1.2 * spacingFactor;
+                                            xPosition = margin;
+                                            // Remove leading space if wrapping
+                                            const wrappedText = skillText.trim() + commaText;
+                                            pdf.text(wrappedText, xPosition, currentY);
+                                            xPosition += pdf.getTextWidth(wrappedText);
+                                        } else {
+                                            pdf.text(fullText, xPosition, currentY);
+                                            xPosition += textWidth;
+                                        }
+                                    });
+                                }
+                            }
+                        });
+                        
+                        // Move to next line after processing the full line
+                        currentY += bodyFontSize * 1.2 * spacingFactor;
+                    } else {
+                        // Regular line without formatting
+                        currentY = addWrappedText(line, margin, currentY, contentWidth);
+                    }
+                });
+            } else {
+                // Skills are not categorized, show as comma-separated list (original behavior)
+                const skillsList = resumeData.skills.split(/[\n,]+/).map(s => s.trim()).filter(s => s);
+                currentY = addWrappedText(skillsList.join(', '), margin, currentY, contentWidth);
+            }
+            
             currentY += bodyFontSize * 0.7 * sectionSpacing; // Add space after skills with section spacing
         }
     }
