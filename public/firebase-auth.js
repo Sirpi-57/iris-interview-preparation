@@ -308,7 +308,7 @@ function getPackageLimit(feature, packageName) {
   const limits = {
       'free': {
           'resumeAnalyses': 1,
-          'mockInterviews': 1,
+          'mockInterviews': 2,
           'pdfDownloads': 5,
           'aiEnhance': 5
       },

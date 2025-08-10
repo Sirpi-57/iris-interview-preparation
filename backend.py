@@ -1477,7 +1477,7 @@ def get_package_limit(package_name, feature_type):
     limits = {
         'free': {
             'resumeAnalyses': 1,
-            'mockInterviews': 1
+            'mockInterviews': 2
         },
         'starter': {
             'resumeAnalyses': 5,
@@ -1735,7 +1735,7 @@ def get_package_limit(package_name, feature_type):
     limits = {
         'free': {
             'resumeAnalyses': 1,
-            'mockInterviews': 1,
+            'mockInterviews': 2,
             'pdfDownloads': 5,
             'aiEnhance': 5
         },
