@@ -436,11 +436,46 @@ def transcribe_audio(audio_file_bytes, filename='audio.webm'):
 def parse_resume_with_claude(resume_text):
     """Parses resume text using the Claude API."""
     if not CLAUDE_API_KEY: raise ValueError("Claude API Key not configured.")
+    
+    # NEW: Detect if this is a law-related resume (India-specific terms)
+    law_keywords = ['law', 'legal', 'advocate', 'lawyer', 'litigation', 'judge', 'magistrate', 'court', 'judicial', 'legal advisor', 'legal counsel', 'law clerk', 'legal assistant', 'high court', 'supreme court', 'district court', 'sessions court', 'family court', 'civil court', 'criminal court', 'bar council', 'llb', 'll.b', 'llm', 'll.m', 'bachelor of law', 'master of law', 'law college', 'law university', 'law school', 'legal studies', 'jurisprudence', 'legal intern', 'legal trainee']
+    
+    is_law_domain = any(keyword.lower() in resume_text.lower() for keyword in law_keywords)
+    
+    # NEW: Domain-specific instructions
+    if is_law_domain:
+        domain_instructions = """
+For legal resumes, pay special attention to:
+- Legal specializations (Criminal Law, Civil Law, Corporate Law, Family Law, Constitutional Law, etc.)
+- Indian legal education (LLB, LLM, BA LLB, BBA LLB from Indian law colleges/universities)
+- Legal internships and clerkships (High Court, Supreme Court, law firms, legal aid societies)
+- Bar Council enrollment and practice certificates
+- Legal research projects, moot court competitions, legal aid work
+- Knowledge of Indian legal framework (IPC, CrPC, CPC, Indian Constitution, etc.)
+- Court appearances, case handling experience, legal drafting skills
+- For "technicalSkills", include legal research tools, case management software, legal databases
+- For "frameworks", include legal procedures, court systems, legal methodologies
+- Extract legal certifications, bar admissions, specialized legal training"""
+        
+        skills_guidance = """For "technicalSkills", include: Legal research methods, Case analysis, Legal drafting, Court procedures, Client counseling, Negotiation skills, Legal databases (Manupatra, SCC Online, etc.), Case management software, Legal writing, Statutory interpretation, etc."""
+        
+        frameworks_guidance = """For "frameworks", include: Indian legal system, Criminal justice system, Civil procedure, Corporate legal framework, Family court procedures, Alternative dispute resolution, Legal ethics framework, etc."""
+    else:
+        domain_instructions = """
+For technical/general resumes, focus on standard professional elements like work experience, technical skills, projects, education, and certifications."""
+        
+        skills_guidance = """For "technicalSkills", include programming languages, tools, software, platforms, and technical competencies."""
+        
+        frameworks_guidance = """For "frameworks", include software frameworks, methodologies, architectural patterns, and technical approaches."""
+
     system_prompt = f"""
 You are an expert resume parser. Analyze this resume text:
 --- START ---
 {resume_text[:30000]}
 --- END ---
+
+{domain_instructions}
+
 Extract the following information and return it as a valid JSON object only (no explanations):
 {{
 "name": "...", "email": "...", "phoneNumber": "...", "location": "...",
@@ -456,10 +491,14 @@ For "yearsOfExperience", follow these steps:
 3. For current positions, calculate up to the present date
 4. Round to the nearest whole number or use ranges like "2-3 years" if appropriate
 5. If it's less than 1 year, use "<1" or "less than 1 year"
-6. If you cannot determine the exact years, infer from job titles (e.g., "Senior" typically requires 5+ years)
-7. If there is no work experience section or only internships/academic projects, set as "fresher" or "0"
+6. If you cannot determine the exact years, infer from job titles (e.g., "Senior" typically requires 5+ years, {"Senior Advocate" typically requires 10+ years" if is_law_domain else ""})
+7. If there is no work experience section or only {"internships/academic projects/moot courts" if is_law_domain else "internships/academic projects"}, set as "fresher" or "0"
 
-Set "hasSummarySection" to true if there is a summary or professional profile paragraph at the beginning of the resume (typically 2-5 lines describing skills and experience). If a field is not found, use null, "", or []. Ensure name, email, phoneNumber are present if found.
+{skills_guidance}
+
+{frameworks_guidance}
+
+Set "hasSummarySection" to true if there is a summary or professional profile paragraph at the beginning of the resume (typically 2-5 lines describing {"legal expertise and experience" if is_law_domain else "skills and experience"}). If a field is not found, use null, "", or []. Ensure name, email, phoneNumber are present if found.
 """
     messages = [{"role": "user", "content": "Parse this resume."}]
     try:
@@ -498,7 +537,14 @@ def match_resume_jd_with_openai(resume_data, job_description):
     # Ensure OPENAI_API_KEY is configured
     if not globals().get("OPENAI_API_KEY"): raise ValueError("OpenAI API Key is not configured.")
 
+    # NEW: Detect if this is a law-related matching (India-specific terms)
     resume_data_str = json.dumps(resume_data, indent=2) if isinstance(resume_data, dict) else str(resume_data)
+    
+    law_keywords = ['law', 'legal', 'advocate', 'lawyer', 'litigation', 'judge', 'magistrate', 'court', 'judicial', 'legal advisor', 'legal counsel', 'law clerk', 'legal assistant', 'high court', 'supreme court', 'district court', 'sessions court', 'family court', 'civil court', 'criminal court']
+    
+    # Check both job description and resume data for law-related content
+    is_law_domain = any(keyword.lower() in job_description.lower() for keyword in law_keywords) or \
+                    any(keyword.lower() in resume_data_str.lower() for keyword in law_keywords)
 
     # Create sections overview for easier reference
     sections_overview = ""
@@ -516,9 +562,45 @@ def match_resume_jd_with_openai(resume_data, job_description):
     if resume_data.get("hasSummarySection") == True:
         sections_overview += "- summary: Present (Detected in introduction paragraph)\n"
 
+    # NEW: Domain-specific analysis instructions
+    if is_law_domain:
+        domain_context = """
+LEGAL DOMAIN CONTEXT: This is an Indian legal position analysis. Focus on:
+- Indian legal qualifications (LLB, LLM, Bar Council enrollment)
+- Indian legal experience (High Court, Supreme Court, District Court experience)
+- Indian legal specializations (Criminal Law, Civil Law, Corporate Law, Family Law, Constitutional Law)
+- Knowledge of Indian legal framework (IPC, BNSS, BNS, CrPC, CPC, Indian Constitution, Evidence Act, Contract Act, etc.)
+- Indian legal skills (Case analysis, Legal drafting, Court appearances, Client counseling in Indian context)
+- Indian legal certifications and continuing legal education
+- Experience with Indian legal procedures and court systems"""
+        
+        skills_focus = """Focus on legal knowledge gaps such as: specific areas of Indian law, court procedures, legal research methods, case law knowledge, statutory interpretation, legal drafting skills, client management, courtroom advocacy, Indian legal technology platforms."""
+        
+        improvement_focus = """For legal resumes, prioritize improvements that highlight:
+- Specific Indian legal expertise and case handling experience
+- Knowledge of relevant Indian statutes and landmark judgments
+- Court appearance experience and advocacy skills
+- Legal research and writing capabilities in Indian legal context
+- Client counseling and case management experience
+- Specialization in relevant areas of Indian law"""
+    else:
+        domain_context = """
+TECHNICAL/GENERAL DOMAIN CONTEXT: This is a standard professional position analysis. Focus on technical skills, work experience, projects, and industry-relevant qualifications."""
+        
+        skills_focus = """Focus on technical or professional skill gaps based on the job requirements such as: programming languages, frameworks, tools, certifications, methodologies, industry experience."""
+        
+        improvement_focus = """For technical/professional resumes, prioritize improvements that highlight:
+- Relevant technical skills and project experience
+- Quantifiable achievements and impact
+- Industry-specific knowledge and certifications
+- Problem-solving capabilities and innovation
+- Leadership and collaboration experience"""
+
     prompt = f"""
 Act as an expert AI resume writer and career coach with 15+ years of experience, specializing in tailoring resumes for competitive roles.
 Your task is to perform a rigorous analysis of the provided resume against the job description and generate SPECIFIC, DETAILED, and ACTIONABLE improvements.
+
+{domain_context}
 
 Job Description:
 --- START JD ---
@@ -541,43 +623,47 @@ JSON Output Structure:
   "matchAnalysis": string (MUST be **at least 4-5 detailed paragraphs**. Discuss specific alignments and mismatches between resume sections and JD requirements. Quantify alignment where possible),
   "keyStrengths": array of objects (MUST contain **at least 5 distinct strengths** from the resume) [
     {{
-      "strength": "<Specific skill, experience, or achievement from resume>",
+      "strength": "<Specific {"legal expertise, case experience, or legal achievement" if is_law_domain else "skill, experience, or achievement"} from resume>",
       "relevance": "<Detailed explanation connecting this strength *directly* to a specific requirement or keyword in the Job Description>",
       "howToEmphasize": "<Concrete suggestion on making this strength more prominent or impactful in the resume>"
     }}
   ],
   "skillGaps": array of objects (MUST identify **at least 3 distinct skill gaps** based on JD qualifications) [
     {{
-      "missingSkill": "<Specific required or preferred skill/experience from JD NOT EVIDENT in the resume>",
+      "missingSkill": "<Specific required or preferred {"legal knowledge/expertise" if is_law_domain else "skill/experience"} from JD NOT EVIDENT in the resume>",
       "importance": "high/medium/low" (Based on JD emphasis),
       "suggestion": "<Actionable advice on how to address this gap>",
-      "alternateSkillToHighlight": "<Identify a related skill the candidate *does* possess that could partially compensate>"
+      "alternateSkillToHighlight": "<Identify a related {"legal skill or experience" if is_law_domain else "skill"} the candidate *does* possess that could partially compensate>"
     }}
   ],
   "jobRequirements": object {{
     "jobTitle": "<Accurately extracted Job Title from JD>",
-    "requiredSkills": ["<List of specific key skills explicitly stated as required in JD>"],
+    "requiredSkills": ["<List of specific key {"legal areas/expertise" if is_law_domain else "skills"} explicitly stated as required in JD>"],
     "experienceLevel": "<Required years/level (e.g., '5+ years', 'Senior Level', 'Entry Level')>",
     "educationNeeded": "<Minimum education requirements mentioned in JD>"
   }},
   "resumeImprovements": array of objects (MUST contain **at least 5 distinct improvements**, with **at least 3 targeting 'workExperience' or 'projects' sections**) [
     {{
       "section": "<Specific resume section (e.g., 'workExperience[0].description', 'projects[1].bulletPoints', 'summary', 'skills')>",
-      "issue": "<Precise problem with the current content (e.g., 'Vague description lacks metrics', 'Bullet point uses weak verb')>",
+      "issue": "<Precise problem with the current content (e.g., 'Vague description lacks {"case details" if is_law_domain else "metrics"}', 'Bullet point uses weak verb')>",
       "recommendation": "<Detailed, specific change needed>",
       "currentContent": "<Exact text snippet from the resume that needs changing>",
       "improvedVersion": "<COMPLETE rewritten version of the content, ready to copy-paste>",
-      "explanation": "<Explain *precisely why* this improvement makes the candidate a stronger fit for this specific job>"
+      "explanation": "<Explain *precisely why* this improvement makes the candidate a stronger fit for this specific {"legal position" if is_law_domain else "job"}>"
     }}
   ]
 }}
+
+{skills_focus}
+
+{improvement_focus}
 
 MANDATORY INSTRUCTIONS:
 1. Every improvement must be SPECIFIC to THIS resume and THIS job description, not generic advice.
 2. For `resumeImprovements.improvedVersion`, provide the FULLY rewritten text, not just instructions or partial edits.
 3. Ensure all recommendations directly align with keywords and requirements from the job description.
-4. Focus on improvements that add quantifiable results, impact, relevant keywords, and stronger alignment with the Job description.
-5. Use strong action verbs and incorporate metrics/quantifiable achievements whenever possible.
+4. Focus on improvements that add {"case details, legal impact, relevant legal keywords" if is_law_domain else "quantifiable results, impact, relevant keywords"}, and stronger alignment with the Job description.
+5. Use strong action verbs and incorporate {"case outcomes/legal impact" if is_law_domain else "metrics/quantifiable achievements"} whenever possible.
 """
 
     try:
@@ -657,6 +743,16 @@ def generate_interview_prep_plan(resume_match_data):
     if not parsed_resume and "resume_data" in resume_match_data: # Fallback if parsedResume isn't top-level
         parsed_resume = resume_match_data["resume_data"]
 
+    # NEW: Detect if this is a law-related prep plan (India-specific terms)
+    job_title = job_requirements.get("jobTitle", "")
+    required_skills = job_requirements.get("requiredSkills", [])
+    current_position = parsed_resume.get("currentPosition", parsed_resume.get("workExperience", [{}])[0].get("jobTitle", ""))
+    
+    law_keywords = ['law', 'legal', 'advocate', 'lawyer', 'litigation', 'judge', 'magistrate', 'court', 'judicial', 'legal advisor', 'legal counsel', 'law clerk', 'legal assistant', 'high court', 'supreme court', 'district court', 'sessions court', 'family court', 'civil court', 'criminal court']
+    is_law_domain = any(keyword.lower() in job_title.lower() for keyword in law_keywords) or \
+                    any(keyword.lower() in ' '.join(required_skills).lower() for keyword in law_keywords) or \
+                    any(keyword.lower() in current_position.lower() for keyword in law_keywords)
+
     try:
         gaps_str = json.dumps(skill_gaps, indent=2) if skill_gaps else "[]"
         requirements_str = json.dumps(job_requirements, indent=2) if job_requirements else "{}"
@@ -673,6 +769,38 @@ def generate_interview_prep_plan(resume_match_data):
         print(f"Warning: Could not serialize data cleanly for prep plan prompt - {json_err}")
         gaps_str, requirements_str, resume_summary_str = str(skill_gaps), str(job_requirements), str(parsed_resume) # Fallback to string
 
+    # NEW: Domain-specific question guidance and concepts structure
+    if is_law_domain:
+        question_guidance = """CRITICAL: This list MUST contain **at least 13 legal knowledge/fundamental questions** directly related to Indian law requirements (from `jobRequirements`) and the candidate's `skillGaps`. Include **only 1-2 behavioral questions**. Focus on:
+        - **Indian Penal Code (IPC)** sections and applications
+        - **Bharatiya Nagarik Suraksha Sanhita (BNSS)** provisions (replacing CrPC)
+        - **Bharatiya Nyaya Sanhita (BNS)** provisions (replacing IPC for new cases)
+        - **Indian Constitution** articles and amendments
+        - **Code of Civil Procedure (CPC)** and criminal procedure knowledge
+        - **Indian Evidence Act** provisions
+        - **Indian Contract Act, 1872**
+        - **Transfer of Property Act, 1882**
+        - **Hindu Marriage Act, 1955** and other Indian personal laws
+        - **Supreme Court and High Court** landmark Indian judgments
+        - Indian legal terminology and statutory interpretations"""
+        
+        concepts_structure = """
+  "conceptsToStudy": {{
+    "fundamentals": [Array of essential Indian legal concepts like basic IPC sections, Constitutional articles, fundamental rights, legal procedures],
+    "advanced": [Array of complex Indian legal topics like advanced constitutional law, complex statutory interpretations, landmark case analyses],
+    "technologies": [Array of Indian legal databases, case management systems, legal research tools used in Indian practice],
+    "methodologies": [Array of Indian legal processes like case preparation methods, court procedures, legal drafting techniques, client counseling approaches]
+  }},"""
+    else:
+        question_guidance = """CRITICAL: This list MUST contain **at least 13 technical/fundamental questions** directly related to the job's required skills (from `jobRequirements`) and the candidate's `skillGaps`. Include **only 1-2 behavioral questions**."""
+        
+        concepts_structure = """
+  "conceptsToStudy": {{
+    "fundamentals": [Array of essential baseline concepts the candidate must be comfortable with],
+    "advanced": [Array of more complex topics that would demonstrate expertise],
+    "technologies": [Array of specific tools, libraries, frameworks mentioned in or related to the JD],
+    "methodologies": [Array of processes, approaches, or methodologies relevant to the role]
+  }},"""
 
     # --- Start of Modified Prompt ---
     system_prompt = f"""
@@ -693,23 +821,17 @@ Your Task: Create a detailed preparation plan structured ONLY as a valid JSON ob
 
 JSON Output Structure:
 {{
-  "focusAreas": [Array of 4-6 specific technical concepts, skills, or behavioral areas MOST critical for success in this interview, derived from JD and gaps],
-  "likelyQuestions": [Array of **exactly 15 to 20** question objects. CRITICAL: This list MUST contain **at least 13 technical/fundamental questions** directly related to the job's required skills (from `jobRequirements`) and the candidate's `skillGaps`. Include **only 1-2 behavioral questions**. For each question, provide tailored guidance.],
-  "conceptsToStudy": {{
-    "fundamentals": [Array of essential baseline concepts the candidate must be comfortable with],
-    "advanced": [Array of more complex topics that would demonstrate expertise],
-    "technologies": [Array of specific tools, libraries, frameworks mentioned in or related to the JD],
-    "methodologies": [Array of processes, approaches, or methodologies relevant to the role]
-  }},
+  "focusAreas": [Array of 4-6 specific {"legal concepts, Indian law areas, or behavioral aspects" if is_law_domain else "technical concepts, skills, or behavioral areas"} MOST critical for success in this interview, derived from JD and gaps],
+  "likelyQuestions": [Array of **exactly 15 to 20** question objects. {question_guidance} For each question, provide tailored guidance.],{concepts_structure}
   "gapStrategies": [Array containing one object for EACH identified skill gap from the input. If no gaps were identified, provide an empty array `[]`.]
 }}
 
 Detailed Structure Definitions:
-- "likelyQuestions": Each object must be `{{"category": "Technical/Behavioral/Situational", "question": "<Specific interview question>", "guidance": "<1-2 sentences of SPECIFIC, actionable advice on how to approach *this* question, referencing candidate's potential experience or gaps>"}}`.
-- "gapStrategies": Each object must be `{{"gap": "<The missingSkill from the input>", "strategy": "<Concrete advice on how to address this gap during the interview (e.g., 'Highlight project X which used related tech Y', 'Discuss relevant coursework Z', 'Acknowledge gap and express eagerness to learn')>", "focus_during_prep": "<Specific topic/skill to study beforehand to mitigate this gap>"}}`.
+- "likelyQuestions": Each object must be `{{"category": "{"Legal Knowledge/Behavioral/Situational" if is_law_domain else "Technical/Behavioral/Situational"}", "question": "<Specific interview question>", "guidance": "<1-2 sentences of SPECIFIC, actionable advice on how to approach *this* question, referencing candidate's potential experience or gaps>"}}`.
+- "gapStrategies": Each object must be `{{"gap": "<The missingSkill from the input>", "strategy": "<Concrete advice on how to address this gap during the interview (e.g., {'Highlight case study X which involved similar legal area Y', 'Discuss relevant law coursework Z', 'Reference internship experience with similar legal procedures' if is_law_domain else 'Highlight project X which used related tech Y', 'Discuss relevant coursework Z', 'Acknowledge gap and express eagerness to learn'})>", "focus_during_prep": "<Specific {'legal topic/statute/case law' if is_law_domain else 'topic/skill'} to study beforehand to mitigate this gap>"}}`.
 
 MANDATORY INSTRUCTIONS:
-1.  **Strict Question Count & Mix:** Generate exactly 15-20 questions total for `likelyQuestions`. At least 13 must be technical/fundamental, max 2 behavioral.
+1.  **Strict Question Count & Mix:** Generate exactly 15-20 questions total for `likelyQuestions`. At least 13 must be {"legal knowledge/fundamental" if is_law_domain else "technical/fundamental"}, max 2 behavioral.
 2.  **JSON Only:** Your response MUST be ONLY the valid JSON object described above. No introductory text, explanations, apologies, or markdown formatting.
 3.  **No Timeline:** **DO NOT INCLUDE** any form of timeline or schedule (e.g., `preparationTimeline`).
 4.  **Relevance:** All content MUST be directly derived from the provided context (Summary, Requirements, Gaps, Analysis).
@@ -826,10 +948,19 @@ def generate_dynamic_timeline_with_openai(session_data, days):
     parsed_resume_input = session_data.get('resume_data', {}) # Assuming resume_data might be top-level input
     parsed_resume = parsed_resume_results if parsed_resume_results else parsed_resume_input
 
+    # NEW: Detect if this is a law-related timeline (India-specific terms)
+    job_title = match_results.get('jobRequirements', {}).get('jobTitle', 'the position')
+    required_skills = match_results.get('jobRequirements', {}).get('requiredSkills', [])
+    current_position = parsed_resume.get('currentPosition', parsed_resume.get('workExperience', [{}])[0].get('jobTitle', ''))
+    
+    law_keywords = ['law', 'legal', 'advocate', 'lawyer', 'litigation', 'judge', 'magistrate', 'court', 'judicial', 'legal advisor', 'legal counsel', 'law clerk', 'legal assistant', 'high court', 'supreme court', 'district court', 'sessions court', 'family court', 'civil court', 'criminal court']
+    is_law_domain = any(keyword.lower() in job_title.lower() for keyword in law_keywords) or \
+                    any(keyword.lower() in ' '.join(required_skills).lower() for keyword in law_keywords) or \
+                    any(keyword.lower() in current_position.lower() for keyword in law_keywords)
+
     focus_areas = prep_plan.get('focusAreas', [])
     concepts_to_study = prep_plan.get('conceptsToStudy', [])
     skill_gaps = match_results.get('skillGaps', []) # Expecting list of objects as defined before
-    job_title = match_results.get('jobRequirements', {}).get('jobTitle', 'the position')
     candidate_name = parsed_resume.get('name', parsed_resume.get('contactInfo', {}).get("name", 'Candidate'))
 
     # Prepare context strings carefully
@@ -861,6 +992,13 @@ def generate_dynamic_timeline_with_openai(session_data, days):
         concepts_str = str(concepts_to_study)
         gaps_str = str(skill_gaps)
 
+    # NEW: Domain-specific task examples and focus areas
+    if is_law_domain:
+        task_examples = """Instead of 'Study X', use 'Review IPC Section 302 vs 304 distinctions', 'Analyze landmark Supreme Court judgment in [Specific Case]', 'Draft STAR answers for 2 likely legal questions about Constitutional Law expertise', 'Research Indian legal procedures for [Specific Court Type]', 'Practice explaining plea bargaining under BNSS', 'Study Transfer of Property Act provisions for property disputes'. Reference Indian legal concepts, statutes, and case law explicitly."""
+        domain_focus = f"Indian legal knowledge for {job_title}"
+    else:
+        task_examples = """Instead of 'Study X', use 'Review [Specific Concept from Concepts list]', 'Implement [Specific Algorithm]', 'Draft STAR answers for 2 likely technical questions about [Specific Skill/Project]', 'Research [Company Name]'s approach to [Relevant Area]', 'Practice explaining [Concept related to a Skill Gap]'. Reference the Concepts/Gaps lists explicitly."""
+        domain_focus = f"technical expertise for {job_title}"
 
     # --- Start of Modified Prompt ---
     prompt = f"""
@@ -871,9 +1009,9 @@ Key Context for Planning:
 * Preparation Duration: {days} days until the interview.
 * Priority Focus Areas:
 {focus_areas_str[:1000]}
-* Specific Concepts/Tools to Master:
+* Specific {"Legal Concepts/Indian Statutes" if is_law_domain else "Concepts/Tools"} to Master:
 {concepts_str[:2000]}
-* Identified Skill Gaps to Address:
+* Identified {"Legal Knowledge" if is_law_domain else "Skill"} Gaps to Address:
 {gaps_str[:1000]}
 
 Instructions: Create a detailed, day-by-day timeline from Day 1 to Day {days}, plus a final "Interview Day" plan.
@@ -882,13 +1020,13 @@ Output ONLY a valid JSON object with the following structure:
   "timeline": [
     {{
       "day": <integer | "Interview Day">,
-      "focus": "<Primary theme or goal for the day (e.g., 'Deep Dive: Core Algorithm Review', 'Behavioral Question Practice & Company Research')>",
+      "focus": "<Primary theme or goal for the day (e.g., {'Deep Dive: IPC Criminal Law Review', 'Constitutional Law & Landmark Cases Practice', 'Legal Drafting & Court Procedure Simulation' if is_law_domain else 'Deep Dive: Core Algorithm Review', 'Behavioral Question Practice & Company Research'})>",
       "schedule": [
         {{
           "time_slot": "<Optional suggested time (e.g., 'Morning', 'Afternoon', '1 hour')>",
-          "task": "<**Highly Specific Task**: Must be actionable. Instead of 'Study X', use 'Review [Specific Concept from Concepts list]', 'Implement [Specific Algorithm]', 'Draft STAR answers for 2 likely technical questions about [Specific Skill/Project]', 'Research [Company Name]'s approach to [Relevant Area]', 'Practice explaining [Concept related to a Skill Gap]'. Reference the Concepts/Gaps lists explicitly.>"
+          "task": "<**Highly Specific Task**: Must be actionable. {task_examples}>"
         }}
-        // Include multiple tasks per day, covering concepts, practice, gaps, research etc.
+        // Include multiple tasks per day, covering {"legal concepts, Indian statutes, case analysis, court procedures, legal drafting" if is_law_domain else "concepts, practice, gaps, research"} etc.
       ],
       "notes": "<Brief strategic advice or reminders for the day>"
     }}
@@ -898,8 +1036,8 @@ Output ONLY a valid JSON object with the following structure:
 }}
 
 CRITICAL REQUIREMENTS:
-1.  **Task Specificity:** Each task in the 'schedule' MUST be concrete and reference specific items from the 'Concepts to Study' or 'Skill Gaps' context provided above. Prioritize fundamental concepts relevant to the job and gaps.
-2.  **Gap Integration:** Explicitly schedule tasks aimed at addressing the identified 'Skill Gaps'.
+1.  **Task Specificity:** Each task in the 'schedule' MUST be concrete and reference specific items from the {'Legal Concepts/Indian Statutes' if is_law_domain else 'Concepts to Study'} or {'Legal Knowledge Gaps' if is_law_domain else 'Skill Gaps'} context provided above. Prioritize {"fundamental Indian legal concepts relevant to the position and legal knowledge gaps" if is_law_domain else "fundamental concepts relevant to the job and gaps"}.
+2.  **Gap Integration:** Explicitly schedule tasks aimed at addressing the identified {'Legal Knowledge Gaps' if is_law_domain else 'Skill Gaps'}.
 3.  **Daily Structure:** Provide entries for every day from 1 to {days}, plus one for "Interview Day".
 4.  **Interview Day Focus:** Tasks for "Interview Day" should focus on light review, mental prep, logistics, and relaxation.
 5.  **JSON Format Only:** The entire output must be a single, valid JSON object. No introductory text, explanations, or markdown. Ensure correct syntax, brackets, commas, and quotes.
@@ -968,11 +1106,11 @@ CRITICAL REQUIREMENTS:
         traceback.print_exc()
         return {"timeline": [], "error": f"Failed to generate timeline due to exception: {str(e)}"}
 
-# REVISED function in backend.py (keeping interview_type parameter)
+# UPDATED function in backend.py (keeping ALL existing functionality + law support)
 def create_mock_interviewer_prompt(resume_data, job_data, interview_type="general"):
     """
     Creates the system prompt for the AI interviewer (IRIS) with refined question structure
-    and GENERALIZED technical question examples (v4 - Domain Agnostic).
+    and GENERALIZED technical question examples (v4 - Domain Agnostic + Law Support).
     """
     job_title = job_data.get("jobRequirements", {}).get("jobTitle", "the position")
     required_skills = job_data.get("jobRequirements", {}).get("requiredSkills", [])
@@ -983,6 +1121,12 @@ def create_mock_interviewer_prompt(resume_data, job_data, interview_type="genera
     candidate_skills = resume_data.get("technicalSkills", [])
     skill_gaps = job_data.get("skillGaps", []) # Get skill gaps from match results
     is_experienced = bool(years_experience and years_experience not in ["0", "fresher", "<1", "less than 1"]) # Simple check for experience
+
+    # NEW: Detect if this is a law-related interview (India-specific terms)
+    law_keywords = ['law', 'legal', 'advocate', 'lawyer', 'litigation', 'judge', 'magistrate', 'court', 'judicial', 'legal advisor', 'legal counsel', 'law clerk', 'legal assistant', 'high court', 'supreme court', 'district court', 'sessions court', 'family court', 'civil court', 'criminal court']
+    is_law_domain = any(keyword.lower() in job_title.lower() for keyword in law_keywords) or \
+                    any(keyword.lower() in ' '.join(required_skills).lower() for keyword in law_keywords) or \
+                    any(keyword.lower() in current_position.lower() for keyword in law_keywords)
 
     # Format data for prompt
     skills_str = ", ".join(required_skills) if required_skills else "as specified in the job description"
@@ -997,6 +1141,97 @@ def create_mock_interviewer_prompt(resume_data, job_data, interview_type="genera
     else:
         technical_focus = interview_type in ["technical", "general"]
         behavioral_focus = interview_type in ["behavioral", "general"]
+
+    # NEW: Domain-specific technical section
+    if is_law_domain:
+        technical_section = """
+3.  **Legal Knowledge Assessment (EXACTLY 2 questions, REQUIRED FOR ALL INTERVIEW TYPES):** 
+    ***Step 1: Analyze the specific legal areas mentioned in the job requirements** ({skills_str}) and create 5 questions based on these exact areas.
+    ***Step 2: Formulate legal knowledge questions with this difficulty mix:**
+    - 1 EASY question: Basic legal definitions, foundational legal concepts, or legal terminology related to the practice area
+    - 3 MEDIUM questions: Core legal principles, statute applications, procedural knowledge, or case law understanding
+    - 1 DIFFICULT question: Complex legal scenarios, comparative analysis of laws, or advanced jurisprudence
+    
+    ***Important:** Your questions MUST focus on pure legal knowledge of the specific areas ({skills_str}) rather than situational application. Questions should directly assess knowledge of:
+    - **Indian Penal Code (IPC)** sections and applications
+    - **Bharatiya Nagarik Suraksha Sanhita (BNSS)** provisions (replacing CrPC)
+    - **Bharatiya Nyaya Sanhita (BNS)** provisions (replacing IPC for new cases)
+    - **Indian Constitution** articles and amendments
+    - **Code of Civil Procedure (CPC)** and **Code of Criminal Procedure** knowledge
+    - **Indian Evidence Act** provisions
+    - **Indian Contract Act, 1872**
+    - **Transfer of Property Act, 1882**
+    - **Hindu Marriage Act, 1955** and other personal laws
+    - **Supreme Court and High Court** landmark judgments
+    - **Legal definitions and terminology** as per Indian law
+    - **Statutory interpretations** under Indian legal framework
+    
+    Examples of appropriate Indian legal knowledge questions:
+    - "Which section of the IPC deals with criminal intimidation and how is it applied in Indian courts?"
+    - "What is the difference between Section 302 and Section 304 of the IPC in the context of Indian criminal law?"
+    - "Under BNSS, what are the provisions for plea bargaining and how do they differ from the old CrPC?"
+    - "Explain the significance of Article 21 of the Indian Constitution in criminal jurisprudence"
+    - "What is the procedure for filing a suit under Order VII of CPC?"
+    - "How does the Indian Evidence Act define 'fact in issue' and 'relevant fact'?"
+    
+    Base each question directly on one of the legal areas in ({skills_str}), tailoring to the exact legal specialization. The questions should test knowledge that would be expected of any qualified legal professional in this exact role ({job_title}).
+        """
+        
+        advanced_section = """
+4.  **Case Analysis & Legal Problem-Solving (1 question, REQUIRED FOR ALL INTERVIEW TYPES):**
+    * Ask 1-2 questions that require applying legal knowledge to complex scenarios or cases relevant to the specific legal role ({job_title}).
+    * The questions should:
+      - Present realistic legal scenarios that might be encountered in this specific role
+      - Require legal reasoning and case analysis
+      - Test the ability to identify legal issues and apply appropriate laws
+      - Be appropriate to the candidate's experience level
+    
+    Examples: 
+    - "A client approaches you claiming harassment by their neighbor under Indian law. Walk me through your legal analysis and the IPC sections you'd consider."
+    - "In a case involving rash driving causing death under Indian criminal law, which IPC/BNS sections would apply and how would you build your argument in an Indian court?"
+    - "How would you handle a property dispute case under the Transfer of Property Act, 1882 in an Indian district court?"
+    - "A matrimonial dispute arises under the Hindu Marriage Act. What would be your approach and which Indian family court procedures would you follow?"
+        """
+        
+        behavioral_section = """
+6.  **Legal Behavioral Assessment (EXACTLY 2 questions, REQUIRED FOR ALL INTERVIEW TYPES):**
+    * You MUST ask 2 behavioral questions, including:
+      - ONE legal situational question relevant to Indian legal practice. Frame it as "Describe a situation where you had to [legal scenario, e.g., 'handle an ethical dilemma with a client under the Bar Council of India rules', 'manage a complex caseload in Indian courts under tight deadlines', 'deal with opposing counsel in a difficult negotiation in Indian legal context', 'present a case before an Indian judge or magistrate']? How did you approach it and what was the outcome?" (STAR method implicitly encouraged).
+      - ONE question about legal strengths OR professional development, requesting a specific example (e.g., "What would you consider your greatest strength as a legal professional, and can you give an example of when it benefited a case or client?" or "Tell me about a time you had to quickly learn a new area of law or legal procedure. How did you approach it?") OR ONE forward-looking question like "Where do you see yourself in your legal career in the next 5 years?"
+    * DO NOT SKIP these questions regardless of the interview type.
+        """
+    else:
+        # Use the existing technical sections for non-law domains
+        technical_section = """
+3.  **Fundamental Technical Knowledge (EXACTLY 2 questions, REQUIRED FOR ALL INTERVIEW TYPES):** 
+    ***Step 1: Analyze the specific skills listed in the job requirements** ({skills_str}) and create 5 questions based on these exact skills.
+    ***Step 2: Formulate fundamental technical questions with this difficulty mix:**
+    - 1 EASY question: Basic definitions, foundational concepts, or terminology related to a core skill
+    - 3 MEDIUM questions: Core technical principles, common usage patterns, or standard implementations
+    - 1 DIFFICULT question: Advanced concepts, trade-offs, optimizations, or deeper understanding
+    
+    ***Important:** Your questions MUST focus on pure technical fundamentals of the specific skills ({skills_str}) rather than situational application. Questions should directly assess knowledge of definitions, concepts, methods, functions, tools, techniques, syntax, features, or comparative understanding relevant to these precise skills.
+    
+    Base each question directly on one of the skills in ({skills_str}), tailoring to the exact field/domain. The questions should test knowledge that would be expected of any qualified professional in this exact role ({job_title}).
+        """
+        
+        advanced_section = """
+4.  **Advanced Application & Problem-Solving (1 question, REQUIRED FOR ALL INTERVIEW TYPES):**
+    * Ask 1-2 questions that require applying knowledge to complex scenarios or problems relevant to the specific role ({job_title}).
+    * The questions should:
+      - Present realistic scenarios that might be encountered in this specific role
+      - Require analytical thinking and decision-making
+      - Test the ability to balance multiple factors or trade-offs
+      - Be appropriate to the candidate's experience level
+        """
+        
+        behavioral_section = """
+6.  **Behavioral Assessment (EXACTLY 2 questions, REQUIRED FOR ALL INTERVIEW TYPES):**
+    * You MUST ask 2 behavioral questions, including:
+      - ONE situational question relevant to the job description. Frame it as "Describe a situation where you had to [scenario relevant to JD, e.g., 'manage conflicting priorities', 'deal with a difficult stakeholder', 'adapt to unexpected changes', 'learn a new complex skill quickly']? How did you approach it and what was the outcome?" (STAR method implicitly encouraged).
+      - ONE question about strengths OR weaknesses, requesting a specific example (e.g., "What would you consider your greatest professional strength, and can you give an example of when it was beneficial?" or "Tell me about a time you identified a weakness in your skillset or approach and what steps you took to improve.") OR ONE forward-looking question like "Where do you see yourself professionally in the next 5 years?"
+    * DO NOT SKIP these questions regardless of the interview type.
+        """
 
     # --- Start of Modified System Prompt ---
     system_prompt = f"""
@@ -1026,35 +1261,16 @@ You are IRIS, an AI Interviewer. Your ONLY role is to conduct a realistic, struc
     * **(If Experienced):** Ask about a relevant previous role OR achievement. Then ask about ONE significant project (contribution OR challenge OR outcome), focusing questions based on '{interview_type}'.
     * **(If Inexperienced):** Ask about ONE significant academic or personal project (motivation OR role OR technique OR challenge OR learning), focusing questions based on '{interview_type}'. Ask one follow-up about a specific aspect if needed.
 
-3.  **Fundamental Technical Knowledge (EXACTLY 2 questions, REQUIRED FOR ALL INTERVIEW TYPES):** 
-    ***Step 1: Analyze the specific skills listed in the job requirements** ({skills_str}) and create 5 questions based on these exact skills.
-    ***Step 2: Formulate fundamental technical questions with this difficulty mix:**
-    - 1 EASY question: Basic definitions, foundational concepts, or terminology related to a core skill
-    - 3 MEDIUM questions: Core technical principles, common usage patterns, or standard implementations
-    - 1 DIFFICULT question: Advanced concepts, trade-offs, optimizations, or deeper understanding
-    
-    ***Important:** Your questions MUST focus on pure technical fundamentals of the specific skills ({skills_str}) rather than situational application. Questions should directly assess knowledge of definitions, concepts, methods, functions, tools, techniques, syntax, features, or comparative understanding relevant to these precise skills.
-    
-    Base each question directly on one of the skills in ({skills_str}), tailoring to the exact field/domain. The questions should test knowledge that would be expected of any qualified professional in this exact role ({job_title}).
+{technical_section}
 
-4.  **Advanced Application & Problem-Solving (1 question, REQUIRED FOR ALL INTERVIEW TYPES):**
-    * Ask 1-2 questions that require applying knowledge to complex scenarios or problems relevant to the specific role ({job_title}).
-    * The questions should:
-      - Present realistic scenarios that might be encountered in this specific role
-      - Require analytical thinking and decision-making
-      - Test the ability to balance multiple factors or trade-offs
-      - Be appropriate to the candidate's experience level
+{advanced_section}
 
 5.  **Skill Gap Exploration (1 question, REQUIRED):**
     * If a relevant skill gap ({skill_gaps_str}) exists, politely ask ONE question related to it (e.g., "The role involves [Gap Skill]. Can you share your familiarity or experience with it?").
     * If the candidate clearly states they lack the skill or knowledge, acknowledge neutrally ('Okay, thank you for letting me know.') and move on.
     * If their answer is vague or suggests superficial knowledge, you *may* ask ONE follow-up question to probe deeper (e.g., 'Could you give an example of how you've used a similar skill or technology?' or 'How would you approach learning [Gap Skill] for this role?'). Limit this phase to max 1 question total.
 
-6.  **Behavioral Assessment (EXACTLY 1 question, REQUIRED FOR ALL INTERVIEW TYPES):**
-    * You MUST ask 2 behavioral questions, including:
-      - ONE situational question relevant to the job description. Frame it as "Describe a situation where you had to [scenario relevant to JD, e.g., 'manage conflicting priorities', 'deal with a difficult stakeholder', 'adapt to unexpected changes', 'learn a new complex skill quickly']? How did you approach it and what was the outcome?" (STAR method implicitly encouraged).
-      - ONE question about strengths OR weaknesses, requesting a specific example (e.g., "What would you consider your greatest professional strength, and can you give an example of when it was beneficial?" or "Tell me about a time you identified a weakness in your skillset or approach and what steps you took to improve.") OR ONE forward-looking question like "Where do you see yourself professionally in the next 5 years?"
-    * DO NOT SKIP these questions regardless of the interview type.
+{behavioral_section}
 
 7.  **HR / Logistics (1 question, REQUIRED):**
     * **(If JD mentions relocation):** Ask ONE question: "The job description mentions potential relocation. Is that something you're open to discussing?"
@@ -1072,7 +1288,7 @@ You are IRIS, an AI Interviewer. Your ONLY role is to conduct a realistic, struc
 **CRITICAL REQUIREMENTS:**
 1. You MUST ask a MINIMUM of 8 questions total before closing.
 2. For 'general' interviews, you MUST include ALL question types as specified above.
-3. The 5 fundamental technical questions MUST be directly based on the specific skills ({skills_str}) mentioned for the role.
+3. The {"5 legal knowledge questions" if is_law_domain else "5 fundamental technical questions"} MUST be directly based on the specific {"legal areas" if is_law_domain else "skills"} ({skills_str}) mentioned for the role.
 4. Tailor all questions to the exact domain, field, and requirements of the role ({job_title}).
 5. Ask exactly ONE question per turn, maintain strong structure, and follow the interview flow in order.
 6. Adapt question difficulty and complexity based on the candidate's experience level.
