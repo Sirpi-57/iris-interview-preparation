@@ -436,46 +436,11 @@ def transcribe_audio(audio_file_bytes, filename='audio.webm'):
 def parse_resume_with_claude(resume_text):
     """Parses resume text using the Claude API."""
     if not CLAUDE_API_KEY: raise ValueError("Claude API Key not configured.")
-    
-    # NEW: Detect if this is a law-related resume (India-specific terms)
-    law_keywords = ['law', 'legal', 'advocate', 'lawyer', 'litigation', 'judge', 'magistrate', 'court', 'judicial', 'legal advisor', 'legal counsel', 'law clerk', 'legal assistant', 'high court', 'supreme court', 'district court', 'sessions court', 'family court', 'civil court', 'criminal court', 'bar council', 'llb', 'll.b', 'llm', 'll.m', 'bachelor of law', 'master of law', 'law college', 'law university', 'law school', 'legal studies', 'jurisprudence', 'legal intern', 'legal trainee']
-    
-    is_law_domain = any(keyword.lower() in resume_text.lower() for keyword in law_keywords)
-    
-    # NEW: Domain-specific instructions
-    if is_law_domain:
-        domain_instructions = """
-For legal resumes, pay special attention to:
-- Legal specializations (Criminal Law, Civil Law, Corporate Law, Family Law, Constitutional Law, etc.)
-- Indian legal education (LLB, LLM, BA LLB, BBA LLB from Indian law colleges/universities)
-- Legal internships and clerkships (High Court, Supreme Court, law firms, legal aid societies)
-- Bar Council enrollment and practice certificates
-- Legal research projects, moot court competitions, legal aid work
-- Knowledge of Indian legal framework (IPC, CrPC, CPC, Indian Constitution, etc.)
-- Court appearances, case handling experience, legal drafting skills
-- For "technicalSkills", include legal research tools, case management software, legal databases
-- For "frameworks", include legal procedures, court systems, legal methodologies
-- Extract legal certifications, bar admissions, specialized legal training"""
-        
-        skills_guidance = """For "technicalSkills", include: Legal research methods, Case analysis, Legal drafting, Court procedures, Client counseling, Negotiation skills, Legal databases (Manupatra, SCC Online, etc.), Case management software, Legal writing, Statutory interpretation, etc."""
-        
-        frameworks_guidance = """For "frameworks", include: Indian legal system, Criminal justice system, Civil procedure, Corporate legal framework, Family court procedures, Alternative dispute resolution, Legal ethics framework, etc."""
-    else:
-        domain_instructions = """
-For technical/general resumes, focus on standard professional elements like work experience, technical skills, projects, education, and certifications."""
-        
-        skills_guidance = """For "technicalSkills", include programming languages, tools, software, platforms, and technical competencies."""
-        
-        frameworks_guidance = """For "frameworks", include software frameworks, methodologies, architectural patterns, and technical approaches."""
-
     system_prompt = f"""
 You are an expert resume parser. Analyze this resume text:
 --- START ---
 {resume_text[:30000]}
 --- END ---
-
-{domain_instructions}
-
 Extract the following information and return it as a valid JSON object only (no explanations):
 {{
 "name": "...", "email": "...", "phoneNumber": "...", "location": "...",
@@ -491,14 +456,10 @@ For "yearsOfExperience", follow these steps:
 3. For current positions, calculate up to the present date
 4. Round to the nearest whole number or use ranges like "2-3 years" if appropriate
 5. If it's less than 1 year, use "<1" or "less than 1 year"
-6. If you cannot determine the exact years, infer from job titles (e.g., "Senior" typically requires 5+ years, {"Senior Advocate" typically requires 10+ years" if is_law_domain else ""})
-7. If there is no work experience section or only {"internships/academic projects/moot courts" if is_law_domain else "internships/academic projects"}, set as "fresher" or "0"
+6. If you cannot determine the exact years, infer from job titles (e.g., "Senior" typically requires 5+ years)
+7. If there is no work experience section or only internships/academic projects, set as "fresher" or "0"
 
-{skills_guidance}
-
-{frameworks_guidance}
-
-Set "hasSummarySection" to true if there is a summary or professional profile paragraph at the beginning of the resume (typically 2-5 lines describing {"legal expertise and experience" if is_law_domain else "skills and experience"}). If a field is not found, use null, "", or []. Ensure name, email, phoneNumber are present if found.
+Set "hasSummarySection" to true if there is a summary or professional profile paragraph at the beginning of the resume (typically 2-5 lines describing skills and experience). If a field is not found, use null, "", or []. Ensure name, email, phoneNumber are present if found.
 """
     messages = [{"role": "user", "content": "Parse this resume."}]
     try:
@@ -537,14 +498,7 @@ def match_resume_jd_with_openai(resume_data, job_description):
     # Ensure OPENAI_API_KEY is configured
     if not globals().get("OPENAI_API_KEY"): raise ValueError("OpenAI API Key is not configured.")
 
-    # NEW: Detect if this is a law-related matching (India-specific terms)
     resume_data_str = json.dumps(resume_data, indent=2) if isinstance(resume_data, dict) else str(resume_data)
-    
-    law_keywords = ['law', 'legal', 'advocate', 'lawyer', 'litigation', 'judge', 'magistrate', 'court', 'judicial', 'legal advisor', 'legal counsel', 'law clerk', 'legal assistant', 'high court', 'supreme court', 'district court', 'sessions court', 'family court', 'civil court', 'criminal court']
-    
-    # Check both job description and resume data for law-related content
-    is_law_domain = any(keyword.lower() in job_description.lower() for keyword in law_keywords) or \
-                    any(keyword.lower() in resume_data_str.lower() for keyword in law_keywords)
 
     # Create sections overview for easier reference
     sections_overview = ""
@@ -562,45 +516,9 @@ def match_resume_jd_with_openai(resume_data, job_description):
     if resume_data.get("hasSummarySection") == True:
         sections_overview += "- summary: Present (Detected in introduction paragraph)\n"
 
-    # NEW: Domain-specific analysis instructions
-    if is_law_domain:
-        domain_context = """
-LEGAL DOMAIN CONTEXT: This is an Indian legal position analysis. Focus on:
-- Indian legal qualifications (LLB, LLM, Bar Council enrollment)
-- Indian legal experience (High Court, Supreme Court, District Court experience)
-- Indian legal specializations (Criminal Law, Civil Law, Corporate Law, Family Law, Constitutional Law)
-- Knowledge of Indian legal framework (IPC, BNSS, BNS, CrPC, CPC, Indian Constitution, Evidence Act, Contract Act, etc.)
-- Indian legal skills (Case analysis, Legal drafting, Court appearances, Client counseling in Indian context)
-- Indian legal certifications and continuing legal education
-- Experience with Indian legal procedures and court systems"""
-        
-        skills_focus = """Focus on legal knowledge gaps such as: specific areas of Indian law, court procedures, legal research methods, case law knowledge, statutory interpretation, legal drafting skills, client management, courtroom advocacy, Indian legal technology platforms."""
-        
-        improvement_focus = """For legal resumes, prioritize improvements that highlight:
-- Specific Indian legal expertise and case handling experience
-- Knowledge of relevant Indian statutes and landmark judgments
-- Court appearance experience and advocacy skills
-- Legal research and writing capabilities in Indian legal context
-- Client counseling and case management experience
-- Specialization in relevant areas of Indian law"""
-    else:
-        domain_context = """
-TECHNICAL/GENERAL DOMAIN CONTEXT: This is a standard professional position analysis. Focus on technical skills, work experience, projects, and industry-relevant qualifications."""
-        
-        skills_focus = """Focus on technical or professional skill gaps based on the job requirements such as: programming languages, frameworks, tools, certifications, methodologies, industry experience."""
-        
-        improvement_focus = """For technical/professional resumes, prioritize improvements that highlight:
-- Relevant technical skills and project experience
-- Quantifiable achievements and impact
-- Industry-specific knowledge and certifications
-- Problem-solving capabilities and innovation
-- Leadership and collaboration experience"""
-
     prompt = f"""
 Act as an expert AI resume writer and career coach with 15+ years of experience, specializing in tailoring resumes for competitive roles.
 Your task is to perform a rigorous analysis of the provided resume against the job description and generate SPECIFIC, DETAILED, and ACTIONABLE improvements.
-
-{domain_context}
 
 Job Description:
 --- START JD ---
@@ -623,47 +541,43 @@ JSON Output Structure:
   "matchAnalysis": string (MUST be **at least 4-5 detailed paragraphs**. Discuss specific alignments and mismatches between resume sections and JD requirements. Quantify alignment where possible),
   "keyStrengths": array of objects (MUST contain **at least 5 distinct strengths** from the resume) [
     {{
-      "strength": "<Specific {"legal expertise, case experience, or legal achievement" if is_law_domain else "skill, experience, or achievement"} from resume>",
+      "strength": "<Specific skill, experience, or achievement from resume>",
       "relevance": "<Detailed explanation connecting this strength *directly* to a specific requirement or keyword in the Job Description>",
       "howToEmphasize": "<Concrete suggestion on making this strength more prominent or impactful in the resume>"
     }}
   ],
   "skillGaps": array of objects (MUST identify **at least 3 distinct skill gaps** based on JD qualifications) [
     {{
-      "missingSkill": "<Specific required or preferred {"legal knowledge/expertise" if is_law_domain else "skill/experience"} from JD NOT EVIDENT in the resume>",
+      "missingSkill": "<Specific required or preferred skill/experience from JD NOT EVIDENT in the resume>",
       "importance": "high/medium/low" (Based on JD emphasis),
       "suggestion": "<Actionable advice on how to address this gap>",
-      "alternateSkillToHighlight": "<Identify a related {"legal skill or experience" if is_law_domain else "skill"} the candidate *does* possess that could partially compensate>"
+      "alternateSkillToHighlight": "<Identify a related skill the candidate *does* possess that could partially compensate>"
     }}
   ],
   "jobRequirements": object {{
     "jobTitle": "<Accurately extracted Job Title from JD>",
-    "requiredSkills": ["<List of specific key {"legal areas/expertise" if is_law_domain else "skills"} explicitly stated as required in JD>"],
+    "requiredSkills": ["<List of specific key skills explicitly stated as required in JD>"],
     "experienceLevel": "<Required years/level (e.g., '5+ years', 'Senior Level', 'Entry Level')>",
     "educationNeeded": "<Minimum education requirements mentioned in JD>"
   }},
   "resumeImprovements": array of objects (MUST contain **at least 5 distinct improvements**, with **at least 3 targeting 'workExperience' or 'projects' sections**) [
     {{
       "section": "<Specific resume section (e.g., 'workExperience[0].description', 'projects[1].bulletPoints', 'summary', 'skills')>",
-      "issue": "<Precise problem with the current content (e.g., 'Vague description lacks {"case details" if is_law_domain else "metrics"}', 'Bullet point uses weak verb')>",
+      "issue": "<Precise problem with the current content (e.g., 'Vague description lacks metrics', 'Bullet point uses weak verb')>",
       "recommendation": "<Detailed, specific change needed>",
       "currentContent": "<Exact text snippet from the resume that needs changing>",
       "improvedVersion": "<COMPLETE rewritten version of the content, ready to copy-paste>",
-      "explanation": "<Explain *precisely why* this improvement makes the candidate a stronger fit for this specific {"legal position" if is_law_domain else "job"}>"
+      "explanation": "<Explain *precisely why* this improvement makes the candidate a stronger fit for this specific job>"
     }}
   ]
 }}
-
-{skills_focus}
-
-{improvement_focus}
 
 MANDATORY INSTRUCTIONS:
 1. Every improvement must be SPECIFIC to THIS resume and THIS job description, not generic advice.
 2. For `resumeImprovements.improvedVersion`, provide the FULLY rewritten text, not just instructions or partial edits.
 3. Ensure all recommendations directly align with keywords and requirements from the job description.
-4. Focus on improvements that add {"case details, legal impact, relevant legal keywords" if is_law_domain else "quantifiable results, impact, relevant keywords"}, and stronger alignment with the Job description.
-5. Use strong action verbs and incorporate {"case outcomes/legal impact" if is_law_domain else "metrics/quantifiable achievements"} whenever possible.
+4. Focus on improvements that add quantifiable results, impact, relevant keywords, and stronger alignment with the Job description.
+5. Use strong action verbs and incorporate metrics/quantifiable achievements whenever possible.
 """
 
     try:
